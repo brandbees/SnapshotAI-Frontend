@@ -124,6 +124,7 @@ export function mapSite(raw: RawSite): Site {
   return {
     id: raw.id,
     agency_id: raw.agency_id,
+    client_id: raw.client_id ?? null,
     name: raw.name || raw.url,
     url: raw.url,
     site_token: raw.site_token,

@@ -128,10 +128,10 @@ function Spotlight1() {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-100 text-sky-700 text-xs font-semibold mb-5">
               White-label reports
             </span>
-            <h2 className="text-3xl font-black text-gray-900 mb-4 leading-tight">
+            <h2 className="text-4xl font-black text-gray-900 mb-5 leading-tight">
               Deliver reports your clients will actually read — with your brand on every page.
             </h2>
-            <p className="text-gray-500 text-base leading-relaxed mb-6">
+            <p className="text-gray-500 text-lg leading-relaxed mb-6">
               Auto-generated PDF reports look like they came from a premium in-house team. Add your logo, brand colors, and custom domain. Clients see your agency — not ours.
             </p>
             <ul className="space-y-3 mb-8">
@@ -143,7 +143,7 @@ function Spotlight1() {
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5">
                   <CheckCircle size={16} className="text-sky-500 shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600">{f}</span>
+                  <span className="text-[15px] text-gray-600">{f}</span>
                 </li>
               ))}
             </ul>
@@ -200,10 +200,10 @@ function Spotlight2() {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-100 text-red-600 text-xs font-semibold mb-5">
               Proactive monitoring
             </span>
-            <h2 className="text-3xl font-black text-gray-900 mb-4 leading-tight">
+            <h2 className="text-4xl font-black text-gray-900 mb-5 leading-tight">
               Know about issues before your clients ever notice them.
             </h2>
-            <p className="text-gray-500 text-base leading-relaxed mb-6">
+            <p className="text-gray-500 text-lg leading-relaxed mb-6">
               Get instant alerts when a score drops, malware is detected, or a plugin has a vulnerability. You stay one step ahead — every single time.
             </p>
             <ul className="space-y-3 mb-8">
@@ -215,7 +215,7 @@ function Spotlight2() {
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5">
                   <CheckCircle size={16} className="text-sky-500 shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600">{f}</span>
+                  <span className="text-[15px] text-gray-600">{f}</span>
                 </li>
               ))}
             </ul>

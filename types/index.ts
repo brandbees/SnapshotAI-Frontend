@@ -15,6 +15,7 @@ export interface Agency {
 export interface Site {
   id: string;
   agency_id: string;
+  client_id?: string | null;
   name: string;
   url: string;
   site_token: string;
@@ -91,9 +92,9 @@ export interface Client {
   id: string;
   agency_id: string;
   name: string;
-  email: string;
-  notes?: string;
-  site_ids: string[];
+  email?: string;
+  company?: string;
+  site_count?: number;
   created_at: string;
 }
 

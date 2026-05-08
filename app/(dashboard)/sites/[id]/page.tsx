@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, RefreshCw, Settings, ExternalLink, Wifi } from "lucide-react";
+import { ArrowLeft, RefreshCw, Settings, ExternalLink, Wifi, Trash2 } from "lucide-react";
 import { useSite } from "@/hooks/useSite";
 import { useAuditStatus } from "@/hooks/useAuditStatus";
 import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
-import { UptimeBadge } from "@/components/dashboard/UptimeBadge";
-import { MalwareBadge } from "@/components/dashboard/MalwareBadge";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { AuditHistoryTable } from "@/components/dashboard/AuditHistoryTable";
 import { PluginStatusPanel } from "@/components/sites/PluginStatusPanel";
@@ -66,6 +64,8 @@ export default function SiteDetailPage() {
   const { site, loading, error, refetch } = useSite(id);
   const [pendingAuditId, setPendingAuditId] = useState<string | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const { done: auditDone } = useAuditStatus(pendingAuditId);
 
   // When audit finishes, refresh site data
@@ -83,6 +83,18 @@ export default function SiteDetailPage() {
       // silent
     } finally {
       setAuditLoading(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteConfirm) { setDeleteConfirm(true); return; }
+    setDeleteLoading(true);
+    try {
+      await api.delete(`/sites/${id}`);
+      router.replace("/sites");
+    } catch {
+      setDeleteLoading(false);
+      setDeleteConfirm(false);
     }
   }
 
@@ -133,6 +145,21 @@ export default function SiteDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDelete}
+              loading={deleteLoading}
+              className={deleteConfirm ? "border-red-300 text-red-600 hover:bg-red-50" : ""}
+            >
+              <Trash2 size={13} />
+              {deleteConfirm ? "Confirm delete?" : "Delete"}
+            </Button>
+            {deleteConfirm && (
+              <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>
+                Cancel
+              </Button>
+            )}
             <Button variant="secondary" size="sm">
               <Settings size={13} />
               Edit Settings

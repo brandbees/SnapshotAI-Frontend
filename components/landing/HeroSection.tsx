@@ -16,32 +16,32 @@ function MockDashboard() {
   return (
     <div className="relative">
       {/* Main card */}
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-5 relative z-10">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-7 relative z-10">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
               abc.com
             </p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">Audit Report</p>
+            <p className="text-lg font-bold text-gray-900 mt-0.5">Audit Report</p>
           </div>
-          <span className="px-2.5 py-1 text-[11px] font-bold bg-green-50 text-green-600 rounded-full border border-green-200 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          <span className="px-3 py-1.5 text-xs font-bold bg-green-50 text-green-600 rounded-full border border-green-200 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500" />
             Clean
           </span>
         </div>
 
-        <div className="flex items-center gap-4 mb-5">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center border border-green-200 shrink-0">
-            <span className="text-3xl font-black text-green-600">87</span>
+        <div className="flex items-center gap-5 mb-7">
+          <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center border border-green-200 shrink-0">
+            <span className="text-5xl font-black text-green-600">87</span>
           </div>
-          <div className="flex-1 space-y-2.5">
+          <div className="flex-1 space-y-3.5">
             {bars.map(({ label, score, color }) => (
-              <div key={label} className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-400 w-16 shrink-0">{label}</span>
-                <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div key={label} className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 w-20 shrink-0">{label}</span>
+                <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${score}%`, background: color }} />
                 </div>
-                <span className="text-[10px] font-bold w-5 text-right" style={{ color }}>
+                <span className="text-xs font-bold w-6 text-right" style={{ color }}>
                   {score}
                 </span>
               </div>
@@ -49,13 +49,13 @@ function MockDashboard() {
           </div>
         </div>
 
-        <div className="border-t border-gray-50 pt-4">
-          <p className="text-[10px] text-gray-400 mb-2">Score trend — Last 7 audits</p>
-          <div className="flex items-end gap-1 h-10">
+        <div className="border-t border-gray-50 pt-5">
+          <p className="text-xs text-gray-400 mb-3">Score trend — Last 7 audits</p>
+          <div className="flex items-end gap-1.5 h-16">
             {[55, 62, 59, 71, 74, 80, 87].map((h, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-t-sm"
+                className="flex-1 rounded-t"
                 style={{ height: `${h}%`, background: `hsl(206,${40 + i * 5}%,${72 - i * 7}%)` }}
               />
             ))}
@@ -64,36 +64,36 @@ function MockDashboard() {
       </div>
 
       {/* Floating badge — top right */}
-      <div className="absolute -top-5 -right-4 z-20 animate-float">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 px-3 py-2.5 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center">
-            <Shield size={14} className="text-green-500" />
+      <div className="absolute -top-6 -right-5 z-20 animate-float">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+            <Shield size={18} className="text-green-500" />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-900">No threats found</p>
-            <p className="text-[10px] text-gray-400">Just scanned · 2m ago</p>
+            <p className="text-sm font-bold text-gray-900">No threats found</p>
+            <p className="text-xs text-gray-400">Just scanned · 2m ago</p>
           </div>
         </div>
       </div>
 
       {/* Floating badge — bottom left */}
       <div
-        className="absolute -bottom-6 -left-4 z-20 animate-float"
+        className="absolute -bottom-7 -left-5 z-20 animate-float"
         style={{ animationDelay: "1.8s" }}
       >
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 px-3 py-2.5 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center">
-            <TrendingUp size={14} className="text-sky-500" />
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
+            <TrendingUp size={18} className="text-sky-500" />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-900">+12 pts this month</p>
-            <p className="text-[10px] text-gray-400">Performance improved</p>
+            <p className="text-sm font-bold text-gray-900">+12 pts this month</p>
+            <p className="text-xs text-gray-400">Performance improved</p>
           </div>
         </div>
       </div>
 
       {/* Subtle shadow glow */}
-      <div className="absolute inset-x-4 -bottom-6 h-12 bg-black/10 blur-xl rounded-full -z-10" />
+      <div className="absolute inset-x-4 -bottom-8 h-14 bg-black/10 blur-xl rounded-full -z-10" />
     </div>
   );
 }
@@ -235,6 +235,28 @@ export function HeroSection() {
                 </div>
               </div>
             </div>
+
+            {/* Agency logos strip */}
+            <div
+              className={`mt-8 pt-7 border-t border-gray-100 transition-all duration-700 ${
+                visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              }`}
+              style={{ transitionDelay: "600ms" }}
+            >
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-4">
+                Used by agencies at
+              </p>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {["PixelCraft", "ThornDigital", "Nair Studio", "WebForge", "CloudMind", "Apex Media"].map((name) => (
+                  <span
+                    key={name}
+                    className="px-3.5 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-500 shadow-sm"
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* ── Right: mock dashboard ── */}
@@ -244,7 +266,7 @@ export function HeroSection() {
             }`}
             style={{ transitionDelay: "200ms" }}
           >
-            <div className="w-full max-w-[340px]">
+            <div className="w-full max-w-[480px]">
               <MockDashboard />
             </div>
           </div>

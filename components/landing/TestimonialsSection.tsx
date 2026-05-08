@@ -81,7 +81,7 @@ export function TestimonialsSection() {
                 ))}
               </div>
 
-              <p className="text-gray-600 text-sm leading-relaxed mb-6">
+              <p className="text-gray-600 text-base leading-relaxed mb-6">
                 &ldquo;{t.quote}&rdquo;
               </p>
 

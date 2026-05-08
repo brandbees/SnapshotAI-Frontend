@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Menu, X, Zap } from "lucide-react";
+import { Menu, X, Zap } from "lucide-react";
 import { isLoggedIn } from "@/lib/auth";
 
 const NAV_LINKS = [
@@ -14,7 +14,6 @@ const NAV_LINKS = [
 export function LandingNav() {
   const [scrolled,   setScrolled]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [search,     setSearch]     = useState("");
   const [loggedIn,   setLoggedIn]   = useState(false);
 
   useEffect(() => { setLoggedIn(isLoggedIn()); }, []);
@@ -68,18 +67,6 @@ export function LandingNav() {
               </button>
             ))}
           </nav>
-
-          {/* Search — desktop */}
-          <div className="hidden lg:flex flex-1 max-w-[200px] items-center gap-2 h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:border-gray-300 focus-within:border-sky-400 focus-within:bg-white transition-all duration-200">
-            <Search size={13} className="text-gray-400 shrink-0" />
-            <input
-              value={search}
-              style={{width: '100%'}}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search…"
-              className="flex-1 text-sm bg-transparent text-gray-700 placeholder:text-gray-400 outline-none"
-            />
-          </div>
 
           {/* Auth — desktop */}
           <div className="hidden md:flex items-center gap-2 ml-auto shrink-0">
