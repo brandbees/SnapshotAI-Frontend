@@ -24,8 +24,8 @@ export function AddSiteModal({ onClose, onSuccess }: AddSiteModalProps) {
     setError("");
     setLoading(true);
     try {
-      const { data } = await api.post<Site>("/sites", { name, url });
-      setSite(data);
+      const { data } = await api.post<{ site: Site }>("/sites", { name, url });
+      setSite(data.site);
       setStep("token");
     } catch (err: unknown) {
       const msg =

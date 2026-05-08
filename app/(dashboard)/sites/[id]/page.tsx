@@ -259,7 +259,7 @@ export default function SiteDetailPage() {
                     { label: "WordPress", value: site.plugin_data.wp_version },
                     { label: "PHP", value: site.plugin_data.php_version },
                     { label: "Server", value: site.plugin_data.server_software },
-                    { label: "Plugins", value: site.plugin_data.active_plugins_count !== undefined ? `${site.plugin_data.active_plugins_count} active` : undefined },
+                    { label: "Plugins", value: site.plugin_data.active_plugins_count != null ? `${site.plugin_data.active_plugins_count} active` : undefined },
                   ]
                     .filter((r) => r.value)
                     .map(({ label, value }) => (

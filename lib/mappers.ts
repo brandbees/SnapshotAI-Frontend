@@ -10,6 +10,7 @@ export interface RawSite {
   name?: string;
   site_token: string;
   plugin_connected: boolean;
+  uptime_status?: "up" | "down" | "unknown";
   wp_version?: string;
   php_version?: string;
   plugin_version?: string;
@@ -127,7 +128,7 @@ export function mapSite(raw: RawSite): Site {
     url: raw.url,
     site_token: raw.site_token,
     plugin_connected: raw.plugin_connected ?? false,
-    uptime_status: "unknown",
+    uptime_status: (raw.uptime_status as Site["uptime_status"]) ?? "unknown",
     scan_schedule:
       (raw.audit_schedule as Site["scan_schedule"]) || "manual",
     last_audit_at: raw.last_audit_at ?? undefined,

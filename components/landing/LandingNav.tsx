@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Menu, X, Zap } from "lucide-react";
+import { isLoggedIn } from "@/lib/auth";
 
 const NAV_LINKS = [
   { label: "Features",     href: "#features"    },
@@ -14,6 +15,9 @@ export function LandingNav() {
   const [scrolled,   setScrolled]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [search,     setSearch]     = useState("");
+  const [loggedIn,   setLoggedIn]   = useState(false);
+
+  useEffect(() => { setLoggedIn(isLoggedIn()); }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -79,18 +83,29 @@ export function LandingNav() {
 
           {/* Auth — desktop */}
           <div className="hidden md:flex items-center gap-2 ml-auto shrink-0">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-semibold text-gray-700 rounded-xl hover:text-gray-900 hover:bg-gray-100 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="px-4 py-2 text-sm font-semibold rounded-xl bg-sky-500 hover:bg-sky-600 text-white shadow-sm shadow-sky-500/20 transition-all hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-1"
-            >
-              Start Free →
-            </Link>
+            {loggedIn ? (
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 text-sm font-semibold rounded-xl bg-sky-500 hover:bg-sky-600 text-white shadow-sm shadow-sky-500/20 transition-all hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-1"
+              >
+                Go to Dashboard →
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="px-4 py-2 text-sm font-semibold text-gray-700 rounded-xl hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-sky-500 hover:bg-sky-600 text-white shadow-sm shadow-sky-500/20 transition-all hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-1"
+                >
+                  Start Free →
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile hamburger */}

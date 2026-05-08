@@ -63,21 +63,30 @@ export function TrendChart({ audits }: TrendChartProps) {
   const [range, setRange] = useState<Range>("Last 30 Days");
 
   const completed = audits.filter((a) => a.status === "completed" && a.scores);
-  const filtered = filterByRange(completed, range).slice(-20);
+  const filtered = filterByRange(completed, range);
 
-  const data = filtered.map((a) => ({
-    date: new Date(a.created_at).toLocaleDateString("en-GB", {
+  // Group by calendar date, average the overall score per day
+  const grouped = new Map<string, number[]>();
+  for (const a of filtered) {
+    const key = new Date(a.created_at).toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
-    }),
-    overall: a.overall_score
+    });
+    const score = a.overall_score
       ?? Math.round(
           ((a.scores!.performance +
             a.scores!.seo +
             a.scores!.security +
             a.scores!.malware) /
             4) * 10
-        ) / 10,
+        ) / 10;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(score);
+  }
+
+  const data = [...grouped.entries()].slice(-20).map(([date, scores]) => ({
+    date,
+    overall: Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10,
   }));
 
   return (
