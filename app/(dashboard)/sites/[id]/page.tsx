@@ -115,10 +115,20 @@ export default function SiteDetailPage() {
               {site.url.replace(/^https?:\/\//, "")}
             </h1>
             <Badge
-              variant={site.uptime_status === "up" ? "success" : "danger"}
+              variant={
+                site.uptime_status === "up"
+                  ? "success"
+                  : site.uptime_status === "down"
+                  ? "danger"
+                  : "muted"
+              }
               dot
             >
-              {site.uptime_status === "up" ? "Online" : "Down"}
+              {site.uptime_status === "up"
+                ? "Online"
+                : site.uptime_status === "down"
+                ? "Down"
+                : "Checking"}
             </Badge>
           </div>
 
@@ -212,7 +222,7 @@ export default function SiteDetailPage() {
           {/* Left: chart + audit history */}
           <div className="lg:col-span-2 space-y-5">
             {/* Trend chart */}
-            {site.audits.filter((a) => a.status === "completed").length >= 2 ? (
+            {site.audits.filter((a) => a.status === "completed").length >= 1 ? (
               <Card>
                 <CardHeader>
                   <CardTitle>Score Trend History</CardTitle>

@@ -135,7 +135,9 @@ export function mapSite(raw: RawSite): Site {
     created_at: raw.created_at,
     latest_scores: mapScores(raw),
     malware_status:
-      raw.is_clean === true
+      raw.malware_score != null
+        ? raw.malware_score >= 80 ? "clean" : "threat"
+        : raw.is_clean === true
         ? "clean"
         : raw.is_clean === false
         ? "threat"

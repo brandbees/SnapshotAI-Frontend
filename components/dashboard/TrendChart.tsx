@@ -118,7 +118,8 @@ export function TrendChart({ audits }: TrendChartProps) {
           <BarChart
             data={data}
             margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
-            barCategoryGap="18%"
+            barCategoryGap={data.length === 1 ? "70%" : "18%"}
+            barGap={4}
           >
             <CartesianGrid
               strokeDasharray="3 3"
