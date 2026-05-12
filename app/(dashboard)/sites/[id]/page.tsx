@@ -405,43 +405,48 @@ function PerformanceTab({ site, audits }: { site: Site; audits: Audit[] }) {
                 Speed Metrics
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    label: "TTFB",
-                    value: perf.ttfb != null ? `${perf.ttfb}ms` : "—",
-                    color:
-                      perf.ttfb == null
-                        ? "var(--muted-foreground)"
-                        : perf.ttfb > 800
-                        ? "var(--score-bad)"
-                        : perf.ttfb > 400
-                        ? "var(--score-warn)"
-                        : "var(--score-good)",
-                  },
-                  {
-                    label: "Load Time",
-                    value: perf.load_time != null ? `${perf.load_time}ms` : "—",
-                    color: "var(--foreground)",
-                  },
-                  {
-                    label: "JS Files",
-                    value: perf.js_count != null ? String(perf.js_count) : "—",
-                    color:
-                      perf.js_count == null
-                        ? "var(--muted-foreground)"
-                        : perf.js_count > 20
-                        ? "var(--score-warn)"
-                        : "var(--score-good)",
-                  },
-                  {
-                    label: "HTML Size",
-                    value:
-                      perf.html_size != null
-                        ? `${Math.round((perf.html_size as number) / 1024)}KB`
-                        : "—",
-                    color: "var(--foreground)",
-                  },
-                ].map(({ label, value, color }) => (
+                {(() => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const p = perf as any;
+                  const ttfb: number | null = p.ttfb_ms ?? null;
+                  const total: number | null = p.total_ms ?? null;
+                  const scripts: number | null = p.script_count ?? null;
+                  const htmlKb: number | null = p.html_kb ?? null;
+                  return [
+                    {
+                      label: "TTFB",
+                      value: ttfb != null ? `${Number(ttfb).toLocaleString()}ms` : "—",
+                      color:
+                        ttfb == null
+                          ? "var(--muted-foreground)"
+                          : ttfb > 800
+                          ? "var(--score-bad)"
+                          : ttfb > 400
+                          ? "var(--score-warn)"
+                          : "var(--score-good)",
+                    },
+                    {
+                      label: "Load Time",
+                      value: total != null ? `${Number(total).toLocaleString()}ms` : "—",
+                      color: "var(--foreground)",
+                    },
+                    {
+                      label: "JS Files",
+                      value: scripts != null ? String(scripts) : "—",
+                      color:
+                        scripts == null
+                          ? "var(--muted-foreground)"
+                          : scripts > 20
+                          ? "var(--score-warn)"
+                          : "var(--score-good)",
+                    },
+                    {
+                      label: "HTML Size",
+                      value: htmlKb != null ? `${Number(htmlKb).toFixed(1)} KB` : "—",
+                      color: "var(--foreground)",
+                    },
+                  ];
+                })().map(({ label, value, color }) => (
                   <div key={label} className="bg-muted/40 rounded-xl p-3">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
                       {label}
@@ -523,14 +528,17 @@ function SeoTab({ site, audits }: { site: Site; audits: Audit[] }) {
   const latestAudit = audits.find((a) => a.status === "completed");
   const seoData = latestAudit?.seo_data;
 
-  const checklist: { label: string; keys: string[] }[] = [
-    { label: "Meta Description", keys: ["has_meta_description", "meta_description"] },
-    { label: "Canonical URL", keys: ["has_canonical", "canonical"] },
-    { label: "OG / Social Tags", keys: ["has_og_tags", "og_tags"] },
-    { label: "H1 Heading", keys: ["has_h1", "h1"] },
-    { label: "Robots Meta", keys: ["has_robots", "robots", "robots_meta"] },
-    { label: "Language Attribute", keys: ["has_lang", "lang"] },
+  type SeoCheck = { id: string; label: string; status: "pass" | "fail" | "warn"; detail?: string };
+  const CHECK_ROWS: { id: string; label: string }[] = [
+    { id: "meta_desc",   label: "Meta Description" },
+    { id: "canonical",   label: "Canonical URL" },
+    { id: "og_title",    label: "OG / Social Tags" },
+    { id: "h1",          label: "H1 Heading" },
+    { id: "robots_meta", label: "Robots Meta" },
+    { id: "html_lang",   label: "Language Attribute" },
   ];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const checksArray: SeoCheck[] = Array.isArray((seoData as any)?.checks) ? (seoData as any).checks : [];
 
   return (
     <div className="space-y-5">
@@ -563,23 +571,34 @@ function SeoTab({ site, audits }: { site: Site; audits: Audit[] }) {
               </p>
             ) : (
               <div>
-                {checklist.map(({ label, keys }) => {
-                  const result = getSeoCheck(seoData, ...keys);
+                {CHECK_ROWS.map(({ id, label }) => {
+                  const check = checksArray.find((c) => c.id === id);
+                  const status = check?.status ?? null;
                   return (
                     <div
-                      key={label}
-                      className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
+                      key={id}
+                      className="flex items-start justify-between py-2.5 border-b border-border last:border-0 gap-4"
                     >
-                      <span className="text-sm text-foreground">{label}</span>
-                      {result === null ? (
-                        <span className="text-xs text-muted-foreground">Unknown</span>
-                      ) : result ? (
-                        <div className="flex items-center gap-1.5">
+                      <div className="min-w-0">
+                        <span className="text-sm text-foreground">{label}</span>
+                        {check?.detail && (
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{check.detail}</p>
+                        )}
+                      </div>
+                      {status === null ? (
+                        <span className="text-xs text-muted-foreground shrink-0">Unknown</span>
+                      ) : status === "pass" ? (
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs" style={{ color: "var(--score-good)" }}>Pass</span>
                           <CheckCircle2 size={15} style={{ color: "var(--score-good)" }} />
                         </div>
+                      ) : status === "warn" ? (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs" style={{ color: "var(--score-warn)" }}>Warn</span>
+                          <AlertCircle size={15} style={{ color: "var(--score-warn)" }} />
+                        </div>
                       ) : (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs" style={{ color: "var(--score-bad)" }}>Fail</span>
                           <XCircle size={15} style={{ color: "var(--score-bad)" }} />
                         </div>
