@@ -1,4 +1,7 @@
-import type { Site, Audit, PillarScores, PluginData, Plugin } from "@/types";
+import type {
+  Site, Audit, PillarScores, PluginData, Plugin,
+  ScanResult, SeoData, PerformanceData, SecurityData,
+} from "@/types";
 
 // ── Raw shapes returned by the backend ───────────────────────────────────────
 
@@ -11,32 +14,55 @@ export interface RawSite {
   site_token: string;
   plugin_connected: boolean;
   uptime_status?: "up" | "down" | "unknown";
+  // WP / server environment
   wp_version?: string;
   php_version?: string;
   plugin_version?: string;
   active_plugins?: RawPlugin[];
   active_plugins_count?: number;
   active_theme?: string;
-  woocommerce_active?: boolean;
+  memory_limit?: string | null;
+  mysql_version?: string | null;
+  server_software?: string;
+  database_size_mb?: number | null;
+  php_max_execution_time?: number | null;
+  // Scheduling
   audit_schedule?: string;
   last_audit_at?: string;
   created_at: string;
   updated_at?: string;
-  // Security fields
-  xml_rpc_enabled?: boolean;
-  file_editor_enabled?: boolean;
-  wp_debug_enabled?: boolean;
-  server_software?: string;
-  plugins_needing_updates?: number;
+  // Security signals
+  xml_rpc_enabled?: boolean | null;
+  file_editor_enabled?: boolean | null;
+  wp_debug_enabled?: boolean | null;
+  login_url_default?: boolean | null;
+  wp_config_writable?: boolean | null;
+  htaccess_writable?: boolean | null;
+  uploads_php_enabled?: boolean | null;
+  ssl_expiry_date?: string | null;
+  admin_users_count?: number | null;
+  admin_usernames?: string[] | null;
+  // Performance / caching
+  caching_plugin?: string | null;
+  cdn_plugin?: string | null;
+  image_optimization_plugin?: string | null;
+  object_cache_enabled?: boolean | null;
+  // Plugin intelligence
+  plugins_needing_updates?: number | null;
   plugins_update_list?: string[];
-  // Joined from latest audit
+  plugins_outdated_12m?: unknown;
+  // WooCommerce
+  woocommerce_active?: boolean | null;
+  woo_order_count?: number | null;
+  woo_revenue?: number | null;
+  // Joined from latest audit (GET /api/sites only)
   performance_score?: number | null;
   seo_score?: number | null;
   accessibility_score?: number | null;
   security_score?: number | null;
   malware_score?: number | null;
   overall_score?: number | null;
-  // Joined from latest scan
+  // Joined from latest scan (GET /api/sites only)
   is_clean?: boolean | null;
   threats?: unknown;
 }
@@ -52,12 +78,23 @@ export interface RawAudit {
   security_score?: number | null;
   malware_score?: number | null;
   overall_score?: number | null;
-  performance_data?: unknown;
-  seo_data?: unknown;
-  security_data?: unknown;
+  seo_data?: SeoData | null;
+  performance_data?: PerformanceData | null;
+  security_data?: SecurityData | null;
   ai_narrative?: string;
   ai_recommendations?: unknown;
   triggered_by?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface RawScan {
+  id: string;
+  site_id: string;
+  agency_id?: string;
+  is_clean: boolean;
+  threats?: unknown;
+  scanner_response?: unknown;
   created_at: string;
   completed_at?: string;
 }
@@ -99,6 +136,15 @@ function mapPlugins(raw?: RawPlugin[]): Plugin[] {
   }));
 }
 
+function parseJsonArray(val: unknown): string[] | null {
+  if (!val) return null;
+  if (Array.isArray(val)) return val as string[];
+  if (typeof val === "string") {
+    try { return JSON.parse(val); } catch { return null; }
+  }
+  return null;
+}
+
 export function mapSite(raw: RawSite): Site {
   const updateSet = new Set<string>(raw.plugins_update_list ?? []);
 
@@ -113,9 +159,9 @@ export function mapSite(raw: RawSite): Site {
         php_version: raw.php_version,
         active_plugins_count: raw.active_plugins_count,
         server_software: raw.server_software,
-        xmlrpc_enabled: raw.xml_rpc_enabled,
-        file_editor_enabled: raw.file_editor_enabled,
-        debug_mode: raw.wp_debug_enabled,
+        xmlrpc_enabled: raw.xml_rpc_enabled ?? undefined,
+        file_editor_enabled: raw.file_editor_enabled ?? undefined,
+        debug_mode: raw.wp_debug_enabled ?? undefined,
         plugins,
         last_sync: raw.updated_at,
       }
@@ -130,8 +176,7 @@ export function mapSite(raw: RawSite): Site {
     site_token: raw.site_token,
     plugin_connected: raw.plugin_connected ?? false,
     uptime_status: (raw.uptime_status as Site["uptime_status"]) ?? "unknown",
-    scan_schedule:
-      (raw.audit_schedule as Site["scan_schedule"]) || "manual",
+    scan_schedule: (raw.audit_schedule as Site["scan_schedule"]) || "manual",
     last_audit_at: raw.last_audit_at ?? undefined,
     created_at: raw.created_at,
     latest_scores: mapScores(raw),
@@ -144,6 +189,36 @@ export function mapSite(raw: RawSite): Site {
         ? "threat"
         : undefined,
     plugin_data: pluginData,
+
+    // Security signals (available on both list and detail endpoints)
+    xml_rpc_enabled: raw.xml_rpc_enabled ?? null,
+    file_editor_enabled: raw.file_editor_enabled ?? null,
+    wp_debug_enabled: raw.wp_debug_enabled ?? null,
+    login_url_default: raw.login_url_default ?? null,
+    wp_config_writable: raw.wp_config_writable ?? null,
+    htaccess_writable: raw.htaccess_writable ?? null,
+    uploads_php_enabled: raw.uploads_php_enabled ?? null,
+    ssl_expiry_date: raw.ssl_expiry_date ?? null,
+    admin_users_count: raw.admin_users_count ?? null,
+    admin_usernames: parseJsonArray(raw.admin_usernames),
+
+    // Performance signals
+    caching_plugin: raw.caching_plugin ?? null,
+    cdn_plugin: raw.cdn_plugin ?? null,
+    php_max_execution_time: raw.php_max_execution_time ?? null,
+    memory_limit: raw.memory_limit ?? null,
+    image_optimization_plugin: raw.image_optimization_plugin ?? null,
+    object_cache_enabled: raw.object_cache_enabled ?? null,
+    mysql_version: raw.mysql_version ?? null,
+    database_size_mb: raw.database_size_mb ?? null,
+
+    // WooCommerce
+    woocommerce_active: raw.woocommerce_active ?? null,
+    woo_order_count: raw.woo_order_count ?? null,
+    woo_revenue: raw.woo_revenue ?? null,
+
+    // Plugin intelligence
+    plugins_needing_updates: raw.plugins_needing_updates ?? null,
   };
 }
 
@@ -155,7 +230,28 @@ export function mapAudit(raw: RawAudit): Audit {
     audit_type: raw.triggered_by === "manual" ? "manual" : "scheduled",
     scores: mapScores(raw),
     overall_score: raw.overall_score ?? undefined,
+    seo_data: raw.seo_data ?? null,
+    performance_data: raw.performance_data ?? null,
+    security_data: raw.security_data ?? null,
     created_at: raw.created_at,
     completed_at: raw.completed_at,
+  };
+}
+
+export function mapScan(raw: RawScan): ScanResult {
+  let threats = null;
+  if (raw.threats) {
+    if (Array.isArray(raw.threats)) {
+      threats = raw.threats as ScanResult["threats"];
+    } else if (typeof raw.threats === "string") {
+      try { threats = JSON.parse(raw.threats); } catch { threats = null; }
+    }
+  }
+  return {
+    id: raw.id,
+    site_id: raw.site_id,
+    is_clean: raw.is_clean ?? true,
+    threats,
+    created_at: raw.created_at,
   };
 }

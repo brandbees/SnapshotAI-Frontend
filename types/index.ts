@@ -10,6 +10,7 @@ export interface Agency {
   brand_name?: string;
   brand_tagline?: string;
   accent_color?: string;
+  trial_ends_at?: string | null;
 }
 
 export interface Site {
@@ -28,6 +29,36 @@ export interface Site {
   latest_scores?: PillarScores;
   malware_status?: "clean" | "threat";
   plugin_data?: PluginData;
+
+  // Security signals
+  xml_rpc_enabled?: boolean | null;
+  file_editor_enabled?: boolean | null;
+  wp_debug_enabled?: boolean | null;
+  login_url_default?: boolean | null;
+  wp_config_writable?: boolean | null;
+  htaccess_writable?: boolean | null;
+  uploads_php_enabled?: boolean | null;
+  ssl_expiry_date?: string | null;
+  admin_users_count?: number | null;
+  admin_usernames?: string[] | null;
+
+  // Performance signals
+  caching_plugin?: string | null;
+  cdn_plugin?: string | null;
+  php_max_execution_time?: number | null;
+  memory_limit?: string | null;
+  image_optimization_plugin?: string | null;
+  object_cache_enabled?: boolean | null;
+  mysql_version?: string | null;
+  database_size_mb?: number | null;
+
+  // WooCommerce
+  woocommerce_active?: boolean | null;
+  woo_order_count?: number | null;
+  woo_revenue?: number | null;
+
+  // Plugin intelligence
+  plugins_needing_updates?: number | null;
 }
 
 export interface PillarScores {
@@ -37,6 +68,54 @@ export interface PillarScores {
   malware: number;
 }
 
+// ── Audit data types ──────────────────────────────────────────────────────────
+
+export interface SeoData {
+  score?: number;
+  // Common field patterns from BrandBees Scanner seo_audit response
+  has_meta_description?: boolean;
+  meta_description?: boolean | { present?: boolean; content?: string };
+  has_canonical?: boolean;
+  canonical?: boolean | { present?: boolean };
+  has_og_tags?: boolean;
+  og_tags?: boolean | { present?: boolean };
+  has_h1?: boolean;
+  h1?: boolean | { present?: boolean; count?: number };
+  has_robots?: boolean;
+  robots?: boolean | { present?: boolean };
+  has_lang?: boolean;
+  lang?: boolean | string | { present?: boolean };
+  [key: string]: unknown;
+}
+
+export interface PerformanceData {
+  ttfb?: number;
+  load_time?: number;
+  caching_detected?: boolean;
+  js_count?: number;
+  html_size?: number;
+  [key: string]: unknown;
+}
+
+export interface SecurityData {
+  issues?: SecurityIssue[];
+  issues_count?: {
+    critical?: number;
+    high?: number;
+    medium?: number;
+    low?: number;
+  };
+  dns_checks?: unknown;
+  threat_intel?: ScanThreat[];
+  [key: string]: unknown;
+}
+
+export interface SecurityIssue {
+  severity?: string;
+  type?: string;
+  description?: string;
+}
+
 export interface Audit {
   id: string;
   site_id: string;
@@ -44,6 +123,9 @@ export interface Audit {
   audit_type: "manual" | "scheduled";
   scores?: PillarScores;
   overall_score?: number;
+  seo_data?: SeoData | null;
+  performance_data?: PerformanceData | null;
+  security_data?: SecurityData | null;
   ai_narrative?: Record<string, string>;
   ai_recommendations?: Recommendation[];
   plugin_data?: PluginData;
@@ -56,6 +138,27 @@ export interface Recommendation {
   description: string;
   effort: "low" | "medium" | "high";
 }
+
+// ── Scan results ──────────────────────────────────────────────────────────────
+
+export interface ScanResult {
+  id: string;
+  site_id: string;
+  is_clean: boolean;
+  threats?: ScanThreat[] | null;
+  created_at: string;
+}
+
+export interface ScanThreat {
+  severity?: string;
+  type?: string;
+  threat_type?: string;
+  file_path?: string;
+  signature_id?: string;
+  description?: string;
+}
+
+// ── Plugin data ───────────────────────────────────────────────────────────────
 
 export interface PluginData {
   wp_version?: string;
@@ -75,6 +178,8 @@ export interface Plugin {
   status: "active" | "inactive";
   update_available: boolean;
 }
+
+// ── Other types ───────────────────────────────────────────────────────────────
 
 export interface Report {
   id: string;

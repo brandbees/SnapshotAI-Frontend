@@ -12,17 +12,23 @@ import {
   CreditCard,
   LogOut,
   Camera,
+  Shield,
+  Zap,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_LABELS } from "@/lib/constants";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/sites", label: "Your Sites", icon: Globe },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/security", label: "Security", icon: Shield },
+  { href: "/performance", label: "Performance", icon: Zap },
+  { href: "/seo", label: "SEO", icon: Search },
+  { href: "/sites", label: "Sites", icon: Globe },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/agent", label: "AI Assistant", icon: Bot },
+  { href: "/agent", label: "AI Agent", icon: Bot },
 ];
 
 const settingsItems = [

@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
-import { mapSite, mapAudit, type RawSite, type RawAudit } from "@/lib/mappers";
-import type { Site, Audit } from "@/types";
+import { mapSite, mapAudit, mapScan, type RawSite, type RawAudit, type RawScan } from "@/lib/mappers";
+import type { Site, Audit, ScanResult } from "@/types";
 
-interface SiteDetail extends Site {
+export interface SiteDetail extends Site {
   audits: Audit[];
+  scans: ScanResult[];
 }
 
 interface RawSiteDetailResponse {
   site: RawSite;
   audits: RawAudit[];
-  scans: unknown[];
+  scans: RawScan[];
 }
 
 export function useSite(id: string) {
@@ -28,6 +29,7 @@ export function useSite(id: string) {
       const { data } = await api.get<RawSiteDetailResponse>(`/sites/${id}`);
       const mapped = mapSite(data.site);
       const audits = (data.audits ?? []).map(mapAudit);
+      const scans = (data.scans ?? []).map(mapScan);
 
       // GET /api/sites/:id doesn't join score columns onto the site row.
       // Derive latest_scores from the most recent completed audit instead.
@@ -40,7 +42,7 @@ export function useSite(id: string) {
         }
       }
 
-      setSite({ ...mapped, audits });
+      setSite({ ...mapped, audits, scans });
     } catch {
       setError("Failed to load site details.");
     } finally {
