@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { TrialBanner } from "@/components/layout/TrialBanner";
-import { isLoggedIn } from "@/lib/auth";
+import { BrandingProvider } from "@/contexts/BrandingContext";
+import { isLoggedIn, getAgency } from "@/lib/auth";
 
 export default function DashboardLayout({
   children,
@@ -17,17 +18,24 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isLoggedIn()) {
       router.replace("/login");
+      return;
+    }
+    const agency = getAgency();
+    if (agency && agency.onboarding_complete === false) {
+      router.replace("/onboarding");
     }
   }, [router]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar />
-        <TrialBanner />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+    <BrandingProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <TopBar />
+          <TrialBanner />
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
       </div>
-    </div>
+    </BrandingProvider>
   );
 }

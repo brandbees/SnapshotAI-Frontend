@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { HexColorPicker } from "react-colorful";
-import { Upload, Check, AlertCircle, X } from "lucide-react";
+import { Upload, Check, AlertCircle, X, Lock } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import { setAgency } from "@/lib/auth";
+import { useBranding } from "@/contexts/BrandingContext";
 import api from "@/lib/api";
 
 interface SettingsPayload {
@@ -16,6 +18,7 @@ interface SettingsPayload {
   brand_name?: string;
   brand_tagline?: string;
   accent_color?: string;
+  favicon_url?: string | null;
 }
 
 interface SettingsResponse extends SettingsPayload {
@@ -24,9 +27,28 @@ interface SettingsResponse extends SettingsPayload {
 
 export default function WhiteLabelPage() {
   const { agency } = useAuth();
+  const { roleCanDo, loading: roleLoading } = useRole();
+  const { setBranding } = useBranding();
+
+  if (!roleLoading && !roleCanDo("edit_white_label")) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
+          <Lock size={22} className="text-muted-foreground" />
+          <p className="text-sm font-semibold text-foreground">Access restricted</p>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Brand settings can only be changed by the account owner.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
+  const [faviconUploading, setFaviconUploading] = useState(false);
   const [brandName, setBrandName] = useState("");
   const [tagline, setTagline] = useState("");
   const [accentColor, setAccentColor] = useState("#6366f1");
@@ -38,6 +60,7 @@ export default function WhiteLabelPage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const faviconRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Load current settings on mount
@@ -47,8 +70,8 @@ export default function WhiteLabelPage() {
       if (data.brand_name) setBrandName(data.brand_name);
       if (data.brand_tagline) setTagline(data.brand_tagline);
       if (data.accent_color) { setAccentColor(data.accent_color); setHexInput(data.accent_color); }
+      if (data.favicon_url) { setFaviconUrl(data.favicon_url); setFaviconPreview(data.favicon_url); }
     }).catch(() => {
-      // Use agency data from JWT as fallback
       if (agency) {
         if (agency.logo_url) { setLogoUrl(agency.logo_url); setLogoPreview(agency.logo_url); }
         if (agency.brand_name) setBrandName(agency.brand_name);
@@ -108,6 +131,39 @@ export default function WhiteLabelPage() {
     e.target.value = "";
   }
 
+  async function uploadFavicon(file: File) {
+    const allowed = ["image/png", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml"];
+    if (!allowed.includes(file.type)) {
+      showToast("error", "Only PNG, ICO, or SVG files are accepted for favicons.");
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      showToast("error", "Favicon must be under 512KB.");
+      return;
+    }
+    setFaviconPreview(URL.createObjectURL(file));
+    setFaviconUploading(true);
+    try {
+      const form = new FormData();
+      form.append("favicon", file);
+      const { data } = await api.post<{ favicon_url: string }>("/settings/favicon", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setFaviconUrl(data.favicon_url);
+    } catch {
+      showToast("error", "Favicon upload failed. Try again.");
+      setFaviconPreview(faviconUrl);
+    } finally {
+      setFaviconUploading(false);
+    }
+  }
+
+  function onFaviconInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) uploadFavicon(file);
+    e.target.value = "";
+  }
+
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
@@ -135,6 +191,7 @@ export default function WhiteLabelPage() {
         brand_name: brandName,
         brand_tagline: tagline,
         accent_color: accentColor,
+        favicon_url: faviconUrl,
       };
       const { data } = await api.put<SettingsResponse>("/settings", payload);
       // Sync updated agency into localStorage so branding applies globally
@@ -148,6 +205,12 @@ export default function WhiteLabelPage() {
         };
         setAgency(updated);
       }
+      setBranding({
+        logoUrl: data.logo_url ?? null,
+        brandName: data.brand_name ?? null,
+        accentColor: data.accent_color ?? null,
+        faviconUrl: data.favicon_url ?? null,
+      });
       showToast("success", "Brand settings saved.");
     } catch {
       showToast("error", "Failed to save. Please try again.");
@@ -219,6 +282,41 @@ export default function WhiteLabelPage() {
                   className="absolute top-2 right-2 p-1 rounded-full bg-background border border-border hover:bg-muted text-muted-foreground"
                 >
                   <X size={12} />
+                </button>
+              )}
+            </div>
+          </Card>
+
+          {/* Favicon upload */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Browser Favicon</CardTitle>
+            </CardHeader>
+            <input ref={faviconRef} type="file" accept=".png,.ico,.svg" className="hidden" onChange={onFaviconInput} />
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => faviconRef.current?.click()}
+                className="relative w-12 h-12 rounded-lg border-2 border-dashed border-border hover:border-border-strong hover:bg-muted/40 flex items-center justify-center shrink-0 transition-colors overflow-hidden"
+                title="Click to upload favicon"
+              >
+                {faviconPreview ? (
+                  <img src={faviconPreview} alt="Favicon preview" className="w-8 h-8 object-contain" />
+                ) : (
+                  <Upload size={18} className="text-muted-foreground" />
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {faviconUploading ? "Uploading…" : faviconPreview ? "Favicon uploaded" : "Upload a favicon"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">PNG, ICO, or SVG — max 512KB. Shown in browser tabs.</p>
+              </div>
+              {faviconPreview && (
+                <button
+                  onClick={() => { setFaviconPreview(null); setFaviconUrl(null); }}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors shrink-0"
+                >
+                  <X size={14} />
                 </button>
               )}
             </div>

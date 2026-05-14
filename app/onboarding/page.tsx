@@ -1,0 +1,510 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Camera, Check, Copy, Loader2, ArrowRight, SkipForward, Globe, LayoutDashboard, AlertCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/Button";
+import api from "@/lib/api";
+import { isLoggedIn } from "@/lib/auth";
+
+const STEPS = ["Welcome", "Add site", "Install plugin", "First scan"];
+
+// ── Step 1 — Welcome ──────────────────────────────────────────────────────────
+
+function StepWelcome({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="flex flex-col items-center text-center gap-6 max-w-md mx-auto">
+      <div
+        className="w-16 h-16 rounded-3xl flex items-center justify-center shadow-lg"
+        style={{ background: "var(--accent)" }}
+      >
+        <Camera size={28} className="text-white" />
+      </div>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground mb-2">
+          Welcome to BrandBees SnapshotAI
+        </h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Monitor your clients&apos; WordPress sites, catch threats early, and
+          deliver beautiful audit reports — all from one dashboard.
+        </p>
+        <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
+          Let&apos;s get your first site set up. It only takes a few minutes.
+        </p>
+      </div>
+      <Button
+        onClick={onNext}
+        className="px-8 h-11 rounded-xl font-bold text-sm flex items-center gap-2"
+      >
+        Get started <ArrowRight size={15} />
+      </Button>
+    </div>
+  );
+}
+
+// ── Step 2 — Add site ─────────────────────────────────────────────────────────
+
+interface NewSite {
+  id: string;
+  site_token: string;
+  name: string;
+  url: string;
+}
+
+function StepAddSite({ onNext }: { onNext: (site: NewSite) => void }) {
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const inputCls =
+    "w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-surface focus:border-transparent transition-all";
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const { data } = await api.post<{ site: NewSite }>("/sites", { name, url });
+      onNext(data.site);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data
+          ?.error || "Failed to add site. Please try again.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="w-full max-w-sm mx-auto">
+      <div className="text-center mb-8">
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow"
+          style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}
+        >
+          <Globe size={20} style={{ color: "var(--accent)" }} />
+        </div>
+        <h2 className="text-xl font-bold text-foreground">Add your first site</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Enter the WordPress site you want to monitor.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            Site name
+          </label>
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputCls}
+            placeholder="Acme Corp Website"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            Site URL
+          </label>
+          <input
+            type="url"
+            required
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className={inputCls}
+            placeholder="https://acme.com"
+          />
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          loading={loading}
+          className="w-full h-11 rounded-xl font-bold text-sm mt-1"
+        >
+          Add site
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+// ── Step 3 — Install plugin ────────────────────────────────────────────────────
+
+function StepInstallPlugin({
+  site,
+  onConnected,
+  onSkip,
+}: {
+  site: NewSite;
+  onConnected: () => void;
+  onSkip: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const checkConnection = useCallback(async () => {
+    try {
+      const { data } = await api.get<{ plugin_connected: boolean }>(`/sites/${site.id}`);
+      if (data.plugin_connected) {
+        setConnected(true);
+        if (pollRef.current) clearInterval(pollRef.current);
+        setTimeout(onConnected, 800);
+      }
+    } catch {
+      // silently ignore poll errors
+    }
+  }, [site.id, onConnected]);
+
+  useEffect(() => {
+    pollRef.current = setInterval(checkConnection, 3000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [checkConnection]);
+
+  function copyToken() {
+    navigator.clipboard.writeText(site.site_token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-xl font-bold text-foreground">Install the plugin</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Install the BrandBees SnapshotAI plugin on{" "}
+          <span className="font-medium text-foreground">{site.name}</span> and
+          paste your site token to connect.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {/* Step instructions */}
+        <div className="bg-surface border border-border rounded-2xl p-5 space-y-3">
+          {[
+            "In your WordPress admin, go to Plugins → Add New",
+            "Search for BrandBees SnapshotAI and install it",
+            "Activate the plugin, then go to SnapshotAI → Settings",
+            "Paste your site token below and save",
+          ].map((step, i) => (
+            <div key={i} className="flex items-start gap-3 text-sm">
+              <span
+                className="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5 text-white"
+                style={{ background: "var(--accent)" }}
+              >
+                {i + 1}
+              </span>
+              <span className="text-foreground leading-snug">{step}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Token copy */}
+        <div className="bg-muted border border-border rounded-2xl p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Your site token
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs text-foreground font-mono bg-surface border border-border rounded-lg px-3 py-2 truncate">
+              {site.site_token}
+            </code>
+            <button
+              onClick={copyToken}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border bg-surface text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              {copied ? (
+                <><Check size={12} className="text-green-500" /> Copied</>
+              ) : (
+                <><Copy size={12} /> Copy</>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Status */}
+        <div className="flex items-center justify-center gap-2 py-2">
+          {connected ? (
+            <>
+              <Check size={16} className="text-green-500" />
+              <span className="text-sm font-semibold text-green-600">Plugin connected!</span>
+            </>
+          ) : (
+            <>
+              <Loader2 size={14} className="animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Waiting for plugin connection…
+              </span>
+            </>
+          )}
+        </div>
+
+        <button
+          onClick={onSkip}
+          className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          <SkipForward size={12} /> Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 4 — First scan ───────────────────────────────────────────────────────
+
+type ScanState = "scanning" | "ready" | "failed";
+
+function StepFirstScan({
+  site,
+  onComplete,
+}: {
+  site: NewSite;
+  onComplete: () => void;
+}) {
+  const [state, setState] = useState<ScanState>("scanning");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const auditFiredRef = useRef(false);
+
+  const checkAudit = useCallback(async () => {
+    try {
+      const { data } = await api.get<{ audits: { status: string }[] }>(`/sites/${site.id}`);
+      const audits = data.audits ?? [];
+      if (audits.some((a) => a.status === "completed")) {
+        setState("ready");
+        if (pollRef.current) clearInterval(pollRef.current);
+      } else if (audits.length > 0 && audits.every((a) => a.status === "failed")) {
+        setState("failed");
+        if (pollRef.current) clearInterval(pollRef.current);
+      }
+    } catch {
+      // silently ignore poll errors
+    }
+  }, [site.id]);
+
+  useEffect(() => {
+    if (!auditFiredRef.current) {
+      auditFiredRef.current = true;
+      api.post(`/audits/${site.id}/run`).catch(() => {});
+    }
+
+    pollRef.current = setInterval(checkAudit, 3000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [checkAudit, site.id]);
+
+  return (
+    <div className="flex flex-col items-center text-center gap-6 max-w-sm mx-auto">
+      {state === "ready" && (
+        <>
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
+            style={{ background: "color-mix(in srgb, #22c55e 15%, transparent)" }}
+          >
+            <Check size={28} className="text-green-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-2">
+              Your first report is ready!
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Head to your dashboard to see the full audit results for{" "}
+              <span className="font-medium text-foreground">{site.name}</span>.
+            </p>
+          </div>
+          <Button
+            onClick={onComplete}
+            className="px-8 h-11 rounded-xl font-bold text-sm flex items-center gap-2"
+          >
+            <LayoutDashboard size={15} /> Go to dashboard
+          </Button>
+        </>
+      )}
+
+      {state === "failed" && (
+        <>
+          <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center shadow-lg">
+            <AlertCircle size={28} className="text-amber-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-2">
+              Audit couldn&apos;t complete
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              We couldn&apos;t reach <span className="font-medium text-foreground">{site.name}</span> right now.
+              You can run a manual audit from your dashboard once the site is live.
+            </p>
+          </div>
+          <Button
+            onClick={onComplete}
+            className="px-8 h-11 rounded-xl font-bold text-sm flex items-center gap-2"
+          >
+            <LayoutDashboard size={15} /> Go to dashboard
+          </Button>
+        </>
+      )}
+
+      {state === "scanning" && (
+        <>
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
+            style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}
+          >
+            <Loader2 size={28} className="animate-spin" style={{ color: "var(--accent)" }} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-2">
+              Running your first audit…
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              We&apos;re scanning{" "}
+              <span className="font-medium text-foreground">{site.name}</span> right
+              now. This usually takes 30–60 seconds.
+            </p>
+          </div>
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full animate-bounce"
+                style={{ background: "var(--accent)", animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </div>
+          <button
+            onClick={onComplete}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Go to dashboard anyway
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Main wizard ───────────────────────────────────────────────────────────────
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  const { updateAgency } = useAuth();
+  const [step, setStep] = useState(0);
+  const [site, setSite] = useState<NewSite | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.replace("/login");
+    }
+  }, [router]);
+
+  async function markComplete() {
+    try {
+      await api.patch("/auth/complete-onboarding");
+      updateAgency({ onboarding_complete: true });
+    } catch {
+      // proceed anyway
+    }
+    router.replace("/dashboard");
+  }
+
+  const progress = ((step + 1) / STEPS.length) * 100;
+
+  return (
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8f9fb 100%)" }}
+    >
+      {/* Header */}
+      <header className="h-14 border-b border-border bg-surface/80 backdrop-blur-sm flex items-center px-6 gap-3 shrink-0">
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{ background: "var(--accent)" }}
+        >
+          <Camera size={14} className="text-white" />
+        </div>
+        <span className="text-sm font-semibold text-foreground">BrandBees SnapshotAI</span>
+      </header>
+
+      {/* Progress bar */}
+      <div className="h-1 bg-border">
+        <div
+          className="h-full transition-all duration-500 ease-in-out"
+          style={{ width: `${progress}%`, background: "var(--accent)" }}
+        />
+      </div>
+
+      {/* Step labels */}
+      <div className="flex justify-center gap-0 pt-6 px-6">
+        {STEPS.map((label, i) => (
+          <div key={label} className="flex items-center">
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                  i < step
+                    ? "bg-green-500 text-white"
+                    : i === step
+                    ? "text-white"
+                    : "bg-muted text-muted-foreground border border-border"
+                }`}
+                style={i === step ? { background: "var(--accent)" } : {}}
+              >
+                {i < step ? <Check size={10} /> : i + 1}
+              </div>
+              <span
+                className={`text-[10px] font-medium hidden sm:block ${
+                  i === step ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {label}
+              </span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div
+                className={`w-12 sm:w-20 h-px mx-1 mb-5 transition-colors ${
+                  i < step ? "bg-green-400" : "bg-border"
+                }`}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-lg bg-surface border border-border rounded-2xl p-8 shadow-[0_4px_32px_0_rgb(0_0_0/0.08)]">
+          {step === 0 && <StepWelcome onNext={() => setStep(1)} />}
+          {step === 1 && (
+            <StepAddSite
+              onNext={(newSite) => {
+                setSite(newSite);
+                setStep(2);
+              }}
+            />
+          )}
+          {step === 2 && site && (
+            <StepInstallPlugin
+              site={site}
+              onConnected={() => setStep(3)}
+              onSkip={() => setStep(3)}
+            />
+          )}
+          {step === 3 && site && (
+            <StepFirstScan site={site} onComplete={markComplete} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

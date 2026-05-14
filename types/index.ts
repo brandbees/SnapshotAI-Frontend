@@ -6,11 +6,16 @@ export interface Agency {
   email: string;
   plan: Plan;
   sites_count: number;
+  sites_limit?: number;
   logo_url?: string;
   brand_name?: string;
   brand_tagline?: string;
   accent_color?: string;
   trial_ends_at?: string | null;
+  onboarding_complete?: boolean;
+  role?: TeamRole;
+  member_id?: string;
+  member_name?: string;
 }
 
 export interface Site {
@@ -203,13 +208,15 @@ export interface Client {
   created_at: string;
 }
 
+export type TeamRole = "owner" | "admin" | "manager" | "analyst";
+
 export interface TeamMember {
   id: string;
   agency_id: string;
-  name: string;
+  name: string | null;
   email: string;
-  role: "admin" | "analyst" | "viewer";
-  status: "active" | "invited";
+  role: Exclude<TeamRole, "owner">;
+  invite_accepted: boolean;
   created_at: string;
 }
 

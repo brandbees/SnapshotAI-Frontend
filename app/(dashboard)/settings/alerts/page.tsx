@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Check, AlertCircle, X, Lock, Mail, Webhook } from "lucide-react";
+import { useRole } from "@/hooks/useRole";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -13,7 +14,22 @@ import type { AlertSettings } from "@/types";
 type Channel = "email" | "slack";
 
 export default function AlertsSettingsPage() {
+  const { roleCanDo, loading: roleLoading } = useRole();
   const { sites, loading: sitesLoading } = useSites();
+
+  if (!roleLoading && !roleCanDo("manage_alerts")) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
+          <Lock size={22} className="text-muted-foreground" />
+          <p className="text-sm font-semibold text-foreground">Access restricted</p>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Alert settings can only be changed by admins and the account owner.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [thresholds, setThresholds] = useState({ performance: 70, seo: 70, security: 70 });
   const [channel, setChannel] = useState<Channel>("email");

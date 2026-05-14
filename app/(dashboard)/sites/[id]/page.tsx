@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useSite } from "@/hooks/useSite";
 import { useAuditStatus } from "@/hooks/useAuditStatus";
+import { useRole } from "@/hooks/useRole";
 import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { AuditHistoryTable } from "@/components/dashboard/AuditHistoryTable";
@@ -155,11 +156,13 @@ function OverviewTab({
   audits,
   runAudit,
   auditLoading,
+  canRunAudit,
 }: {
   site: Site;
   audits: Audit[];
   runAudit: () => void;
   auditLoading: boolean;
+  canRunAudit: boolean;
 }) {
   const scores = site.latest_scores;
   const prevAudit = audits[1];
@@ -217,9 +220,11 @@ function OverviewTab({
             <p className="text-xs text-muted-foreground mt-1">
               Run your first audit to see scores
             </p>
-            <Button className="mt-4" size="sm" onClick={runAudit} loading={auditLoading}>
-              Run first audit
-            </Button>
+            {canRunAudit && (
+              <Button className="mt-4" size="sm" onClick={runAudit} loading={auditLoading}>
+                Run first audit
+              </Button>
+            )}
           </div>
         </Card>
       )}
@@ -631,11 +636,13 @@ function MalwareTab({
   scans,
   onRunScan,
   scanning,
+  canRunScan,
 }: {
   site: Site;
   scans: ScanResult[];
   onRunScan: () => void;
   scanning: boolean;
+  canRunScan: boolean;
 }) {
   const score = site.latest_scores?.malware;
   const [expandedScan, setExpandedScan] = useState<string | null>(null);
@@ -660,16 +667,18 @@ function MalwareTab({
               <p className="text-sm text-muted-foreground">No scan yet</p>
             </div>
           )}
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={onRunScan}
-            loading={scanning}
-            className="w-full"
-          >
-            <RefreshCw size={13} />
-            {scanning ? "Scanning…" : "Run Scan"}
-          </Button>
+          {canRunScan && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onRunScan}
+              loading={scanning}
+              className="w-full"
+            >
+              <RefreshCw size={13} />
+              {scanning ? "Scanning…" : "Run Scan"}
+            </Button>
+          )}
         </Card>
 
         {/* Scan history */}
@@ -935,6 +944,9 @@ export default function SiteDetailPage() {
   const searchParams = useSearchParams();
 
   const { site, loading, error, refetch } = useSite(id);
+  const { roleCanDo } = useRole();
+  const canRunAudit = roleCanDo("run_audit");
+  const canDeleteSite = roleCanDo("delete_site");
   const [pendingAuditId, setPendingAuditId] = useState<string | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -1024,29 +1036,33 @@ export default function SiteDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {deleteConfirm && (
+            {canDeleteSite && deleteConfirm && (
               <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>
                 Cancel
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDelete}
-              loading={deleteLoading}
-              className={deleteConfirm ? "border-red-300 text-red-600 hover:bg-red-50" : ""}
-            >
-              <Trash2 size={13} />
-              {deleteConfirm ? "Confirm?" : "Delete"}
-            </Button>
-            <Button
-              size="sm"
-              loading={auditLoading || !!pendingAuditId}
-              onClick={runAudit}
-            >
-              <RefreshCw size={13} />
-              {pendingAuditId ? "Running…" : "Run Audit"}
-            </Button>
+            {canDeleteSite && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDelete}
+                loading={deleteLoading}
+                className={deleteConfirm ? "border-red-300 text-red-600 hover:bg-red-50" : ""}
+              >
+                <Trash2 size={13} />
+                {deleteConfirm ? "Confirm?" : "Delete"}
+              </Button>
+            )}
+            {canRunAudit && (
+              <Button
+                size="sm"
+                loading={auditLoading || !!pendingAuditId}
+                onClick={runAudit}
+              >
+                <RefreshCw size={13} />
+                {pendingAuditId ? "Running…" : "Run Audit"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1135,6 +1151,7 @@ export default function SiteDetailPage() {
             audits={site.audits}
             runAudit={runAudit}
             auditLoading={auditLoading}
+            canRunAudit={canRunAudit}
           />
         )}
         {activeTab === "security" && <SecurityTab site={site} />}
@@ -1148,6 +1165,7 @@ export default function SiteDetailPage() {
             scans={site.scans}
             onRunScan={runAudit}
             scanning={auditLoading || !!pendingAuditId}
+            canRunScan={canRunAudit}
           />
         )}
         {activeTab === "plugins" && <PluginsTab site={site} />}

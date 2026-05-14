@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { useSites } from "@/hooks/useSites";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import { SiteCard } from "@/components/dashboard/SiteCard";
 import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -263,11 +264,13 @@ function AttentionItem({ site }: { site: Site }) {
 export default function DashboardPage() {
   const { sites, loading, error, refetch } = useSites();
   const { agency } = useAuth();
+  const { roleCanDo } = useRole();
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
 
   const limit = agency ? PLAN_LIMITS[agency.plan] : 1;
   const atLimit = sites.length >= limit;
+  const canAddSite = roleCanDo("add_site");
 
   const connectedCount = sites.filter((s) => s.plugin_connected).length;
   const threatCount = sites.filter((s) => s.malware_status === "threat").length;
@@ -338,17 +341,19 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-foreground">
             Portfolio Overview
           </h1>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              onClick={() => setShowAdd(true)}
-              disabled={atLimit}
-              size="md"
-              title={atLimit ? "Upgrade to add more sites" : undefined}
-            >
-              <Plus size={15} />
-              Add Site
-            </Button>
-          </div>
+          {canAddSite && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                onClick={() => setShowAdd(true)}
+                disabled={atLimit}
+                size="md"
+                title={atLimit ? "Upgrade to add more sites" : undefined}
+              >
+                <Plus size={15} />
+                Add Site
+              </Button>
+            </div>
+          )}
         </div>
 
         {sites.length > 0 && (
@@ -387,12 +392,12 @@ export default function DashboardPage() {
             icon={<Globe size={22} />}
             title="No sites yet"
             description="Add your first client site to start monitoring performance, SEO, security, and malware."
-            action={
+            action={canAddSite ? (
               <Button onClick={() => setShowAdd(true)}>
                 <Plus size={15} />
                 Add your first site
               </Button>
-            }
+            ) : undefined}
           />
         )}
 

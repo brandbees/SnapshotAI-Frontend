@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, Users, Globe, Mail, Building2, Trash2, Link2 } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
+import { useRole } from "@/hooks/useRole";
 import { AddClientModal } from "@/components/clients/AddClientModal";
 import { AssignSitesModal } from "@/components/clients/AssignSitesModal";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -24,6 +25,7 @@ function ClientCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const { roleCanDo } = useRole();
 
   async function handleDelete() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -61,33 +63,35 @@ function ClientCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {confirmDelete ? (
-              <>
+          {roleCanDo("add_site") && (
+            <div className="flex items-center gap-1 shrink-0">
+              {confirmDelete ? (
+                <>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
+                  >
+                    {deleting ? "Deleting…" : "Confirm"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
                 <button
                   onClick={handleDelete}
-                  disabled={deleting}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="Delete client"
                 >
-                  {deleting ? "Deleting…" : "Confirm"}
+                  <Trash2 size={14} />
                 </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={handleDelete}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors"
-                title="Delete client"
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Details */}
@@ -114,13 +118,15 @@ function ClientCard({
         </div>
 
         {/* Assign sites button */}
-        <button
-          onClick={() => setShowAssign(true)}
-          className="flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline mt-auto"
-        >
-          <Link2 size={11} />
-          Manage assigned sites
-        </button>
+        {roleCanDo("add_site") && (
+          <button
+            onClick={() => setShowAssign(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline mt-auto"
+          >
+            <Link2 size={11} />
+            Manage assigned sites
+          </button>
+        )}
       </Card>
 
       {showAssign && (
@@ -140,14 +146,16 @@ function ClientCard({
 
 export default function ClientsPage() {
   const { clients, loading, error, refetch } = useClients();
+  const { roleCanDo } = useRole();
   const [showAdd, setShowAdd] = useState(false);
+  const canAddClient = roleCanDo("add_site");
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <PageHeader
         title="Clients"
         description="Manage your client relationships and site assignments."
-        action={
+        action={canAddClient ? (
           <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white"
@@ -155,7 +163,7 @@ export default function ClientsPage() {
           >
             <Plus size={15} /> Add client
           </button>
-        }
+        ) : undefined}
       />
 
       {loading && (
@@ -169,7 +177,7 @@ export default function ClientsPage() {
           icon={<Users size={20} />}
           title="No clients yet"
           description="Add your first client to group sites and send branded reports."
-          action={
+          action={canAddClient ? (
             <button
               onClick={() => setShowAdd(true)}
               className="px-4 py-2 rounded-md text-sm font-semibold text-white"
@@ -177,7 +185,7 @@ export default function ClientsPage() {
             >
               Add client
             </button>
-          }
+          ) : undefined}
         />
       )}
       {!loading && clients.length > 0 && (

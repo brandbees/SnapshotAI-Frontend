@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Globe } from "lucide-react";
 import { useSites } from "@/hooks/useSites";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import { SiteCard } from "@/components/dashboard/SiteCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
@@ -14,16 +15,18 @@ import { PLAN_LIMITS } from "@/lib/constants";
 export default function SitesPage() {
   const { sites, loading, error, refetch } = useSites();
   const { agency } = useAuth();
+  const { roleCanDo } = useRole();
   const [showAdd, setShowAdd] = useState(false);
 
   const limit = agency ? PLAN_LIMITS[agency.plan] : 1;
   const atLimit = sites.length >= limit;
+  const canAddSite = roleCanDo("add_site");
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <PageHeader
         title="Your Sites"
-        action={
+        action={canAddSite ? (
           <button
             onClick={() => setShowAdd(true)}
             disabled={atLimit}
@@ -32,7 +35,7 @@ export default function SitesPage() {
           >
             <Plus size={15} /> Add site
           </button>
-        }
+        ) : undefined}
       />
 
       {loading && (
@@ -48,7 +51,7 @@ export default function SitesPage() {
           icon={<Globe size={20} />}
           title="No sites yet"
           description="Add your first site to start monitoring."
-          action={
+          action={canAddSite ? (
             <button
               onClick={() => setShowAdd(true)}
               className="px-4 py-2 rounded-md text-sm font-semibold text-white"
@@ -56,7 +59,7 @@ export default function SitesPage() {
             >
               Add site
             </button>
-          }
+          ) : undefined}
         />
       )}
       {!loading && sites.length > 0 && (

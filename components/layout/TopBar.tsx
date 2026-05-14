@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, Search } from "lucide-react";
+import Link from "next/link";
 import { MobileNav } from "./MobileNav";
 import { useAuth } from "@/hooks/useAuth";
 import { PLAN_LABELS } from "@/lib/constants";
@@ -35,10 +36,13 @@ export function TopBar() {
         </button>
 
         {agency && (
-          <div className="flex items-center gap-2.5 pl-2 ml-1 border-l border-border">
+          <Link
+            href="/settings/profile"
+            className="flex items-center gap-2.5 pl-2 ml-1 border-l border-border hover:opacity-80 transition-opacity"
+          >
             <div className="text-right hidden sm:block">
               <p className="text-xs font-semibold text-foreground leading-none">
-                {agency.name}
+                {agency.member_name ?? agency.name}
               </p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {PLAN_LABELS[agency.plan]}
@@ -48,9 +52,9 @@ export function TopBar() {
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
               style={{ background: "var(--accent)" }}
             >
-              {agency.name[0].toUpperCase()}
+              {(agency.member_name ?? agency.name)[0].toUpperCase()}
             </div>
-          </div>
+          </Link>
         )}
       </div>
     </header>

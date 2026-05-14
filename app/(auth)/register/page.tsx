@@ -30,7 +30,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(agencyName, email, password, coupon || undefined);
-      router.replace("/dashboard");
+      router.replace("/onboarding");
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data

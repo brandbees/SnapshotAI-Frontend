@@ -9,6 +9,7 @@ export default function SettingsPage() {
       />
       <div className="space-y-3">
         {[
+          { href: "/settings/profile", label: "Profile", desc: "Your name and password" },
           { href: "/settings/white-label", label: "Brand Settings", desc: "Logo, brand name, accent color" },
           { href: "/settings/alerts", label: "Alert Settings", desc: "Thresholds and notification channels" },
           { href: "/settings/team", label: "Team", desc: "Invite and manage team members" },

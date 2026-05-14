@@ -48,7 +48,26 @@ export function useAuth() {
     window.location.href = "/login";
   }
 
+  function updateAgency(updates: Partial<Agency>): void {
+    setAgencyState((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      setAgency(updated);
+      return updated;
+    });
+  }
+
+  async function refreshAgency(): Promise<void> {
+    try {
+      const { data } = await api.get<{ agency: Agency }>("/auth/me");
+      setAgency(data.agency);
+      setAgencyState(data.agency);
+    } catch {
+      // token expired or network error — leave existing state
+    }
+  }
+
   const isLoggedIn = !!getToken();
 
-  return { agency, loading, isLoggedIn, login, register, logout };
+  return { agency, loading, isLoggedIn, login, register, logout, updateAgency, refreshAgency };
 }
