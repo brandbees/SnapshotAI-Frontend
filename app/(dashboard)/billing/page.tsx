@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, AlertCircle, X, Tag, CreditCard, Users, Globe, Zap } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -46,7 +46,7 @@ function getDaysRemaining(trialEndsAt: string): number {
   return Math.max(0, Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
-export default function BillingPage() {
+function BillingPage() {
   const { agency, refreshAgency } = useAuth();
   const searchParams = useSearchParams();
   const verifiedRef = useRef(false);
@@ -307,5 +307,13 @@ export default function BillingPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <BillingPage />
+    </Suspense>
   );
 }
