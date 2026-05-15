@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, RefreshCw, ExternalLink, Trash2,
@@ -109,7 +109,6 @@ function SignalRow({
 function PluginDataPanel({ site }: { site: Site }) {
   const [open, setOpen] = useState(false);
   const pd = site.plugin_data;
-  if (!pd && !site.mysql_version && !site.memory_limit) return null;
 
   const rows = [
     { label: "WordPress", value: pd?.wp_version },
@@ -118,6 +117,16 @@ function PluginDataPanel({ site }: { site: Site }) {
     { label: "Server", value: pd?.server_software },
     { label: "Memory limit", value: site.memory_limit },
     { label: "DB size", value: site.database_size_mb != null ? `${site.database_size_mb} MB` : undefined },
+    { label: "DB tables", value: site.database_table_count != null ? String(site.database_table_count) : undefined },
+    { label: "Autoloaded options", value: site.autoloaded_options_kb != null ? `${site.autoloaded_options_kb} KB` : undefined },
+    { label: "Transients", value: site.transient_count != null ? String(site.transient_count) : undefined },
+    { label: "Post revisions", value: site.post_revisions_count != null ? String(site.post_revisions_count) : undefined },
+    { label: "Orphaned post meta", value: site.orphaned_post_meta_count != null ? String(site.orphaned_post_meta_count) : undefined },
+    { label: "Total posts", value: site.total_posts != null ? String(site.total_posts) : undefined },
+    { label: "Total pages", value: site.total_pages != null ? String(site.total_pages) : undefined },
+    { label: "Total media", value: site.total_media != null ? String(site.total_media) : undefined },
+    { label: "Total comments", value: site.total_comments != null ? String(site.total_comments) : undefined },
+    { label: "Last published", value: site.last_published_at ? timeAgo(site.last_published_at) : undefined },
     { label: "Last sync", value: pd?.last_sync ? timeAgo(pd.last_sync) : undefined },
   ].filter((r) => r.value);
 
@@ -342,8 +351,8 @@ function SecurityTab({ site }: { site: Site }) {
                   <span
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{
-                      color: site.admin_users_count > 2 ? "var(--score-warn)" : "var(--score-good)",
-                      background: site.admin_users_count > 2 ? "var(--score-warn-bg, #fef3c7)" : "var(--score-good-bg)",
+                      color: site.admin_users_count > 3 ? "var(--score-warn)" : "var(--score-good)",
+                      background: site.admin_users_count > 3 ? "var(--score-warn-bg, #fef3c7)" : "var(--score-good-bg)",
                     }}
                   >
                     {site.admin_users_count} admin{site.admin_users_count !== 1 ? "s" : ""}
@@ -511,6 +520,52 @@ function PerformanceTab({ site, audits }: { site: Site; audits: Audit[] }) {
             </div>
           </Card>
 
+          {/* Database Health */}
+          {(site.autoloaded_options_kb != null || site.transient_count != null || site.post_revisions_count != null || site.object_cache_enabled != null) && (
+            <Card padding="md">
+              <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-3">
+                Database Health
+              </p>
+              {[
+                { label: "Autoloaded Options", value: site.autoloaded_options_kb, unit: "KB", warnAt: 800 },
+                { label: "Transients",         value: site.transient_count,       unit: "",   warnAt: 100 },
+                { label: "Post Revisions",     value: site.post_revisions_count,  unit: "",   warnAt: 500 },
+              ].map(({ label, value, unit, warnAt }) => {
+                if (value == null) return null;
+                const isWarn = value > warnAt;
+                return (
+                  <div key={label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                    <span className="text-sm text-foreground">{label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium" style={{ color: isWarn ? "var(--score-warn)" : "var(--score-good)" }}>
+                        {value.toLocaleString()}{unit ? ` ${unit}` : ""}
+                      </span>
+                      {isWarn
+                        ? <AlertCircle size={15} style={{ color: "var(--score-warn)" }} />
+                        : <CheckCircle2 size={15} style={{ color: "var(--score-good)" }} />}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-foreground">Object Cache</span>
+                {site.object_cache_enabled == null ? (
+                  <span className="text-xs text-muted-foreground">Unknown</span>
+                ) : site.object_cache_enabled ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Enabled</span>
+                    <CheckCircle2 size={15} style={{ color: "var(--score-good)" }} />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Disabled</span>
+                    <AlertCircle size={15} style={{ color: "var(--score-warn)" }} />
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Real-user metrics placeholder */}
           <Card padding="md" className="border-dashed">
             <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">
@@ -637,12 +692,14 @@ function MalwareTab({
   onRunScan,
   scanning,
   canRunScan,
+  scanError,
 }: {
   site: Site;
   scans: ScanResult[];
   onRunScan: () => void;
   scanning: boolean;
   canRunScan: boolean;
+  scanError?: string | null;
 }) {
   const score = site.latest_scores?.malware;
   const [expandedScan, setExpandedScan] = useState<string | null>(null);
@@ -668,16 +725,21 @@ function MalwareTab({
             </div>
           )}
           {canRunScan && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={onRunScan}
-              loading={scanning}
-              className="w-full"
-            >
-              <RefreshCw size={13} />
-              {scanning ? "Scanning…" : "Run Scan"}
-            </Button>
+            <div className="w-full space-y-1.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onRunScan}
+                loading={scanning}
+                className="w-full"
+              >
+                <RefreshCw size={13} />
+                {scanning ? "Scanning…" : "Run Scan"}
+              </Button>
+              {scanError && (
+                <p className="text-xs text-center" style={{ color: "var(--score-bad)" }}>{scanError}</p>
+              )}
+            </div>
           )}
         </Card>
 
@@ -697,7 +759,8 @@ function MalwareTab({
             ) : (
               <div className="divide-y divide-border">
                 {scans.map((scan) => {
-                  const hasThreats = scan.threats && scan.threats.length > 0;
+                  const threatHits = scan.threats && scan.threats.length > 0 ? scan.threats : null;
+                  const canExpand = !scan.is_clean;
                   const isExpanded = expandedScan === scan.id;
                   return (
                     <div key={scan.id}>
@@ -729,7 +792,7 @@ function MalwareTab({
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          {!scan.is_clean && scan.threats && (
+                          {!scan.is_clean && (
                             <span
                               className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                               style={{
@@ -737,52 +800,56 @@ function MalwareTab({
                                 background: "var(--score-bad-bg)",
                               }}
                             >
-                              {scan.threats.length} threat{scan.threats.length !== 1 ? "s" : ""}
+                              {threatHits
+                                ? `${threatHits.length} threat${threatHits.length !== 1 ? "s" : ""}`
+                                : "Threats detected"}
                             </span>
                           )}
-                          {hasThreats && (
+                          {canExpand && (
                             isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                           )}
                         </div>
                       </div>
-                      {isExpanded && hasThreats && (
+                      {isExpanded && canExpand && (
                         <div className="mx-0 mb-2 bg-red-50 rounded-xl overflow-hidden">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-red-100">
-                                <th className="px-4 py-2 text-left font-semibold text-red-700">Type</th>
-                                <th className="px-4 py-2 text-left font-semibold text-red-700">Severity</th>
-                                <th className="px-4 py-2 text-left font-semibold text-red-700">File / Detail</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {scan.threats!.map((threat, i) => (
-                                <tr key={i} className="border-b border-red-100 last:border-0">
-                                  <td className="px-4 py-2 text-foreground">
-                                    {threat.threat_type || threat.type || "Unknown"}
-                                  </td>
-                                  <td className="px-4 py-2">
-                                    <span
-                                      className="font-semibold capitalize"
-                                      style={{
-                                        color:
-                                          threat.severity === "critical" || threat.severity === "high"
-                                            ? "var(--score-bad)"
-                                            : threat.severity === "medium"
-                                            ? "var(--score-warn)"
-                                            : "var(--muted-foreground)",
-                                      }}
-                                    >
-                                      {threat.severity || "—"}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-2 font-mono text-[10px] text-muted-foreground truncate max-w-[200px]">
-                                    {threat.file_path || threat.description || "—"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          {threatHits && threatHits.length > 0 ? (
+                            <>
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-red-100">
+                                    <th className="px-4 py-2 text-left font-semibold text-red-700">URL / Domain</th>
+                                    <th className="px-4 py-2 text-left font-semibold text-red-700">Threat Type</th>
+                                    <th className="px-4 py-2 text-left font-semibold text-red-700">Source Feed</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {threatHits.map((threat, i) => (
+                                    <tr key={i} className="border-b border-red-100 last:border-0">
+                                      <td className="px-4 py-2 font-mono text-[10px] text-muted-foreground truncate max-w-[200px]">
+                                        {threat.url || threat.file_path || threat.description || "—"}
+                                      </td>
+                                      <td className="px-4 py-2 text-foreground">
+                                        {threat.threat_type || threat.type || "Unknown"}
+                                      </td>
+                                      <td className="px-4 py-2 text-muted-foreground">
+                                        {threat.source || threat.severity || "—"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {scan.sources_used && scan.sources_used.length > 0 && (
+                                <div className="px-4 py-2 border-t border-red-100">
+                                  <span className="text-[10px] font-semibold text-red-700 uppercase tracking-wider">Sources used: </span>
+                                  <span className="text-[10px] text-red-600">{scan.sources_used.join(", ")}</span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="px-4 py-3">
+                              <p className="text-xs text-red-700">No specific threat details available — URL matched threat intelligence feed</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -867,7 +934,7 @@ function PluginsTab({ site }: { site: Site }) {
                             background: "var(--score-warn-bg, #fef3c7)",
                           }}
                         >
-                          Update available
+                          Update available{plugin.new_version ? ` → v${plugin.new_version}` : ""}
                         </span>
                       ) : (
                         <span
@@ -881,6 +948,41 @@ function PluginsTab({ site }: { site: Site }) {
                         </span>
                       )}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Abandoned plugins */}
+      {site.plugins_outdated_12m && site.plugins_outdated_12m.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-foreground">Abandoned Plugins</h3>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ color: "var(--score-warn)", background: "var(--score-warn-bg, #fef3c7)" }}
+            >
+              {site.plugins_outdated_12m.length} plugin{site.plugins_outdated_12m.length !== 1 ? "s" : ""} not updated in 12+ months
+            </span>
+          </div>
+          <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-muted/40">
+                <tr>
+                  {["Plugin", "Version", "Last Updated"].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {site.plugins_outdated_12m.map((p) => (
+                  <tr key={p.name} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-foreground">{p.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.version || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{p.last_updated || "Unknown"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -953,6 +1055,15 @@ export default function SiteDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [tokenVisible, setTokenVisible] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scanPollRef.current) clearInterval(scanPollRef.current);
+    };
+  }, []);
 
   function copyToken(token: string) {
     navigator.clipboard.writeText(token).then(() => {
@@ -984,6 +1095,38 @@ export default function SiteDetailPage() {
       // silent
     } finally {
       setAuditLoading(false);
+    }
+  }
+
+  async function runScan() {
+    setScanLoading(true);
+    setScanError(null);
+    try {
+      await api.post(`/scanner/scan/${id}`);
+      scanPollRef.current = setInterval(async () => {
+        try {
+          const { data } = await api.get<{ status: string }>(`/scanner/${id}/status`);
+          if (data.status === "completed" || data.status === "failed") {
+            clearInterval(scanPollRef.current!);
+            scanPollRef.current = null;
+            setScanLoading(false);
+            if (data.status === "failed") {
+              setScanError("Scan failed. Please try again.");
+            } else {
+              refetch();
+            }
+          }
+        } catch {
+          clearInterval(scanPollRef.current!);
+          scanPollRef.current = null;
+          setScanLoading(false);
+          setScanError("Failed to check scan status.");
+        }
+      }, 3000);
+    } catch (err: unknown) {
+      setScanLoading(false);
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setScanError(msg || "Failed to start scan.");
     }
   }
 
@@ -1163,9 +1306,10 @@ export default function SiteDetailPage() {
           <MalwareTab
             site={site}
             scans={site.scans}
-            onRunScan={runAudit}
-            scanning={auditLoading || !!pendingAuditId}
+            onRunScan={runScan}
+            scanning={scanLoading}
             canRunScan={canRunAudit}
+            scanError={scanError}
           />
         )}
         {activeTab === "plugins" && <PluginsTab site={site} />}

@@ -64,6 +64,19 @@ export interface Site {
 
   // Plugin intelligence
   plugins_needing_updates?: number | null;
+  plugins_outdated_12m?: PluginOutdated[] | null;
+
+  // Content counts & DB health
+  database_table_count?: number | null;
+  autoloaded_options_kb?: number | null;
+  transient_count?: number | null;
+  post_revisions_count?: number | null;
+  orphaned_post_meta_count?: number | null;
+  total_posts?: number | null;
+  total_pages?: number | null;
+  total_media?: number | null;
+  total_comments?: number | null;
+  last_published_at?: string | null;
 }
 
 export interface PillarScores {
@@ -151,6 +164,7 @@ export interface ScanResult {
   site_id: string;
   is_clean: boolean;
   threats?: ScanThreat[] | null;
+  sources_used?: string[] | null;
   created_at: string;
 }
 
@@ -161,6 +175,8 @@ export interface ScanThreat {
   file_path?: string;
   signature_id?: string;
   description?: string;
+  url?: string;
+  source?: string;
 }
 
 // ── Plugin data ───────────────────────────────────────────────────────────────
@@ -177,11 +193,18 @@ export interface PluginData {
   last_sync?: string;
 }
 
+export interface PluginOutdated {
+  name: string;
+  version?: string;
+  last_updated?: string;
+}
+
 export interface Plugin {
   name: string;
   version: string;
   status: "active" | "inactive";
   update_available: boolean;
+  new_version?: string;
 }
 
 // ── Other types ───────────────────────────────────────────────────────────────

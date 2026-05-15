@@ -21,7 +21,9 @@ export default function DashboardLayout({
       return;
     }
     const agency = getAgency();
-    if (agency && agency.onboarding_complete === false) {
+    // Only redirect to onboarding for new accounts (trial_ends_at is set on register).
+    // Old accounts have trial_ends_at = null and must never be forced through onboarding.
+    if (agency && agency.onboarding_complete === false && agency.trial_ends_at != null) {
       router.replace("/onboarding");
     }
   }, [router]);

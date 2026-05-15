@@ -1,6 +1,6 @@
 import type {
   Site, Audit, PillarScores, PluginData, Plugin,
-  ScanResult, SeoData, PerformanceData, SecurityData,
+  ScanResult, SeoData, PerformanceData, SecurityData, PluginOutdated,
 } from "@/types";
 
 // ── Raw shapes returned by the backend ───────────────────────────────────────
@@ -49,8 +49,19 @@ export interface RawSite {
   object_cache_enabled?: boolean | null;
   // Plugin intelligence
   plugins_needing_updates?: number | null;
-  plugins_update_list?: string[];
+  plugins_update_list?: Array<{ name: string; current_version?: string; new_version?: string } | string>;
   plugins_outdated_12m?: unknown;
+  // Content counts & DB health
+  database_table_count?: number | null;
+  autoloaded_options_kb?: number | null;
+  transient_count?: number | null;
+  post_revisions_count?: number | null;
+  orphaned_post_meta_count?: number | null;
+  total_posts?: number | null;
+  total_pages?: number | null;
+  total_media?: number | null;
+  total_comments?: number | null;
+  last_published_at?: string | null;
   // WooCommerce
   woocommerce_active?: boolean | null;
   woo_order_count?: number | null;
@@ -145,12 +156,30 @@ function parseJsonArray(val: unknown): string[] | null {
   return null;
 }
 
+function parseOutdated(val: unknown): PluginOutdated[] | null {
+  if (!val) return null;
+  const arr = Array.isArray(val) ? val : (() => {
+    if (typeof val === "string") { try { return JSON.parse(val); } catch { return null; } }
+    return null;
+  })();
+  if (!Array.isArray(arr)) return null;
+  return arr as PluginOutdated[];
+}
+
 export function mapSite(raw: RawSite): Site {
-  const updateSet = new Set<string>(raw.plugins_update_list ?? []);
+  const updateMap = new Map<string, string>();
+  for (const item of raw.plugins_update_list ?? []) {
+    if (typeof item === "string") {
+      updateMap.set(item, "");
+    } else if (item && typeof item === "object" && item.name) {
+      updateMap.set(item.name, item.new_version ?? "");
+    }
+  }
 
   const plugins = mapPlugins(raw.active_plugins).map((p) => ({
     ...p,
-    update_available: updateSet.has(p.name),
+    update_available: updateMap.has(p.name),
+    new_version: updateMap.get(p.name) || undefined,
   }));
 
   const pluginData: PluginData | undefined = raw.plugin_connected
@@ -219,6 +248,19 @@ export function mapSite(raw: RawSite): Site {
 
     // Plugin intelligence
     plugins_needing_updates: raw.plugins_needing_updates ?? null,
+    plugins_outdated_12m: parseOutdated(raw.plugins_outdated_12m),
+
+    // Content counts & DB health
+    database_table_count: raw.database_table_count ?? null,
+    autoloaded_options_kb: raw.autoloaded_options_kb ?? null,
+    transient_count: raw.transient_count ?? null,
+    post_revisions_count: raw.post_revisions_count ?? null,
+    orphaned_post_meta_count: raw.orphaned_post_meta_count ?? null,
+    total_posts: raw.total_posts ?? null,
+    total_pages: raw.total_pages ?? null,
+    total_media: raw.total_media ?? null,
+    total_comments: raw.total_comments ?? null,
+    last_published_at: raw.last_published_at ?? null,
   };
 }
 
@@ -239,19 +281,36 @@ export function mapAudit(raw: RawAudit): Audit {
 }
 
 export function mapScan(raw: RawScan): ScanResult {
-  let threats = null;
+  let threats: ScanResult["threats"] = null;
+  let sources_used: string[] | null = null;
+
   if (raw.threats) {
-    if (Array.isArray(raw.threats)) {
-      threats = raw.threats as ScanResult["threats"];
-    } else if (typeof raw.threats === "string") {
-      try { threats = JSON.parse(raw.threats); } catch { threats = null; }
+    const parsed = (() => {
+      if (typeof raw.threats === "string") {
+        try { return JSON.parse(raw.threats); } catch { return null; }
+      }
+      return raw.threats;
+    })();
+
+    if (Array.isArray(parsed)) {
+      threats = parsed as ScanResult["threats"];
+    } else if (parsed && typeof parsed === "object") {
+      const obj = parsed as { hits?: unknown; sources_used?: unknown };
+      if (Array.isArray(obj.hits)) {
+        threats = obj.hits as ScanResult["threats"];
+      }
+      if (Array.isArray(obj.sources_used)) {
+        sources_used = obj.sources_used as string[];
+      }
     }
   }
+
   return {
     id: raw.id,
     site_id: raw.site_id,
     is_clean: raw.is_clean ?? true,
     threats,
+    sources_used,
     created_at: raw.created_at,
   };
 }
