@@ -15,9 +15,9 @@
   /* Brand */
   --primary: #111827;
   --primary-foreground: #ffffff;
-  --accent: #0ea5e9;
-  --accent-hover: #0284c7;
-  --accent-light: #e0f2fe;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-light: #eef2ff;
   --accent-foreground: #ffffff;
 
   /* Feedback */
@@ -159,3 +159,10 @@ button, a, input, select, textarea {
 .animate-fade-in    { animation: fade-in    0.4s  ease-out forwards; }
 .animate-scale-in   { animation: scale-in   0.45s ease-out forwards; }
 .animate-spin       { animation: spin 0.8s linear infinite; }
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.animate-slide-in-right { animation: slide-in-right 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards; }

@@ -6,22 +6,27 @@ import {
   ArrowLeft, RefreshCw, ExternalLink, Trash2,
   CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp,
   Shield, Package, ShoppingCart, Wifi, Key, Copy, Eye, EyeOff,
+  Activity, Wrench, TrendingUp, Clock, Zap, Server, Database, LayoutGrid,
 } from "lucide-react";
+import {
+  ResponsiveContainer, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  PieChart, Pie, Cell,
+} from "recharts";
 import { useSite } from "@/hooks/useSite";
 import { useAuditStatus } from "@/hooks/useAuditStatus";
 import { useRole } from "@/hooks/useRole";
 import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
-import { TrendChart } from "@/components/dashboard/TrendChart";
 import { AuditHistoryTable } from "@/components/dashboard/AuditHistoryTable";
-import { MalwareBadge } from "@/components/dashboard/MalwareBadge";
-import { UptimeBadge } from "@/components/dashboard/UptimeBadge";
-import { LoadingPage, LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { LoadingPage } from "@/components/shared/LoadingSpinner";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import api from "@/lib/api";
-import { scoreColor, timeAgo } from "@/lib/utils";
-import type { Site, Audit, ScanResult, SeoData } from "@/types";
+import { timeAgo, scoreHex } from "@/lib/utils";
+import type { Site, Audit, ScanResult } from "@/types";
+
+const AVATAR_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
+function siteAvatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length]; }
 
 // ── Tab config ────────────────────────────────────────────────────────────────
 
@@ -31,16 +36,19 @@ type Tab =
   | "performance"
   | "seo"
   | "malware"
+  | "uptime"
   | "plugins"
   | "woocommerce";
 
 const BASE_TABS: { key: Tab; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "security", label: "Security" },
-  { key: "performance", label: "Performance" },
-  { key: "seo", label: "SEO" },
-  { key: "malware", label: "Malware" },
-  { key: "plugins", label: "Plugins" },
+  { key: "overview",     label: "Overview" },
+  { key: "seo",          label: "SEO" },
+  { key: "security",     label: "Security" },
+  { key: "performance",  label: "Performance" },
+  { key: "malware",      label: "Malware" },
+  { key: "uptime",       label: "Uptime" },
+  { key: "plugins",      label: "Plugins" },
+  { key: "woocommerce",  label: "WooCommerce" },
 ];
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -50,17 +58,7 @@ function sslDaysRemaining(date: string | null | undefined): number | null {
   return Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000);
 }
 
-function getSeoCheck(data: SeoData, ...keys: string[]): boolean | null {
-  for (const key of keys) {
-    const val = data[key];
-    if (val === undefined || val === null) continue;
-    if (typeof val === "boolean") return val;
-    if (typeof val === "object" && "present" in (val as object))
-      return (val as { present?: boolean }).present ?? null;
-    if (typeof val === "string") return val.length > 0;
-  }
-  return null;
-}
+
 
 // ── Signal row (Security + Performance) ──────────────────────────────────────
 
@@ -107,51 +105,140 @@ function SignalRow({
 // ── Plugin data panel (collapsible) ──────────────────────────────────────────
 
 function PluginDataPanel({ site }: { site: Site }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const pd = site.plugin_data;
 
-  const rows = [
+  const serverRows = [
     { label: "WordPress", value: pd?.wp_version },
-    { label: "PHP", value: pd?.php_version },
-    { label: "MySQL", value: site.mysql_version },
-    { label: "Server", value: pd?.server_software },
-    { label: "Memory limit", value: site.memory_limit },
-    { label: "DB size", value: site.database_size_mb != null ? `${site.database_size_mb} MB` : undefined },
-    { label: "DB tables", value: site.database_table_count != null ? String(site.database_table_count) : undefined },
-    { label: "Autoloaded options", value: site.autoloaded_options_kb != null ? `${site.autoloaded_options_kb} KB` : undefined },
-    { label: "Transients", value: site.transient_count != null ? String(site.transient_count) : undefined },
-    { label: "Post revisions", value: site.post_revisions_count != null ? String(site.post_revisions_count) : undefined },
-    { label: "Orphaned post meta", value: site.orphaned_post_meta_count != null ? String(site.orphaned_post_meta_count) : undefined },
-    { label: "Total posts", value: site.total_posts != null ? String(site.total_posts) : undefined },
-    { label: "Total pages", value: site.total_pages != null ? String(site.total_pages) : undefined },
-    { label: "Total media", value: site.total_media != null ? String(site.total_media) : undefined },
-    { label: "Total comments", value: site.total_comments != null ? String(site.total_comments) : undefined },
-    { label: "Last published", value: site.last_published_at ? timeAgo(site.last_published_at) : undefined },
-    { label: "Last sync", value: pd?.last_sync ? timeAgo(pd.last_sync) : undefined },
-  ].filter((r) => r.value);
+    { label: "PHP",       value: pd?.php_version },
+    { label: "MySQL",     value: site.mysql_version },
+    { label: "Server",    value: pd?.server_software },
+    { label: "Memory",    value: site.memory_limit },
+  ].filter((r) => r.value) as { label: string; value: string }[];
 
-  if (rows.length === 0) return null;
+  const dbRows = [
+    { label: "DB Size",         value: site.database_size_mb != null       ? `${site.database_size_mb} MB`         : null, warn: false },
+    { label: "DB Tables",       value: site.database_table_count != null   ? String(site.database_table_count)     : null, warn: false },
+    { label: "Autoloaded",      value: site.autoloaded_options_kb != null  ? `${site.autoloaded_options_kb} KB`    : null, warn: (site.autoloaded_options_kb ?? 0) > 800 },
+    { label: "Transients",      value: site.transient_count != null        ? String(site.transient_count)          : null, warn: (site.transient_count ?? 0) > 100 },
+    { label: "Post Revisions",  value: site.post_revisions_count != null   ? String(site.post_revisions_count)     : null, warn: (site.post_revisions_count ?? 0) > 500 },
+    { label: "Orphaned Meta",   value: site.orphaned_post_meta_count != null ? String(site.orphaned_post_meta_count) : null, warn: (site.orphaned_post_meta_count ?? 0) > 0 },
+  ].filter((r) => r.value !== null) as { label: string; value: string; warn: boolean }[];
+
+  const contentRows = [
+    { label: "Posts",    value: site.total_posts != null    ? String(site.total_posts)    : null },
+    { label: "Pages",    value: site.total_pages != null    ? String(site.total_pages)    : null },
+    { label: "Media",    value: site.total_media != null    ? String(site.total_media)    : null },
+    { label: "Comments", value: site.total_comments != null ? String(site.total_comments) : null },
+  ].filter((r) => r.value !== null) as { label: string; value: string }[];
+
+  const metaRows = [
+    { label: "Last published", value: site.last_published_at ? timeAgo(site.last_published_at) : null },
+    { label: "Last sync",      value: pd?.last_sync ? timeAgo(pd.last_sync) : null },
+  ].filter((r) => r.value !== null) as { label: string; value: string }[];
+
+  const totalCount = serverRows.length + dbRows.length + contentRows.length + metaRows.length;
+  const hasData = totalCount > 0;
 
   return (
-    <div className="border border-border rounded-2xl overflow-hidden">
+    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      {/* Toggle header */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-3.5 bg-muted/40 hover:bg-muted/70 transition-colors text-sm font-semibold text-foreground"
+        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors"
       >
-        Server & Environment
-        {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+          <Server size={15} className="text-blue-500" />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-foreground">Server & Environment</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {hasData ? `${totalCount} data points collected` : "Connect plugin to collect server data"}
+          </p>
+        </div>
+        <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="px-5 py-3 space-y-0 bg-surface">
-          {rows.map(({ label, value }) => (
-            <div
-              key={label}
-              className="flex items-center justify-between py-2 border-b border-border last:border-0"
-            >
-              <span className="text-xs text-muted-foreground">{label}</span>
-              <span className="text-xs font-medium text-foreground">{value}</span>
+
+      {open && !hasData && (
+        <div className="border-t border-border px-5 py-8 flex flex-col items-center gap-2 text-center">
+          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+            <Server size={16} className="text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No environment data yet</p>
+          <p className="text-xs text-muted-foreground">Install and connect the plugin to collect<br />server, database, and content stats.</p>
+        </div>
+      )}
+
+      {open && hasData && (
+        <div className="border-t border-border divide-y divide-border">
+
+          {/* Server rows */}
+          {serverRows.length > 0 && (
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Server size={12} className="text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Server</p>
+              </div>
+              <div>
+                {serverRows.map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+                    <span className="text-xs font-semibold text-foreground text-right ml-4 break-all">{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* Database rows */}
+          {dbRows.length > 0 && (
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Database size={12} className="text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Database</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+                {dbRows.map(({ label, value, warn }) => (
+                  <div key={label} className="flex items-center justify-between py-2 border-b border-border last:border-0 sm:last:border-0">
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <span className={`text-xs font-semibold tabular-nums ${warn ? "text-amber-500" : "text-foreground"}`}>
+                      {value}
+                      {warn && <AlertCircle size={11} className="inline ml-1 text-amber-400" />}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Content stats */}
+          {contentRows.length > 0 && (
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <LayoutGrid size={12} className="text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Content</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {contentRows.map(({ label, value }) => (
+                  <div key={label} className="bg-gray-50 rounded-xl px-3 py-3 text-center">
+                    <p className="text-xl font-bold text-foreground tabular-nums">{value}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Meta */}
+          {metaRows.length > 0 && (
+            <div className="px-5 py-3 flex items-center gap-6 flex-wrap bg-gray-50/60">
+              {metaRows.map(({ label, value }) => (
+                <span key={label} className="text-xs text-muted-foreground">
+                  {label}: <span className="font-semibold text-foreground">{value}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -175,6 +262,9 @@ function OverviewTab({
 }) {
   const scores = site.latest_scores;
   const prevAudit = audits[1];
+  const overallScore = scores
+    ? Math.round((scores.performance + scores.seo + scores.security + scores.malware) / 4)
+    : null;
 
   const pillarConfig: {
     key: "performance" | "seo" | "security" | "malware";
@@ -182,80 +272,217 @@ function OverviewTab({
     isMalware?: boolean;
   }[] = [
     { key: "performance", label: "Performance" },
-    { key: "seo", label: "SEO" },
-    { key: "security", label: "Security" },
-    { key: "malware", label: "Malware", isMalware: true },
+    { key: "seo",         label: "SEO" },
+    { key: "security",    label: "Security" },
+    { key: "malware",     label: "Malware", isMalware: true },
   ];
 
-  function sublabelVariant(key: string, score: number): "good" | "warn" | "bad" {
-    if (key === "malware") return score >= 80 ? "good" : "bad";
-    return score >= 80 ? "good" : score >= 50 ? "warn" : "bad";
-  }
+  // Collect top issues from available site data
+  const issues: { label: string; severity: "critical" | "warn" }[] = [];
+  if (site.xml_rpc_enabled)    issues.push({ label: "XML-RPC is enabled", severity: "warn" });
+  if (site.file_editor_enabled) issues.push({ label: "File editor enabled", severity: "warn" });
+  if (site.wp_debug_enabled)   issues.push({ label: "Debug mode active", severity: "critical" });
+  if (site.login_url_default)  issues.push({ label: "Default /wp-login URL exposed", severity: "warn" });
+  if (site.wp_config_writable) issues.push({ label: "wp-config.php is writable", severity: "critical" });
+  if (site.htaccess_writable)  issues.push({ label: ".htaccess is writable", severity: "critical" });
+  if (!site.caching_plugin)    issues.push({ label: "No caching plugin installed", severity: "warn" });
+  if (site.admin_usernames?.includes("admin")) issues.push({ label: 'Admin username "admin" exists', severity: "critical" });
+  const sslDays = sslDaysRemaining(site.ssl_expiry_date);
+  if (sslDays !== null && sslDays < 30)
+    issues.push({ label: `SSL expires in ${sslDays}d`, severity: sslDays < 7 ? "critical" : "warn" });
+
+  // Overall health trend
+  const completed = audits.filter((a) => a.status === "completed" && a.scores);
+  const trendPts = completed.slice(-10).map((a) => ({
+    date: new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    score: Math.round((a.scores!.performance + a.scores!.seo + a.scores!.security + a.scores!.malware) / 4),
+  }));
+  const displayTrend = trendPts.length === 1
+    ? [{ date: "—", score: trendPts[0].score }, trendPts[0]]
+    : trendPts;
 
   return (
     <div className="space-y-5">
+
+      {/* Quick stats strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          {
+            label: "Health Score",
+            value: overallScore !== null ? `${overallScore}` : "—",
+            unit: overallScore !== null ? "/100" : "",
+            color: overallScore !== null ? scoreHex(overallScore) : "#9ca3af",
+            icon: <TrendingUp size={15} />,
+          },
+          {
+            label: "30d Uptime",
+            value: site.uptime_percentage !== undefined && site.uptime_percentage !== null
+              ? `${site.uptime_percentage.toFixed(1)}` : "—",
+            unit: "%",
+            color: "#10b981",
+            icon: <Activity size={15} />,
+          },
+          {
+            label: "Last Audit",
+            value: site.last_audit_at ? timeAgo(site.last_audit_at) : "Never",
+            unit: "",
+            color: "#6366f1",
+            icon: <Clock size={15} />,
+          },
+          {
+            label: "Scan Schedule",
+            value: site.scan_schedule ?? "Manual",
+            unit: "",
+            color: "#f59e0b",
+            icon: <Zap size={15} />,
+          },
+        ].map(({ label, value, unit, color, icon }) => (
+          <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: color + "18", color }}>
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground truncate">{label}</p>
+              <p className="text-base font-bold text-foreground tabular-nums leading-tight truncate">
+                {value}<span className="text-xs font-normal text-muted-foreground">{unit}</span>
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 4 score gauges */}
       {scores ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {pillarConfig.map(({ key, label, isMalware }) => {
             const score = scores[key];
             const prevScore = prevAudit?.scores?.[key];
-            const delta =
-              prevScore !== undefined ? score - prevScore : undefined;
-            const sub =
-              delta === undefined
-                ? undefined
-                : delta === 0
-                ? "No change"
-                : `${delta > 0 ? "+" : ""}${delta} from last`;
+            const delta = prevScore !== undefined ? score - prevScore : undefined;
+            const sub = delta === undefined ? undefined : delta === 0 ? "No change" : `${delta > 0 ? "+" : ""}${delta} from last`;
+            const variant: "good" | "warn" | "bad" =
+              delta === 0 ? "warn" : key === "malware" ? (score >= 80 ? "good" : "bad") : score >= 80 ? "good" : score >= 50 ? "warn" : "bad";
             return (
-              <Card key={key} padding="md" className="flex flex-col items-center justify-center min-h-[200px]">
-                <ScoreGauge
-                  score={score}
-                  label={label}
-                  sublabel={sub}
-                  sublabelVariant={delta === 0 ? "warn" : sublabelVariant(key, score)}
-                  size="lg"
-                  isMalware={!!isMalware}
-                />
-              </Card>
+              <div key={key} className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center min-h-[190px]">
+                <ScoreGauge score={score} label={label} sublabel={sub} sublabelVariant={variant} size="lg" isMalware={!!isMalware} />
+              </div>
             );
           })}
         </div>
       ) : (
-        <Card className="flex items-center justify-center py-12">
+        <div className="bg-white rounded-2xl border border-border shadow-sm flex items-center justify-center py-12">
           <div className="text-center">
             <Wifi size={24} className="text-muted-foreground mx-auto mb-2" />
             <p className="text-sm font-semibold text-foreground">No audit data yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Run your first audit to see scores
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Run your first audit to see scores</p>
             {canRunAudit && (
               <Button className="mt-4" size="sm" onClick={runAudit} loading={auditLoading}>
                 Run first audit
               </Button>
             )}
           </div>
-        </Card>
+        </div>
       )}
 
+      {/* Main two-column section: left = trend + audit history, right = issues + environment */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Left column */}
         <div className="lg:col-span-2 space-y-5">
-          {audits.filter((a) => a.status === "completed").length >= 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Score Trend</CardTitle>
-              </CardHeader>
-              <TrendChart audits={audits} />
-            </Card>
-          )}
-          <Card>
-            <CardHeader>
-              <CardTitle>Audit History</CardTitle>
-            </CardHeader>
-            <AuditHistoryTable audits={audits} />
-          </Card>
+          {/* Health Score Trend */}
+          <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-foreground">Health Score Trend</h3>
+              {trendPts.length >= 2 && (() => {
+                const delta = trendPts[trendPts.length - 1].score - trendPts[0].score;
+                return (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${delta >= 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
+                    {delta >= 0 ? "+" : ""}{delta} pts
+                  </span>
+                );
+              })()}
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">Overall average across all pillars</p>
+            {displayTrend.length === 0 ? (
+              <div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
+                Run audits to build trend data
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={displayTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="overviewGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+                    formatter={(v) => [`${v}`, "Health Score"]}
+                  />
+                  <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2}
+                    fill="url(#overviewGrad)" dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Audit History */}
+          <div className="bg-white rounded-2xl border border-border shadow-sm">
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground">Audit History</h3>
+            </div>
+            <div className="p-5">
+              <AuditHistoryTable audits={audits} />
+            </div>
+          </div>
         </div>
-        <div>
+
+        {/* Right column */}
+        <div className="space-y-5">
+          {/* Top Issues */}
+          <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Top Issues</h3>
+              {issues.length > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                  {issues.length} found
+                </span>
+              )}
+            </div>
+            {issues.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 gap-2">
+                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                  <CheckCircle2 size={18} className="text-green-500" />
+                </div>
+                <p className="text-sm font-medium text-foreground">All clear!</p>
+                <p className="text-xs text-muted-foreground text-center">No critical issues detected</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {issues.slice(0, 7).map(({ label, severity }) => (
+                  <div key={label} className={`flex items-center gap-2.5 p-2.5 rounded-xl ${
+                    severity === "critical" ? "bg-red-50" : "bg-amber-50"
+                  }`}>
+                    {severity === "critical"
+                      ? <XCircle size={13} className="text-red-500 shrink-0" />
+                      : <AlertCircle size={13} className="text-amber-500 shrink-0" />}
+                    <span className="text-xs font-medium text-foreground flex-1 min-w-0">{label}</span>
+                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      severity === "critical" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
+                    }`}>
+                      {severity === "critical" ? "High" : "Warn"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Server & Environment */}
           <PluginDataPanel site={site} />
         </div>
       </div>
@@ -584,100 +811,339 @@ function PerformanceTab({ site, audits }: { site: Site; audits: Audit[] }) {
 // ── SEO Tab ───────────────────────────────────────────────────────────────────
 
 function SeoTab({ site, audits }: { site: Site; audits: Audit[] }) {
-  const score = site.latest_scores?.seo;
+  const score = site.latest_scores?.seo ?? null;
   const latestAudit = audits.find((a) => a.status === "completed");
   const seoData = latestAudit?.seo_data;
 
   type SeoCheck = { id: string; label: string; status: "pass" | "fail" | "warn"; detail?: string };
-  const CHECK_ROWS: { id: string; label: string }[] = [
-    { id: "meta_desc",   label: "Meta Description" },
-    { id: "canonical",   label: "Canonical URL" },
-    { id: "og_title",    label: "OG / Social Tags" },
-    { id: "h1",          label: "H1 Heading" },
-    { id: "robots_meta", label: "Robots Meta" },
-    { id: "html_lang",   label: "Language Attribute" },
-  ];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const checksArray: SeoCheck[] = Array.isArray((seoData as any)?.checks) ? (seoData as any).checks : [];
 
+  const passCount    = checksArray.filter((c) => c.status === "pass").length;
+  const failCount    = checksArray.filter((c) => c.status === "fail").length;
+  const warnCount    = checksArray.filter((c) => c.status === "warn").length;
+  const totalChecks  = checksArray.length || 10;
+  const issueCount   = failCount + warnCount;
+
+  const scoreLabel =
+    score === null ? "No Data" :
+    score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Needs Work" : "Poor";
+  const scoreLabelColor =
+    score === null ? "text-muted-foreground" :
+    score >= 80 ? "text-green-600" : score >= 60 ? "text-green-500" :
+    score >= 40 ? "text-amber-500" : "text-red-500";
+
+  // SEO-specific trend from audit history
+  const completed = audits.filter((a) => a.status === "completed" && a.scores);
+  const trendPts = completed.slice(-8).map((a) => ({
+    date: new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    score: a.scores!.seo,
+  }));
+  const displayTrend = trendPts.length === 1
+    ? [{ date: "—", score: trendPts[0].score }, trendPts[0]]
+    : trendPts;
+  const scoreDelta =
+    trendPts.length >= 2
+      ? trendPts[trendPts.length - 1].score - trendPts[0].score
+      : null;
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* ── Top 3 stat cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Score gauge */}
-        <Card padding="lg" className="flex flex-col items-center gap-3">
-          {score !== undefined ? (
-            <ScoreGauge
-              score={score}
-              label="SEO Score"
-              sublabel={score >= 80 ? "Optimised" : score >= 50 ? "Needs work" : "Poor"}
-              sublabelVariant={score >= 80 ? "good" : score >= 50 ? "warn" : "bad"}
-              size="lg"
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex items-center gap-5">
+          <ScoreGauge score={score ?? 0} label="" size="md" />
+          <div>
+            <p className="text-xs text-muted-foreground">SEO Score</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums leading-tight">
+              {score ?? "—"}
+              <span className="text-sm font-normal text-muted-foreground">/100</span>
+            </p>
+            <span className={`text-sm font-semibold ${scoreLabelColor}`}>{scoreLabel}</span>
+          </div>
+        </div>
+
+        {/* Issue counts */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <p className="text-xs font-medium text-muted-foreground mb-3">Issues Breakdown</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col items-center bg-red-50 rounded-xl py-3">
+              <span className="text-2xl font-bold text-red-500 tabular-nums">{failCount}</span>
+              <span className="text-[10px] text-red-400 font-medium mt-0.5">Critical</span>
+            </div>
+            <div className="flex flex-col items-center bg-amber-50 rounded-xl py-3">
+              <span className="text-2xl font-bold text-amber-500 tabular-nums">{warnCount}</span>
+              <span className="text-[10px] text-amber-400 font-medium mt-0.5">Warning</span>
+            </div>
+            <div className="flex flex-col items-center bg-blue-50 rounded-xl py-3">
+              <span className="text-2xl font-bold text-blue-500 tabular-nums">0</span>
+              <span className="text-[10px] text-blue-400 font-medium mt-0.5">Info</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Checklist summary */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <p className="text-xs font-medium text-muted-foreground mb-1">SEO Checklist</p>
+          <p className="text-2xl font-bold text-foreground mt-2 tabular-nums">
+            {passCount}
+            <span className="text-sm font-normal text-muted-foreground"> / {totalChecks} passed</span>
+          </p>
+          <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${totalChecks > 0 ? (passCount / totalChecks) * 100 : 0}%` }}
             />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {issueCount > 0 ? `${issueCount} items need attention` : "All checks passed"}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Middle: trend + checklist ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* SEO Score Trend */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center justify-between mb-0.5">
+            <h3 className="text-sm font-semibold text-foreground">SEO Score Trend</h3>
+            {scoreDelta !== null && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                scoreDelta >= 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+              }`}>
+                {scoreDelta >= 0 ? "+" : ""}{scoreDelta} pts
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Last 6 months</p>
+          {displayTrend.length === 0 ? (
+            <div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
+              Run audits to build trend data
+            </div>
           ) : (
-            <div className="text-center py-6">
-              <p className="text-sm text-muted-foreground">No audit yet</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={displayTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="seoGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#ec4899" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+                  formatter={(v) => [`${v}`, "SEO Score"]}
+                />
+                <Area type="monotone" dataKey="score" stroke="#ec4899" strokeWidth={2} fill="url(#seoGrad)"
+                  dot={{ r: 3, fill: "#ec4899", strokeWidth: 0 }} activeDot={{ r: 5 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* SEO Checklist */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">SEO Checklist</h3>
+          {checksArray.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2">
+              <p className="text-xs text-muted-foreground text-center">
+                Run an audit to see SEO checklist
+              </p>
+            </div>
+          ) : (
+            <div>
+              {checksArray.map(({ id, label, status, detail }) => (
+                <div key={id} className="flex items-start justify-between py-2.5 border-b border-border last:border-0 gap-3">
+                  <div className="flex items-start gap-2 min-w-0">
+                    {status === "pass"
+                      ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-good)" }} />
+                      : status === "warn"
+                      ? <AlertCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-warn)" }} />
+                      : <XCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-bad)" }} />}
+                    <div className="min-w-0">
+                      <span className="text-sm text-foreground">{label}</span>
+                      {detail && <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>}
+                    </div>
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    status === "pass" ? "bg-green-50 text-green-600" :
+                    status === "warn" ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
+                  }`}>
+                    {status === "pass" ? "Pass" : status === "warn" ? "Warn" : "Fail"}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
-        </Card>
+        </div>
+      </div>
 
-        <div className="lg:col-span-2">
-          <Card padding="md">
-            <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-3">
-              On-page Checklist
-            </p>
-            {!seoData ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                Run an audit to see on-page SEO signals.
-              </p>
-            ) : (
-              <div>
-                {CHECK_ROWS.map(({ id, label }) => {
-                  const check = checksArray.find((c) => c.id === id);
-                  const status = check?.status ?? null;
-                  return (
-                    <div
-                      key={id}
-                      className="flex items-start justify-between py-2.5 border-b border-border last:border-0 gap-4"
-                    >
-                      <div className="min-w-0">
-                        <span className="text-sm text-foreground">{label}</span>
-                        {check?.detail && (
-                          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{check.detail}</p>
-                        )}
-                      </div>
-                      {status === null ? (
-                        <span className="text-xs text-muted-foreground shrink-0">Unknown</span>
-                      ) : status === "pass" ? (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-xs" style={{ color: "var(--score-good)" }}>Pass</span>
-                          <CheckCircle2 size={15} style={{ color: "var(--score-good)" }} />
-                        </div>
-                      ) : status === "warn" ? (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-xs" style={{ color: "var(--score-warn)" }}>Warn</span>
-                          <AlertCircle size={15} style={{ color: "var(--score-warn)" }} />
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-xs" style={{ color: "var(--score-bad)" }}>Fail</span>
-                          <XCircle size={15} style={{ color: "var(--score-bad)" }} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+      {/* ── SEO Issues table ── */}
+      {checksArray.filter((c) => c.status !== "pass").length > 0 && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">SEO Issues</h3>
+            <span className="text-xs text-muted-foreground">
+              {checksArray.filter((c) => c.status !== "pass").length} open issues
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  {["Issue", "Severity", "Status", "Action"].map((h) => (
+                    <th key={h} className="text-left text-xs text-muted-foreground font-medium pb-2 pr-4 last:pr-0">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {checksArray
+                  .filter((c) => c.status !== "pass")
+                  .map(({ id, label, status, detail }) => (
+                    <tr key={id} className="border-b border-border last:border-0 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-foreground">{label}</p>
+                        {detail && <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          status === "fail" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+                        }`}>
+                          {status === "fail" ? "Critical" : "Warning"}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className="text-xs font-semibold text-amber-500">Open</span>
+                      </td>
+                      <td className="py-3">
+                        <button className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold border border-border text-foreground hover:bg-gray-50 transition-colors">
+                          <Wrench size={10} /> Fix
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Uptime Tab ────────────────────────────────────────────────────────────────
+
+function UptimeTab({ site }: { site: Site }) {
+  const uptime  = site.uptime_percentage ?? 0;
+  const isUp    = site.uptime_status === "up";
+  const isDown  = site.uptime_status === "down";
+  const label   = isUp ? "Excellent" : isDown ? "Down" : "Unknown";
+  const labelCl = isUp ? "text-green-600" : isDown ? "text-red-600" : "text-gray-500";
+
+  return (
+    <div className="space-y-5">
+      {/* ── Top stat cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Big uptime number */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
+          <p className="text-xs text-muted-foreground mb-2">30-Day Uptime</p>
+          <p className="text-4xl font-bold text-foreground tabular-nums">
+            {uptime.toFixed(1)}
+            <span className="text-xl font-semibold text-muted-foreground">%</span>
+          </p>
+          <span className={`text-sm font-semibold ${labelCl} mt-1 block`}>
+            ● {label}
+          </span>
+        </div>
+
+        {/* Donut ring */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-3">
+          <PieChart width={100} height={100}>
+            <Pie
+              data={[{ value: uptime }, { value: 100 - uptime }]}
+              cx={45} cy={45}
+              innerRadius={32} outerRadius={46}
+              startAngle={90} endAngle={-270}
+              dataKey="value" strokeWidth={0}
+            >
+              <Cell fill={isUp ? "#10b981" : isDown ? "#ef4444" : "#9ca3af"} />
+              <Cell fill="#f3f4f6" />
+            </Pie>
+          </PieChart>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1 text-green-600">
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+              Up: {uptime.toFixed(1)}%
+            </span>
+            <span className="flex items-center gap-1 text-red-500">
+              <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+              Down: {(100 - uptime).toFixed(1)}%
+            </span>
+          </div>
+        </div>
+
+        {/* Stats list */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 space-y-3">
+          {[
+            { icon: <Activity size={13} className="text-teal-500" />, label: "Avg Response Time", value: "—" },
+            { icon: <AlertCircle size={13} className="text-amber-500" />, label: "Incidents (30d)", value: "—" },
+            { icon: <XCircle size={13} className="text-red-400" />, label: "Total Downtime", value: "—" },
+            { icon: <CheckCircle2 size={13} className="text-green-500" />, label: "Last Check", value: site.last_audit_at ? timeAgo(site.last_audit_at) : "—" },
+          ].map(({ icon, label, value }) => (
+            <div key={label} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {icon}
+                <span className="text-xs text-muted-foreground">{label}</span>
               </div>
-            )}
-          </Card>
+              <span className="text-xs font-semibold text-foreground tabular-nums">{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-          <Card padding="md" className="border-dashed mt-4">
-            <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1">
-              Broken Links
+      {/* ── Status banner ── */}
+      <div className={`rounded-2xl border p-5 ${
+        isUp ? "bg-green-50 border-green-200" :
+        isDown ? "bg-red-50 border-red-200" : "bg-gray-50 border-border"
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            isUp ? "bg-green-100" : isDown ? "bg-red-100" : "bg-gray-200"
+          }`}>
+            <Activity size={18} className={isUp ? "text-green-600" : isDown ? "text-red-600" : "text-gray-500"} />
+          </div>
+          <div>
+            <p className={`text-sm font-semibold ${isUp ? "text-green-700" : isDown ? "text-red-700" : "text-gray-600"}`}>
+              {isUp ? "Site is currently online" : isDown ? "Site is currently down" : "Status unknown"}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Broken link scanning is available in Phase 3B.
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isUp
+                ? "All systems operational. Uptime monitoring is active."
+                : isDown
+                ? "The site is not responding. Check your server or DNS settings."
+                : "Connect the plugin and run an audit to enable uptime monitoring."}
             </p>
-          </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Incident log placeholder ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Incident Log</h3>
+          <span className="text-xs text-muted-foreground">Last 30 days</span>
+        </div>
+        <div className="flex flex-col items-center justify-center py-10 gap-2">
+          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+            <CheckCircle2 size={18} className="text-green-500" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No incidents recorded</p>
+          <p className="text-xs text-muted-foreground">Uptime history will appear here once monitoring data is collected.</p>
         </div>
       </div>
     </div>
@@ -1151,112 +1617,165 @@ export default function SiteDetailPage() {
     );
   }
 
-  const tabs = [
-    ...BASE_TABS,
-    ...(site.woocommerce_active
-      ? [{ key: "woocommerce" as Tab, label: "WooCommerce" }]
-      : []),
-  ];
+  const tabs = BASE_TABS;
+
+  const overallScore = site.latest_scores
+    ? Math.round(
+        (site.latest_scores.performance + site.latest_scores.seo +
+          site.latest_scores.security + site.latest_scores.malware) / 4
+      )
+    : null;
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="-m-6 flex flex-col">
+
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="px-6 py-4 border-b border-border bg-surface">
-        <div className="flex items-center gap-3 mb-1">
+      <div className="bg-white border-b border-border shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+
+        {/* Main row */}
+        <div className="px-6 py-4 flex items-center gap-3">
+          {/* Back */}
           <button
-            onClick={() => router.back()}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            onClick={() => router.push("/sites")}
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors shrink-0"
           >
             <ArrowLeft size={16} />
           </button>
 
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <h1 className="text-base font-bold text-foreground truncate">
-              {site.name}
-            </h1>
-            <UptimeBadge status={site.uptime_status} />
-            <MalwareBadge status={site.malware_status} />
+          {/* Avatar */}
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl font-bold shrink-0 shadow-sm"
+            style={{ background: siteAvatarColor(site.id) }}
+          >
+            {site.name[0]?.toUpperCase()}
           </div>
 
+          {/* Name + meta */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-foreground truncate">{site.name}</h1>
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
+                site.uptime_status === "up"   ? "bg-green-50 text-green-700 border-green-200" :
+                site.uptime_status === "down" ? "bg-red-50 text-red-700 border-red-200"       :
+                                                "bg-gray-100 text-gray-500 border-gray-200"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  site.uptime_status === "up"   ? "bg-green-500" :
+                  site.uptime_status === "down" ? "bg-red-500"   : "bg-gray-400"
+                }`} />
+                {site.uptime_status === "up" ? "Online" : site.uptime_status === "down" ? "Down" : "Unknown"}
+              </span>
+              {overallScore !== null && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border shrink-0"
+                  style={{ background: scoreHex(overallScore) + "14", borderColor: scoreHex(overallScore) + "40", color: scoreHex(overallScore) }}>
+                  Health {overallScore}/100
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs text-muted-foreground">
+              <a
+                href={site.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-accent transition-colors"
+              >
+                {site.url.replace(/^https?:\/\//, "")}
+                <ExternalLink size={10} />
+              </a>
+              {site.last_audit_at && <span>· Last audit {timeAgo(site.last_audit_at)}</span>}
+              {site.plugin_data?.wp_version && <span>· WP {site.plugin_data.wp_version}</span>}
+              {site.plugin_data?.php_version && <span>· PHP {site.plugin_data.php_version}</span>}
+            </div>
+          </div>
+
+          {/* Score mini-pills — desktop */}
+          {site.latest_scores && (
+            <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+              {(
+                [
+                  { label: "Perf", score: site.latest_scores.performance, color: "#10b981" },
+                  { label: "SEO",  score: site.latest_scores.seo,         color: "#ec4899" },
+                  { label: "Sec",  score: site.latest_scores.security,    color: "#06b6d4" },
+                  { label: "Mal",  score: site.latest_scores.malware,     color: "#8b5cf6" },
+                ] as const
+              ).map(({ label, score, color }) => (
+                <div key={label} className="flex flex-col items-center px-2.5 py-1.5 rounded-xl border border-border bg-gray-50 min-w-[44px]">
+                  <span className="text-sm font-bold tabular-nums" style={{ color }}>{score}</span>
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide font-semibold">{label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
             {canDeleteSite && deleteConfirm && (
-              <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="px-3 py-2 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-gray-50 transition-colors"
+              >
                 Cancel
-              </Button>
+              </button>
             )}
             {canDeleteSite && (
-              <Button
-                variant="secondary"
-                size="sm"
+              <button
                 onClick={handleDelete}
-                loading={deleteLoading}
-                className={deleteConfirm ? "border-red-300 text-red-600 hover:bg-red-50" : ""}
+                disabled={deleteLoading}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                  deleteConfirm ? "border-red-300 text-red-600 hover:bg-red-50" : "border-border text-foreground hover:bg-gray-50"
+                }`}
               >
                 <Trash2 size={13} />
-                {deleteConfirm ? "Confirm?" : "Delete"}
-              </Button>
+                {deleteLoading ? "Deleting…" : deleteConfirm ? "Confirm?" : "Delete"}
+              </button>
             )}
             {canRunAudit && (
-              <Button
-                size="sm"
-                loading={auditLoading || !!pendingAuditId}
+              <button
                 onClick={runAudit}
+                disabled={auditLoading || !!pendingAuditId}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                style={{ background: "var(--accent)" }}
               >
-                <RefreshCw size={13} />
+                <RefreshCw size={13} className={auditLoading || pendingAuditId ? "animate-spin" : ""} />
                 {pendingAuditId ? "Running…" : "Run Audit"}
-              </Button>
+              </button>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pl-9 flex-wrap">
-          <a
-            href={site.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted-foreground hover:text-accent flex items-center gap-1 transition-colors"
-          >
-            {site.url.replace(/^https?:\/\//, "")}
-            <ExternalLink size={10} />
-          </a>
-          {site.last_audit_at && (
-            <span className="text-xs text-muted-foreground">
-              · Last audit {timeAgo(site.last_audit_at)}
+        {/* Token / plugin strip */}
+        <div className="px-6 pb-3 flex items-center gap-4 flex-wrap border-t border-gray-100 bg-gray-50/60 pt-2.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Key size={10} />
+            <span className="font-mono select-all">
+              {tokenVisible ? site.site_token : `${site.site_token.slice(0, 8)}••••••••`}
             </span>
-          )}
-
-          {/* Site token */}
-          <div className="flex items-center gap-1.5 ml-auto">
-            <Key size={10} className="text-muted-foreground" />
-            <span className="text-xs text-muted-foreground font-mono select-all">
-              {tokenVisible ? site.site_token : `${site.site_token.slice(0, 6)}••••••••`}
-            </span>
-            <button
-              onClick={() => setTokenVisible((v) => !v)}
-              title={tokenVisible ? "Hide token" : "Show token"}
-              className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button onClick={() => setTokenVisible((v) => !v)} className="p-0.5 hover:text-foreground transition-colors">
               {tokenVisible ? <EyeOff size={11} /> : <Eye size={11} />}
             </button>
-            <button
-              onClick={() => copyToken(site.site_token)}
-              title="Copy site token"
-              className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {tokenCopied ? (
-                <CheckCircle2 size={11} style={{ color: "var(--score-good)" }} />
-              ) : (
-                <Copy size={11} />
-              )}
+            <button onClick={() => copyToken(site.site_token)} className="p-0.5 hover:text-foreground transition-colors">
+              {tokenCopied ? <CheckCircle2 size={11} style={{ color: "var(--score-good)" }} /> : <Copy size={11} />}
             </button>
           </div>
+          <span className={`flex items-center gap-1 text-xs font-medium ${site.plugin_connected ? "text-green-600" : "text-muted-foreground"}`}>
+            <Package size={10} />
+            {site.plugin_connected ? "Plugin connected" : "Plugin not connected"}
+          </span>
+          {site.uptime_percentage !== undefined && site.uptime_percentage !== null && (
+            <span className="text-xs text-muted-foreground">
+              Uptime: <span className="font-semibold text-foreground">{site.uptime_percentage.toFixed(1)}%</span>
+            </span>
+          )}
+          {site.scan_schedule && (
+            <span className="text-xs text-muted-foreground">
+              Schedule: <span className="font-semibold text-foreground capitalize">{site.scan_schedule}</span>
+            </span>
+          )}
         </div>
 
         {/* Audit running banner */}
         {pendingAuditId && (
-          <div className="mt-3 ml-9 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg max-w-sm">
-            <LoadingSpinner size="sm" />
-            <p className="text-xs text-blue-700 font-medium">
+          <div className="mx-6 mb-3 flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
+            <RefreshCw size={13} className="animate-spin text-indigo-600 shrink-0" />
+            <p className="text-xs text-indigo-700 font-medium">
               Audit running — results will update automatically
             </p>
           </div>
@@ -1264,7 +1783,7 @@ export default function SiteDetailPage() {
       </div>
 
       {/* ── Tab nav ────────────────────────────────────────────────────────── */}
-      <div className="border-b border-border bg-surface px-6 overflow-x-auto">
+      <div className="border-b border-border bg-white px-6 overflow-x-auto">
         <div className="flex gap-0 min-w-max">
           {tabs.map(({ key, label }) => (
             <button
@@ -1278,16 +1797,14 @@ export default function SiteDetailPage() {
               ].join(" ")}
             >
               {label}
-              {key === "woocommerce" && (
-                <ShoppingCart size={11} className="inline ml-1 opacity-60" />
-              )}
+              {key === "woocommerce" && <ShoppingCart size={11} className="inline ml-1 opacity-60" />}
             </button>
           ))}
         </div>
       </div>
 
       {/* ── Tab content ────────────────────────────────────────────────────── */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 bg-[#f8fafc]">
         {activeTab === "overview" && (
           <OverviewTab
             site={site}
@@ -1297,12 +1814,10 @@ export default function SiteDetailPage() {
             canRunAudit={canRunAudit}
           />
         )}
-        {activeTab === "security" && <SecurityTab site={site} />}
-        {activeTab === "performance" && (
-          <PerformanceTab site={site} audits={site.audits} />
-        )}
-        {activeTab === "seo" && <SeoTab site={site} audits={site.audits} />}
-        {activeTab === "malware" && (
+        {activeTab === "seo"         && <SeoTab site={site} audits={site.audits} />}
+        {activeTab === "security"    && <SecurityTab site={site} />}
+        {activeTab === "performance" && <PerformanceTab site={site} audits={site.audits} />}
+        {activeTab === "malware"     && (
           <MalwareTab
             site={site}
             scans={site.scans}
@@ -1312,7 +1827,8 @@ export default function SiteDetailPage() {
             scanError={scanError}
           />
         )}
-        {activeTab === "plugins" && <PluginsTab site={site} />}
+        {activeTab === "uptime"      && <UptimeTab site={site} />}
+        {activeTab === "plugins"     && <PluginsTab site={site} />}
         {activeTab === "woocommerce" && <WooCommerceTab site={site} />}
       </div>
     </div>

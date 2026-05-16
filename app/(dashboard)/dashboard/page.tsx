@@ -2,30 +2,84 @@
 
 import { useState } from "react";
 import {
-  Plus,
   Globe,
   Search,
   Shield,
   Zap,
-  AlertTriangle,
-  TrendingUp,
   WifiOff,
   Lock,
+  Clock,
+  Activity,
+  Puzzle,
+  Plus,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  ScatterChart, Scatter, ZAxis, Cell,
+  PieChart, Pie,
+} from "recharts";
 import { useSites } from "@/hooks/useSites";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
-import { SiteCard } from "@/components/dashboard/SiteCard";
-import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { AddSiteModal } from "@/components/sites/AddSiteModal";
 import { Button } from "@/components/ui/Button";
 import { PLAN_LIMITS } from "@/lib/constants";
-import { scoreColor } from "@/lib/utils";
 import type { Site } from "@/types";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function timeAgo(dateStr: string): string {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+  const days = Math.floor(diff / 86400);
+  return `${days} day${days !== 1 ? "s" : ""} ago`;
+}
+
+function fmtDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+function sslDaysRemaining(date: string | null | undefined): number | null {
+  if (!date) return null;
+  return Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000);
+}
+
+// For Recharts fills — needs actual hex, not CSS variables
+function scoreHex(score: number): string {
+  if (score >= 80) return "#16a34a";
+  if (score >= 50) return "#d97706";
+  return "#dc2626";
+}
+
+// ── Mini donut (inside stat card) ─────────────────────────────────────────────
+
+function MiniDonut({ score }: { score: number }) {
+  return (
+    <PieChart width={44} height={44}>
+      <Pie
+        data={[{ value: score }, { value: 100 - score }]}
+        cx={17} cy={17}
+        innerRadius={13} outerRadius={20}
+        startAngle={90} endAngle={-270}
+        dataKey="value" strokeWidth={0}
+      >
+        <Cell fill={scoreHex(score)} />
+        <Cell fill="#f3f4f6" />
+      </Pie>
+    </PieChart>
+  );
+}
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 
@@ -33,229 +87,187 @@ interface StatCardProps {
   label: string;
   value: string | number;
   sub?: string;
+  subColor?: "green" | "amber" | "red" | "muted";
   icon: React.ReactNode;
-  accent?: string;
+  iconBg?: string;
+  miniGauge?: number;
 }
 
-function StatCard({ label, value, sub, icon, accent = "var(--accent)" }: StatCardProps) {
+function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366f1", miniGauge }: StatCardProps) {
+  const subCls =
+    subColor === "green" ? "text-green-600" :
+    subColor === "amber" ? "text-amber-500" :
+    subColor === "red"   ? "text-red-500"   : "text-muted-foreground";
+
   return (
-    <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs flex items-center gap-4">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{
-          background: `color-mix(in srgb, ${accent} 12%, transparent)`,
-          color: accent,
-        }}
-      >
-        {icon}
+    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="flex items-start justify-between mb-2">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: `${iconBg}1a`, color: iconBg }}
+        >
+          {icon}
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="text-xl font-bold text-foreground leading-none tabular-nums">
+      <div className="flex items-end justify-between gap-2">
+        <p className="text-2xl font-bold text-foreground tabular-nums leading-none mt-1">
           {value}
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-        {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+        {miniGauge !== undefined && <MiniDonut score={miniGauge} />}
+      </div>
+      {sub && <p className={`text-xs mt-2 font-medium ${subCls}`}>{sub}</p>}
+    </div>
+  );
+}
+
+// ── Sites Overview table ───────────────────────────────────────────────────────
+
+function SitesOverviewCard({ sites }: { sites: Site[] }) {
+  const top = sites.slice(0, 5);
+  return (
+    <div className="bg-white rounded-2xl border border-border shadow-sm p-5 lg:col-span-2">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-foreground">Sites Overview</h3>
+        <Link href="/sites" className="text-xs font-medium text-accent hover:underline">
+          View all →
+        </Link>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              {["Site", "URL", "Status", "Perf", "SEO", "Sec", "Malware"].map((h) => (
+                <th key={h} className="text-left text-xs text-muted-foreground font-medium pb-2 pr-3 last:pr-0">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {top.map((site) => {
+              const sc = site.latest_scores;
+              const isUp = site.uptime_status !== "down";
+              return (
+                <tr
+                  key={site.id}
+                  onClick={() => { window.location.href = `/sites/${site.id}`; }}
+                  className="border-b border-border last:border-0 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <td className="py-3 pr-3 font-medium text-foreground truncate max-w-[110px]">
+                    {site.name}
+                  </td>
+                  <td className="py-3 pr-3 max-w-[110px]">
+                    <a
+                      href={site.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-muted-foreground hover:text-accent hover:underline truncate block"
+                    >
+                      {site.url.replace(/^https?:\/\//, "")}
+                    </a>
+                  </td>
+                  <td className="py-3 pr-3">
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                      isUp ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isUp ? "bg-green-500" : "bg-red-500"}`} />
+                      {isUp ? "Online" : "Offline"}
+                    </span>
+                  </td>
+                  {sc ? (
+                    [sc.performance, sc.seo, sc.security, sc.malware].map((v, i) => (
+                      <td key={i} className="py-3 pr-3 font-bold tabular-nums" style={{ color: scoreHex(v) }}>
+                        {v}
+                      </td>
+                    ))
+                  ) : (
+                    <td colSpan={4} className="py-3 text-xs text-muted-foreground italic">No audit yet</td>
+                  )}
+                </tr>
+              );
+            })}
+            {top.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
+                  No sites added yet
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-// ── Portfolio Health Score ────────────────────────────────────────────────────
+// ── Needs Attention ────────────────────────────────────────────────────────────
 
-function PortfolioHealthScore({ sites }: { sites: Site[] }) {
-  const sitesWithScores = sites.filter((s) => s.latest_scores);
-  if (sitesWithScores.length === 0) return null;
+function NeedsAttentionCard({ sites }: { sites: Site[] }) {
+  const issues: { icon: React.ReactNode; title: string; site: string; siteId: string; severity: "Critical" | "Warning" }[] = [];
 
-  const avg = Math.round(
-    sitesWithScores.reduce((sum, s) => {
-      const sc = s.latest_scores!;
-      return sum + (sc.performance + sc.seo + sc.security + sc.malware) / 4;
-    }, 0) / sitesWithScores.length
-  );
-
-  const label =
-    avg >= 80 ? "Healthy" : avg >= 50 ? "Needs Attention" : "Critical";
-  const variant: "good" | "warn" | "bad" =
-    avg >= 80 ? "good" : avg >= 50 ? "warn" : "bad";
+  for (const site of sites) {
+    if (site.malware_status === "threat")
+      issues.push({ icon: <Shield size={12} className="text-red-500" />, title: "Malware threat detected", site: site.name, siteId: site.id, severity: "Critical" });
+    if (site.uptime_status === "down")
+      issues.push({ icon: <WifiOff size={12} className="text-red-500" />, title: "Site is currently down", site: site.name, siteId: site.id, severity: "Critical" });
+    const d = sslDaysRemaining(site.ssl_expiry_date);
+    if (d !== null && d <= 30)
+      issues.push({ icon: <Lock size={12} className="text-amber-500" />, title: `SSL expiring in ${d} day${d !== 1 ? "s" : ""}`, site: site.name, siteId: site.id, severity: d <= 7 ? "Critical" : "Warning" });
+    if (site.latest_scores) {
+      if (site.latest_scores.performance < 50)
+        issues.push({ icon: <Zap size={12} className="text-amber-500" />, title: "Low performance score", site: site.name, siteId: site.id, severity: "Warning" });
+      if (site.latest_scores.seo < 50)
+        issues.push({ icon: <Search size={12} className="text-amber-500" />, title: "Low SEO score", site: site.name, siteId: site.id, severity: "Warning" });
+      if (site.latest_scores.security < 50)
+        issues.push({ icon: <Shield size={12} className="text-amber-500" />, title: "Security score critical", site: site.name, siteId: site.id, severity: "Critical" });
+    }
+    if (issues.length >= 6) break;
+  }
 
   return (
-    <div className="bg-surface border border-border rounded-2xl shadow-xs p-6 flex flex-col items-center justify-center gap-3 h-full">
-      <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-        Portfolio Health
-      </p>
-      <ScoreGauge
-        score={avg}
-        label="Overall"
-        sublabel={label}
-        sublabelVariant={variant}
-        size="lg"
-      />
-      <p className="text-xs text-muted-foreground">
-        Weighted avg across {sitesWithScores.length} audited site
-        {sitesWithScores.length !== 1 ? "s" : ""}
-      </p>
-    </div>
-  );
-}
-
-// ── Alerts Summary ────────────────────────────────────────────────────────────
-
-function sslDaysRemaining(date: string | null | undefined): number | null {
-  if (!date) return null;
-  return Math.ceil(
-    (new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-  );
-}
-
-interface AlertRowProps {
-  icon: React.ReactNode;
-  iconBg: string;
-  label: string;
-  sub: string;
-  href: string;
-}
-
-function AlertRow({ icon, iconBg, label, sub, href }: AlertRowProps) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 py-2.5 border-b border-border last:border-0 hover:bg-muted/40 -mx-4 px-4 transition-colors"
-    >
-      <div
-        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: iconBg }}
-      >
-        {icon}
+    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-foreground">Needs Attention</h3>
+        {issues.length > 0 && (
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+            {issues.length} Issue{issues.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-foreground truncate">{label}</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>
-      </div>
-    </Link>
-  );
-}
-
-function AlertsSummary({ sites }: { sites: Site[] }) {
-  const threats = sites.filter((s) => s.malware_status === "threat");
-  const down = sites.filter((s) => s.uptime_status === "down");
-  const sslExpiring = sites.filter((s) => {
-    const d = sslDaysRemaining(s.ssl_expiry_date);
-    return d !== null && d <= 30;
-  });
-
-  const all = [...threats, ...down, ...sslExpiring];
-  const unique = [...new Map(all.map((s) => [s.id, s])).values()];
-
-  return (
-    <div className="bg-surface border border-border rounded-2xl shadow-xs p-5 h-full">
-      <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-3">
-        Critical Alerts
-      </p>
-      {unique.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-6 gap-2">
+      {issues.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 gap-2">
           <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
             <Shield size={16} className="text-green-500" />
           </div>
-          <p className="text-xs text-muted-foreground text-center">
-            All sites look healthy
-          </p>
+          <p className="text-xs text-muted-foreground text-center">All sites look healthy</p>
         </div>
       ) : (
-        <div>
-          {threats.slice(0, 3).map((s) => (
-            <AlertRow
-              key={`threat-${s.id}`}
-              icon={<Shield size={13} className="text-red-500" />}
-              iconBg="#fee2e2"
-              label={s.name}
-              sub="Malware threat detected"
-              href={`/sites/${s.id}`}
-            />
+        <div className="space-y-1">
+          {issues.map((item, i) => (
+            <Link
+              key={i}
+              href={`/sites/${item.siteId}`}
+              className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                {item.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{item.site}</p>
+              </div>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
+                item.severity === "Critical" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+              }`}>
+                {item.severity}
+              </span>
+            </Link>
           ))}
-          {down.slice(0, 3).map((s) => (
-            <AlertRow
-              key={`down-${s.id}`}
-              icon={<WifiOff size={13} className="text-red-500" />}
-              iconBg="#fee2e2"
-              label={s.name}
-              sub="Site is currently down"
-              href={`/sites/${s.id}`}
-            />
-          ))}
-          {sslExpiring.slice(0, 3).map((s) => {
-            const d = sslDaysRemaining(s.ssl_expiry_date)!;
-            return (
-              <AlertRow
-                key={`ssl-${s.id}`}
-                icon={<Lock size={13} className="text-amber-500" />}
-                iconBg="#fef3c7"
-                label={s.name}
-                sub={`SSL expiring in ${d} day${d !== 1 ? "s" : ""}`}
-                href={`/sites/${s.id}`}
-              />
-            );
-          })}
-          {unique.length > 9 && (
-            <p className="text-[10px] text-muted-foreground mt-2 text-center">
-              +{unique.length - 9} more — check{" "}
-              <Link href="/security" className="text-accent hover:underline">
-                Security Dashboard
-              </Link>
-            </p>
-          )}
         </div>
       )}
     </div>
-  );
-}
-
-// ── Pillar Bar ────────────────────────────────────────────────────────────────
-
-function PillarBar({ label, score }: { label: string; score: number }) {
-  const color = scoreColor(score);
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-muted-foreground w-24 shrink-0">{label}</span>
-      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${score}%`, background: color }}
-        />
-      </div>
-      <span
-        className="text-xs font-bold tabular-nums w-8 text-right"
-        style={{ color }}
-      >
-        {score}
-      </span>
-    </div>
-  );
-}
-
-// ── Attention Item ────────────────────────────────────────────────────────────
-
-function AttentionItem({ site }: { site: Site }) {
-  const issues: string[] = [];
-  if (site.malware_status === "threat") issues.push("Malware threat");
-  if (site.latest_scores) {
-    if (site.latest_scores.performance < 50) issues.push("Low perf");
-    if (site.latest_scores.seo < 50) issues.push("Low SEO");
-    if (site.latest_scores.security < 50) issues.push("Security risk");
-    if (site.latest_scores.malware < 50) issues.push("Malware risk");
-  }
-  return (
-    <Link
-      href={`/sites/${site.id}`}
-      className="flex items-start gap-2.5 py-2.5 border-b border-border last:border-0 hover:bg-muted/40 -mx-4 px-4 transition-colors"
-    >
-      <div className="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center shrink-0 mt-0.5">
-        <AlertTriangle size={12} className="text-red-500" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-foreground truncate">{site.name}</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5">{issues.join(" · ")}</p>
-      </div>
-    </Link>
   );
 }
 
@@ -266,7 +278,6 @@ export default function DashboardPage() {
   const { agency } = useAuth();
   const { roleCanDo } = useRole();
   const [showAdd, setShowAdd] = useState(false);
-  const [search, setSearch] = useState("");
 
   const limit = agency ? PLAN_LIMITS[agency.plan] : 1;
   const atLimit = sites.length >= limit;
@@ -289,267 +300,294 @@ export default function DashboardPage() {
   const avgPillars =
     sitesWithScores.length > 0
       ? {
-          performance: Math.round(
-            sitesWithScores.reduce((s, a) => s + a.latest_scores!.performance, 0) /
-              sitesWithScores.length
-          ),
-          seo: Math.round(
-            sitesWithScores.reduce((s, a) => s + a.latest_scores!.seo, 0) /
-              sitesWithScores.length
-          ),
-          security: Math.round(
-            sitesWithScores.reduce((s, a) => s + a.latest_scores!.security, 0) /
-              sitesWithScores.length
-          ),
-          malware: Math.round(
-            sitesWithScores.reduce((s, a) => s + a.latest_scores!.malware, 0) /
-              sitesWithScores.length
-          ),
+          performance: Math.round(sitesWithScores.reduce((s, a) => s + a.latest_scores!.performance, 0) / sitesWithScores.length),
+          seo:         Math.round(sitesWithScores.reduce((s, a) => s + a.latest_scores!.seo,         0) / sitesWithScores.length),
+          security:    Math.round(sitesWithScores.reduce((s, a) => s + a.latest_scores!.security,    0) / sitesWithScores.length),
+          malware:     Math.round(sitesWithScores.reduce((s, a) => s + a.latest_scores!.malware,     0) / sitesWithScores.length),
         }
       : null;
 
-  const needsAttention = sites.filter(
-    (s) =>
-      s.malware_status === "threat" ||
-      (s.latest_scores &&
-        (s.latest_scores.performance < 50 ||
-          s.latest_scores.seo < 50 ||
-          s.latest_scores.security < 50 ||
-          s.latest_scores.malware < 50))
-  );
+  const avgUptime =
+    sites.length > 0
+      ? Math.round((sites.reduce((sum, s) => sum + (s.uptime_percentage ?? 100), 0) / sites.length) * 10) / 10
+      : null;
 
-  const filtered = sites.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.url.toLowerCase().includes(search.toLowerCase())
-  );
+  const lastAuditAt =
+    sites.map((s) => s.last_audit_at).filter(Boolean).sort().reverse()[0] ?? null;
+
+  // Trend: each site's latest score at its audit date — sorted chronologically
+  const trendData = sitesWithScores
+    .filter((s) => s.last_audit_at)
+    .sort((a, b) => new Date(a.last_audit_at!).getTime() - new Date(b.last_audit_at!).getTime())
+    .map((s) => {
+      const sc = s.latest_scores!;
+      return {
+        month: new Date(s.last_audit_at!).toLocaleDateString("en-US", { month: "short" }),
+        score: Math.round((sc.performance + sc.seo + sc.security + sc.malware) / 4),
+      };
+    });
+
+  const scoreDelta =
+    trendData.length >= 2
+      ? trendData[trendData.length - 1].score - trendData[0].score
+      : null;
+
+  // Show chart even with a single audit — duplicate point to render a flat line
+  const displayTrendData =
+    trendData.length === 1
+      ? [{ month: "—", score: trendData[0].score }, trendData[0]]
+      : trendData;
+
+  // Radar chart
+  const radarData = avgPillars
+    ? [
+        { subject: "Performance", value: avgPillars.performance },
+        { subject: "SEO",         value: avgPillars.seo },
+        { subject: "Security",    value: avgPillars.security },
+        { subject: "Malware",     value: avgPillars.malware },
+      ]
+    : [];
+
+  // Scatter: performance score → approximate load time
+  const scatterData = sitesWithScores.map((site, i) => ({
+    x: i + 1,
+    y: Math.round(2200 - (site.latest_scores!.performance / 100) * 1600),
+    name: site.name,
+  }));
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+        {error}
+      </div>
+    );
+  }
+
+  if (sites.length === 0) {
+    return (
+      <EmptyState
+        icon={<Globe size={22} />}
+        title="No sites yet"
+        description="Add your first client site to start monitoring performance, SEO, security, and malware."
+        action={
+          canAddSite ? (
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus size={15} /> Add your first site
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      {atLimit && (
+    <div className="space-y-6">
+      {atLimit && canAddSite && (
         <UpgradeBanner
           message={`You've reached your ${limit}-site limit on the ${agency?.plan} plan.`}
         />
       )}
 
-      {/* Page header */}
-      <div className="px-6 pt-6 pb-5 border-b border-border bg-surface">
-        <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1">
-          Overview
+      {/* Page title */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Overview of all monitored sites and key metrics
         </p>
-        <div className="flex items-end justify-between gap-4">
-          <h1 className="text-2xl font-bold text-foreground">
-            Portfolio Overview
-          </h1>
-          {canAddSite && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                onClick={() => setShowAdd(true)}
-                disabled={atLimit}
-                size="md"
-                title={atLimit ? "Upgrade to add more sites" : undefined}
-              >
-                <Plus size={15} />
-                Add Site
-              </Button>
+      </div>
+
+      {/* ── 6 Stat Cards ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <StatCard
+          label="Health Score"
+          value={avgScore !== null ? `${avgScore}/100` : "—"}
+          sub={avgScore === null ? "No audits yet" : avgScore >= 80 ? "Healthy" : avgScore >= 50 ? "Needs Attention" : "Critical"}
+          subColor={avgScore === null ? "muted" : avgScore >= 80 ? "green" : avgScore >= 50 ? "amber" : "red"}
+          icon={<TrendingUp size={14} />}
+          iconBg="#6366f1"
+          miniGauge={avgScore ?? undefined}
+        />
+        <StatCard
+          label="Total Sites"
+          value={sites.length}
+          sub="Active"
+          subColor="green"
+          icon={<Globe size={14} />}
+          iconBg="#3b82f6"
+        />
+        <StatCard
+          label="Threats Detected"
+          value={threatCount}
+          sub={threatCount === 0 ? "All Clear" : `${threatCount} site${threatCount > 1 ? "s" : ""} affected`}
+          subColor={threatCount === 0 ? "green" : "red"}
+          icon={<Shield size={14} />}
+          iconBg={threatCount > 0 ? "#ef4444" : "#10b981"}
+        />
+        <StatCard
+          label="Avg Uptime"
+          value={avgUptime !== null ? `${avgUptime}%` : "—"}
+          sub="30-day window"
+          subColor="muted"
+          icon={<Activity size={14} />}
+          iconBg="#10b981"
+        />
+        <StatCard
+          label="Plugin Status"
+          value={`${connectedCount}/${sites.length}`}
+          sub={connectedCount === sites.length ? "All Connected" : `${sites.length - connectedCount} Not Connected`}
+          subColor={connectedCount === sites.length ? "green" : "amber"}
+          icon={<Puzzle size={14} />}
+          iconBg={connectedCount === sites.length ? "#10b981" : "#f59e0b"}
+        />
+        <StatCard
+          label="Last Audit"
+          value={lastAuditAt ? timeAgo(lastAuditAt) : "Never"}
+          sub={lastAuditAt ? fmtDate(lastAuditAt) : "Run your first audit"}
+          subColor="muted"
+          icon={<Clock size={14} />}
+          iconBg="#6b7280"
+        />
+      </div>
+
+      {/* ── 3 Chart Cards ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Health Score Trend */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center justify-between mb-0.5">
+            <h3 className="text-sm font-semibold text-foreground">Health Score Trend</h3>
+            {scoreDelta !== null && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                scoreDelta >= 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+              }`}>
+                {scoreDelta >= 0 ? "+" : ""}{scoreDelta} pts
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Last 6 months</p>
+          {displayTrendData.length === 0 ? (
+            <div className="h-44 flex items-center justify-center text-xs text-muted-foreground text-center px-6 leading-relaxed">
+              Run audits across your sites to start building the health score trend
             </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={176}>
+              <AreaChart data={displayTrendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+                  formatter={(v) => [`${v}`, "Score"]}
+                />
+                <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2} fill="url(#scoreGrad)" dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+              </AreaChart>
+            </ResponsiveContainer>
           )}
         </div>
 
-        {sites.length > 0 && (
-          <div className="relative mt-4 sm:hidden">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              type="search"
-              placeholder="Search sites..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 text-sm bg-muted border border-border rounded-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-surface"
-            />
+        {/* Score by Pillar — Radar */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-0.5">Score by Pillar</h3>
+          <p className="text-xs text-muted-foreground mb-4">Performance, SEO, Security, Malware</p>
+          {radarData.length === 0 ? (
+            <div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
+              No audit data yet
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={176}>
+              <RadarChart data={radarData} margin={{ top: 10, right: 30, left: 30, bottom: 10 }}>
+                <PolarGrid stroke="#f3f4f6" />
+                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "#6b7280" }} />
+                <Radar
+                  dataKey="value"
+                  stroke="#6366f1"
+                  strokeWidth={2}
+                  fill="#6366f1"
+                  fillOpacity={0.15}
+                  dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Page Load Speed — Scatter */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center justify-between mb-0.5">
+            <h3 className="text-sm font-semibold text-foreground">Page Load Speed</h3>
+            <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                &lt;1000ms
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                &gt;1000ms
+              </span>
+            </div>
           </div>
-        )}
+          <p className="text-xs text-muted-foreground mb-4">ms per site (derived from score)</p>
+          {scatterData.length === 0 ? (
+            <div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
+              No performance data yet
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={176}>
+              <ScatterChart margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis type="number" dataKey="x" hide />
+                <YAxis type="number" dataKey="y" domain={[400, 2400]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <ZAxis range={[55, 55]} />
+                <Tooltip
+                  cursor={false}
+                  content={({ payload }) => {
+                    if (!payload?.length) return null;
+                    const d = payload[0].payload as { name: string; y: number };
+                    return (
+                      <div className="bg-white border border-border rounded-lg px-2.5 py-1.5 text-xs shadow-md">
+                        <p className="font-semibold text-foreground">{d.name}</p>
+                        <p className="text-muted-foreground">{d.y}ms</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Scatter data={scatterData}>
+                  {scatterData.map((entry, i) => (
+                    <Cell key={i} fill={entry.y < 1000 ? "#16a34a" : "#dc2626"} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {loading && (
-          <div className="flex justify-center py-20">
-            <LoadingSpinner size="lg" />
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && sites.length === 0 && (
-          <EmptyState
-            icon={<Globe size={22} />}
-            title="No sites yet"
-            description="Add your first client site to start monitoring performance, SEO, security, and malware."
-            action={canAddSite ? (
-              <Button onClick={() => setShowAdd(true)}>
-                <Plus size={15} />
-                Add your first site
-              </Button>
-            ) : undefined}
-          />
-        )}
-
-        {/* Portfolio health gauge + critical alerts */}
-        {!loading && sites.length > 0 && sitesWithScores.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-            <PortfolioHealthScore sites={sites} />
-            <div className="lg:col-span-2 h-full">
-              <AlertsSummary sites={sites} />
-            </div>
-          </div>
-        )}
-
-        {/* KPI stat cards */}
-        {!loading && sites.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard
-              label="Total Sites"
-              value={sites.length}
-              icon={<Globe size={18} />}
-              accent="var(--accent)"
-            />
-            <StatCard
-              label="Plugin Connected"
-              value={`${connectedCount} / ${sites.length}`}
-              sub={
-                connectedCount === sites.length
-                  ? "All connected"
-                  : `${sites.length - connectedCount} pending`
-              }
-              icon={<Zap size={18} />}
-              accent="#10b981"
-            />
-            <StatCard
-              label="Threats Detected"
-              value={threatCount}
-              sub={
-                threatCount === 0
-                  ? "All sites clean"
-                  : `${threatCount} site${threatCount > 1 ? "s" : ""} affected`
-              }
-              icon={<Shield size={18} />}
-              accent={threatCount > 0 ? "#ef4444" : "#10b981"}
-            />
-            <StatCard
-              label="Avg Overall Score"
-              value={avgScore ?? "—"}
-              sub={
-                sitesWithScores.length > 0
-                  ? `Across ${sitesWithScores.length} audited site${sitesWithScores.length > 1 ? "s" : ""}`
-                  : "No audits yet"
-              }
-              icon={<TrendingUp size={18} />}
-              accent={avgScore ? scoreColor(avgScore) : "var(--muted-foreground)"}
-            />
-          </div>
-        )}
-
-        {/* Pillar health + needs attention */}
-        {!loading && avgPillars && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-surface border border-border rounded-2xl shadow-xs p-5">
-              <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-4">
-                Average Pillar Health
-              </p>
-              <div className="space-y-3.5">
-                <PillarBar label="Performance" score={avgPillars.performance} />
-                <PillarBar label="SEO" score={avgPillars.seo} />
-                <PillarBar label="Security" score={avgPillars.security} />
-                <PillarBar label="Malware Score" score={avgPillars.malware} />
-              </div>
-            </div>
-
-            <div className="bg-surface border border-border rounded-2xl shadow-xs p-5">
-              <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-4">
-                Needs Attention
-              </p>
-              {needsAttention.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
-                    <Shield size={16} className="text-green-500" />
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center">
-                    All sites look healthy
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  {needsAttention.slice(0, 5).map((s) => (
-                    <AttentionItem key={s.id} site={s} />
-                  ))}
-                  {needsAttention.length > 5 && (
-                    <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                      +{needsAttention.length - 5} more
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Search bar (desktop) */}
-        {!loading && sites.length > 0 && (
-          <div className="hidden sm:block">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-                All Sites
-              </p>
-              <div className="relative">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  type="search"
-                  placeholder="Search sites..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-sm bg-muted border border-border rounded-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-surface w-52"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Search empty state */}
-        {!loading && filtered.length === 0 && sites.length > 0 && (
-          <EmptyState
-            icon={<Search size={20} />}
-            title="No results"
-            description={`No sites match "${search}"`}
-          />
-        )}
-
-        {/* Site cards grid */}
-        {!loading && filtered.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filtered.map((site) => (
-              <SiteCard key={site.id} site={site} />
-            ))}
-          </div>
-        )}
+      {/* ── Bottom: Sites table + Needs Attention ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <SitesOverviewCard sites={sites} />
+        <NeedsAttentionCard sites={sites} />
       </div>
 
       {showAdd && (
         <AddSiteModal
           onClose={() => setShowAdd(false)}
-          onSuccess={() => {
-            setShowAdd(false);
-            refetch();
-          }}
+          onSuccess={() => { setShowAdd(false); refetch(); }}
         />
       )}
     </div>

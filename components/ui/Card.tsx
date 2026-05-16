@@ -23,7 +23,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "bg-card rounded-xl border border-border",
+        "bg-card rounded-2xl border border-border",
         "shadow-[0_1px_3px_0_rgb(0_0_0/0.07),0_1px_2px_-1px_rgb(0_0_0/0.07)]",
         hover &&
           "hover:shadow-[0_4px_6px_-1px_rgb(0_0_0/0.08),0_2px_4px_-2px_rgb(0_0_0/0.06)] hover:border-border-strong cursor-pointer",

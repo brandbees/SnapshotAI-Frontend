@@ -12,6 +12,12 @@ export function scoreColor(score: number): string {
   return "var(--score-bad)";
 }
 
+export function scoreHex(score: number): string {
+  if (score >= SCORE_THRESHOLDS.good) return "#16a34a";
+  if (score >= SCORE_THRESHOLDS.warn) return "#d97706";
+  return "#dc2626";
+}
+
 export function scoreTailwind(score: number): string {
   if (score >= SCORE_THRESHOLDS.good) return "text-score-good";
   if (score >= SCORE_THRESHOLDS.warn) return "text-score-warn";

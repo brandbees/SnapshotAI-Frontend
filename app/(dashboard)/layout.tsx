@@ -35,7 +35,7 @@ export default function DashboardLayout({
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar />
           <TrialBanner />
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-[#f8fafc] p-6">{children}</main>
         </div>
       </div>
     </BrandingProvider>
