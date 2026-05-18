@@ -1253,7 +1253,9 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
       .catch(() => {});
   }, [site.id]);
 
-  const uptime  = site.uptime_percentage ?? 0;
+  const uptime    = site.uptime_percentage ?? null;
+  const hasData   = uptime !== null;
+  const uptimeNum = uptime ?? 0;
   const isUp    = site.uptime_status === "up";
   const isDown  = site.uptime_status === "down";
   const ringColor = isUp ? "#10b981" : isDown ? "#ef4444" : "#9ca3af";
@@ -1273,10 +1275,14 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 flex flex-col justify-between">
           <div>
             <p className="text-xs text-muted-foreground font-medium mb-3">30-Day Uptime</p>
-            <p className="text-5xl font-bold text-foreground tabular-nums leading-none">
-              {uptime.toFixed(1)}
-              <span className="text-2xl font-semibold text-muted-foreground">%</span>
-            </p>
+            {hasData ? (
+              <p className="text-5xl font-bold text-foreground tabular-nums leading-none">
+                {uptimeNum.toFixed(1)}
+                <span className="text-2xl font-semibold text-muted-foreground">%</span>
+              </p>
+            ) : (
+              <p className="text-5xl font-bold text-muted-foreground leading-none">—</p>
+            )}
           </div>
           <div className="mt-4">
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full"
@@ -1292,31 +1298,39 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
           <div className="relative">
             <PieChart width={120} height={120}>
               <Pie
-                data={[{ value: Math.max(0.5, uptime) }, { value: Math.max(0, 100 - uptime) }]}
+                data={hasData
+                  ? [{ value: Math.max(0.5, uptimeNum) }, { value: Math.max(0, 100 - uptimeNum) }]
+                  : [{ value: 0 }, { value: 100 }]}
                 cx={58} cy={58}
                 innerRadius={38} outerRadius={54}
                 startAngle={90} endAngle={-270}
                 dataKey="value" strokeWidth={0}
               >
-                <Cell fill={ringColor} />
+                <Cell fill={hasData ? ringColor : "#e5e7eb"} />
                 <Cell fill="#f3f4f6" />
               </Pie>
             </PieChart>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-base font-bold text-foreground tabular-nums">{uptime.toFixed(1)}%</span>
+              <span className="text-base font-bold text-foreground tabular-nums">
+                {hasData ? `${uptimeNum.toFixed(1)}%` : "—"}
+              </span>
               <span className="text-[10px] text-muted-foreground">Uptime</span>
             </div>
           </div>
-          <div className="flex items-center gap-5 text-xs">
-            <span className="flex items-center gap-1.5 font-medium text-green-600">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              Up: {uptime.toFixed(1)}%
-            </span>
-            <span className="flex items-center gap-1.5 font-medium text-red-500">
-              <span className="w-2 h-2 rounded-full bg-red-400" />
-              Down: {(100 - uptime).toFixed(1)}%
-            </span>
-          </div>
+          {hasData ? (
+            <div className="flex items-center gap-5 text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-green-600">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Up: {uptimeNum.toFixed(1)}%
+              </span>
+              <span className="flex items-center gap-1.5 font-medium text-red-500">
+                <span className="w-2 h-2 rounded-full bg-red-400" />
+                Down: {(100 - uptimeNum).toFixed(1)}%
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Collecting monitoring data…</p>
+          )}
         </div>
 
         {/* Stats list */}
