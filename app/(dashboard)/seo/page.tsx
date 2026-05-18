@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Search, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown,
-  AlertCircle, CheckCircle2, TrendingUp,
+  AlertCircle, CheckCircle2, TrendingUp, Globe, Award, Zap,
 } from "lucide-react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -14,24 +14,24 @@ import { useSites } from "@/hooks/useSites";
 import { useAuth } from "@/hooks/useAuth";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { scoreHex, scoreColor, scoreBgTailwind } from "@/lib/utils";
+import { scoreHex, scoreBgTailwind } from "@/lib/utils";
 import type { Site } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SortKey = "name" | "seo" | "last_scan";
-type SortDir = "asc" | "desc";
+type SortDir  = "asc" | "desc";
 type FilterTab = "all" | "good" | "warning" | "poor";
 
 function healthBucket(score: number | undefined | null): FilterTab {
   if (score == null) return "poor";
-  if (score >= 80) return "good";
-  if (score >= 50) return "warning";
+  if (score >= 80)   return "good";
+  if (score >= 50)   return "warning";
   return "poor";
 }
 
 const filterTabs: { key: FilterTab; label: string }[] = [
-  { key: "all",     label: "All" },
+  { key: "all",     label: "All Sites" },
   { key: "good",    label: "Good (80+)" },
   { key: "warning", label: "Warning (50–79)" },
   { key: "poor",    label: "Poor (<50)" },
@@ -40,34 +40,88 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SortIcon({ col, sortBy, dir }: { col: SortKey; sortBy: SortKey; dir: SortDir }) {
-  if (sortBy !== col) return <ChevronsUpDown size={12} className="text-muted-foreground/50" />;
+  if (sortBy !== col) return <ChevronsUpDown size={11} className="text-muted-foreground/40" />;
   return dir === "asc"
-    ? <ChevronUp size={12} className="text-accent" />
-    : <ChevronDown size={12} className="text-accent" />;
+    ? <ChevronUp size={11} className="text-accent" />
+    : <ChevronDown size={11} className="text-accent" />;
 }
 
-function AvgScoreDonut({ score, color }: { score: number; color: string }) {
+// Large donut gauge
+function ScoreRing({ score, color, size }: { score: number; color: string; size: number }) {
   const data = [{ v: score }, { v: 100 - score }];
+  const ir = size * 0.34;
+  const or = size * 0.46;
   return (
-    <div className="relative" style={{ width: 120, height: 120 }}>
-      <PieChart width={120} height={120}>
-        <Pie
-          data={data}
-          cx={56} cy={56}
-          innerRadius={40} outerRadius={54}
-          startAngle={90} endAngle={-270}
-          dataKey="v"
-          strokeWidth={0}
-        >
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <PieChart width={size} height={size}>
+        <Pie data={data} cx={size / 2 - 2} cy={size / 2 - 2}
+          innerRadius={ir} outerRadius={or}
+          startAngle={90} endAngle={-270} dataKey="v" strokeWidth={0}>
           <Cell fill={color} />
-          <Cell fill="#f3f4f6" />
+          <Cell fill="#f1f5f9" />
         </Pie>
       </PieChart>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>{score}</span>
-        <span className="text-[10px] text-muted-foreground mt-0.5">/100</span>
+        <span style={{ fontSize: size * 0.22, color }} className="font-bold tabular-nums leading-none">{score}</span>
+        <span className="text-muted-foreground mt-0.5" style={{ fontSize: size * 0.1 }}>/100</span>
       </div>
     </div>
+  );
+}
+
+// Custom bar tooltip
+function BarTip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { fullName: string; score: number } }> }) {
+  if (!active || !payload?.length) return null;
+  const { fullName, score } = payload[0].payload;
+  const c = score >= 80 ? "#16a34a" : score >= 50 ? "#d97706" : "#dc2626";
+  return (
+    <div className="bg-white border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
+      <p className="font-semibold text-foreground">{fullName}</p>
+      <p className="font-bold mt-0.5" style={{ color }}>Score: {score}/100</p>
+    </div>
+  );
+}
+
+// Custom pie tooltip
+function PieTip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { color: string } }> }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
+      <p className="font-semibold text-foreground">{payload[0].name}</p>
+      <p className="text-muted-foreground">{payload[0].value} site{payload[0].value !== 1 ? "s" : ""}</p>
+    </div>
+  );
+}
+
+// Mini site row for performers panels
+function SiteRow({ site, rank, showRank }: { site: Site; rank?: number; showRank?: boolean }) {
+  const score = site.latest_scores!.seo;
+  const hex = scoreHex(score);
+  const initials = site.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  return (
+    <Link
+      href={`/sites/${site.id}?tab=seo`}
+      className="flex items-center gap-3 py-2.5 -mx-4 px-4 hover:bg-gray-50 transition-colors rounded-xl group"
+    >
+      {showRank && (
+        <span className="text-xs font-bold text-muted-foreground w-4 text-center shrink-0">{rank}</span>
+      )}
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+        style={{ background: hex }}>
+        {initials}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-foreground truncate leading-tight">{site.name}</p>
+        <p className="text-[10px] text-muted-foreground truncate">{site.url.replace(/^https?:\/\//, "")}</p>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="text-xs font-bold tabular-nums" style={{ color: hex }}>{score}</span>
+        <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${score}%`, background: hex }} />
+        </div>
+        <ExternalLink size={11} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+    </Link>
   );
 }
 
@@ -85,17 +139,18 @@ export default function SeoPage() {
 
   // ── Aggregates ──────────────────────────────────────────────────────────────
 
-  const audited = useMemo(() => sites.filter((s) => s.latest_scores?.seo != null), [sites]);
+  const audited    = useMemo(() => sites.filter(s => s.latest_scores?.seo != null), [sites]);
+  const notAudited = sites.length - audited.length;
 
   const avgScore = useMemo(() => {
     if (!audited.length) return null;
     return Math.round(audited.reduce((sum, s) => sum + s.latest_scores!.seo, 0) / audited.length);
   }, [audited]);
 
-  const goodCount = useMemo(() => audited.filter((s) => s.latest_scores!.seo >= 80).length, [audited]);
-  const warnCount = useMemo(() => audited.filter((s) => { const sc = s.latest_scores!.seo; return sc >= 50 && sc < 80; }).length, [audited]);
-  const poorCount = useMemo(() => audited.filter((s) => s.latest_scores!.seo < 50).length, [audited]);
-  const notAudited = sites.length - audited.length;
+  const goodCount = useMemo(() => audited.filter(s => s.latest_scores!.seo >= 80).length, [audited]);
+  const warnCount = useMemo(() => audited.filter(s => { const sc = s.latest_scores!.seo; return sc >= 50 && sc < 80; }).length, [audited]);
+  const poorCount = useMemo(() => audited.filter(s => s.latest_scores!.seo < 50).length, [audited]);
+  const goodPct   = audited.length > 0 ? Math.round(goodCount / audited.length * 100) : 0;
 
   const avgColor = avgScore != null ? scoreHex(avgScore) : "#9ca3af";
   const avgLabel = avgScore == null ? "No Data"
@@ -104,42 +159,57 @@ export default function SeoPage() {
     : avgScore >= 40 ? "Needs Work"
     : "Poor";
 
-  // Horizontal bar chart — top 10 by score desc
-  const barData = useMemo(() =>
+  // Score bucket histogram
+  const buckets = useMemo(() => [
+    { range: "0–20",  min: 0,  max: 20,  color: "#ef4444" },
+    { range: "20–40", min: 20, max: 40,  color: "#f97316" },
+    { range: "40–60", min: 40, max: 60,  color: "#eab308" },
+    { range: "60–80", min: 60, max: 80,  color: "#22c55e" },
+    { range: "80+",   min: 80, max: 101, color: "#16a34a" },
+  ].map(b => ({
+    ...b,
+    count: audited.filter(s => s.latest_scores!.seo >= b.min && s.latest_scores!.seo < b.max).length,
+  })), [audited]);
+
+  // Distribution pie data
+  const distPie = useMemo(() => [
+    { name: "Good (80+)",     value: goodCount,  color: "#16a34a" },
+    { name: "Warning (50–79)", value: warnCount, color: "#f59e0b" },
+    { name: "Poor (<50)",     value: poorCount,  color: "#ef4444" },
+    { name: "Not audited",    value: notAudited, color: "#e2e8f0" },
+  ].filter(d => d.value > 0), [goodCount, warnCount, poorCount, notAudited]);
+
+  // Per-site bar data (all sites, sorted best first)
+  const allBarData = useMemo(() =>
     [...audited]
       .sort((a, b) => b.latest_scores!.seo - a.latest_scores!.seo)
-      .slice(0, 10)
-      .map((s) => ({
-        name: s.name.length > 18 ? s.name.slice(0, 16) + "…" : s.name,
+      .map(s => ({
+        name: s.name.length > 20 ? s.name.slice(0, 18) + "…" : s.name,
+        fullName: s.name,
         score: s.latest_scores!.seo,
         id: s.id,
       })),
   [audited]);
 
-  // Sites needing attention (score < 80, sorted worst first)
-  const attentionSites = useMemo(() =>
-    [...audited]
-      .filter((s) => s.latest_scores!.seo < 80)
-      .sort((a, b) => a.latest_scores!.seo - b.latest_scores!.seo)
-      .slice(0, 6),
-  [audited]);
+  // Top 5 + bottom 5
+  const topSites    = useMemo(() => [...audited].sort((a, b) => b.latest_scores!.seo - a.latest_scores!.seo).slice(0, 5), [audited]);
+  const bottomSites = useMemo(() => [...audited].filter(s => s.latest_scores!.seo < 80).sort((a, b) => a.latest_scores!.seo - b.latest_scores!.seo).slice(0, 5), [audited]);
 
   // ── Filtered / sorted table ─────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
     let base = filter === "all"
       ? sites
-      : sites.filter((s) => healthBucket(s.latest_scores?.seo) === filter);
+      : sites.filter(s => healthBucket(s.latest_scores?.seo) === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
-      base = base.filter((s) => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
+      base = base.filter(s => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
     }
     return [...base].sort((a: Site, b: Site) => {
-      let va: number | string = 0;
-      let vb: number | string = 0;
-      if (sortBy === "name")      { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
-      else if (sortBy === "seo")  { va = a.latest_scores?.seo ?? -1; vb = b.latest_scores?.seo ?? -1; }
-      else                        { va = a.last_audit_at ?? ""; vb = b.last_audit_at ?? ""; }
+      let va: number | string = 0, vb: number | string = 0;
+      if (sortBy === "name")     { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+      else if (sortBy === "seo") { va = a.latest_scores?.seo ?? -1; vb = b.latest_scores?.seo ?? -1; }
+      else                       { va = a.last_audit_at ?? ""; vb = b.last_audit_at ?? ""; }
       if (va < vb) return sortDir === "asc" ? -1 : 1;
       if (va > vb) return sortDir === "asc" ? 1 : -1;
       return 0;
@@ -147,7 +217,7 @@ export default function SeoPage() {
   }, [sites, filter, search, sortBy, sortDir]);
 
   function toggleSort(col: SortKey) {
-    if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortBy(col); setSortDir("asc"); }
   }
 
@@ -155,420 +225,525 @@ export default function SeoPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  if (loading) return (
+    <div className="flex justify-center py-24"><LoadingSpinner size="lg" /></div>
+  );
+  if (error) return (
+    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>
+  );
+  if (sites.length === 0) return (
+    <EmptyState icon={<Search size={22} />} title="No sites yet" description="Add your first site to start monitoring SEO health." />
+  );
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-5 border-b border-border bg-surface">
-        <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1">
-          Intelligence
-        </p>
-        <h1 className="text-2xl font-bold text-foreground">SEO</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Search engine optimization issues and recommendations across all sites.
-        </p>
+    <div className="space-y-6">
+
+      {/* ── Page title ── */}
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1">Intelligence</p>
+          <h1 className="text-2xl font-bold text-foreground">SEO Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Search engine optimization health across all {sites.length} site{sites.length !== 1 ? "s" : ""}.
+          </p>
+        </div>
+        <div className="hidden sm:flex items-center gap-2 mt-1">
+          <span className="text-xs text-muted-foreground bg-white border border-border rounded-full px-3 py-1.5 shadow-xs">
+            {audited.length} of {sites.length} sites audited
+          </span>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
-        {loading && (
-          <div className="flex justify-center py-20">
-            <LoadingSpinner size="lg" />
-          </div>
-        )}
+      {/* ── Hero overview card ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-border">
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && sites.length === 0 && (
-          <EmptyState
-            icon={<Search size={22} />}
-            title="No sites yet"
-            description="Add your first site to start monitoring SEO health."
-          />
-        )}
-
-        {!loading && !error && sites.length > 0 && (
-          <>
-            {/* ── Top 3 stat cards ── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-              {/* Avg SEO Score donut */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-1">
-                {avgScore != null ? (
-                  <>
-                    <AvgScoreDonut score={avgScore} color={avgColor} />
-                    <p className="text-sm font-semibold text-foreground mt-1">Avg SEO Score</p>
-                    <p className="text-xs font-semibold" style={{ color: avgColor }}>{avgLabel}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Across {audited.length} audited site{audited.length !== 1 ? "s" : ""}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-24 h-24 rounded-full border-4 border-gray-100 flex items-center justify-center">
-                      <span className="text-[11px] text-muted-foreground text-center leading-tight px-2">No<br/>data yet</span>
-                    </div>
-                    <p className="text-sm font-semibold text-foreground mt-2">Avg SEO Score</p>
-                    <p className="text-xs text-muted-foreground">Run audits to see scores</p>
-                  </>
-                )}
-              </div>
-
-              {/* Health Distribution */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-                <p className="text-xs font-medium text-muted-foreground mb-3">Health Distribution</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="flex flex-col items-center bg-green-50 rounded-xl py-3">
-                    <span className="text-2xl font-bold text-green-600 tabular-nums">{goodCount}</span>
-                    <span className="text-[10px] text-green-500 font-medium mt-0.5">Good</span>
-                  </div>
-                  <div className="flex flex-col items-center bg-amber-50 rounded-xl py-3">
-                    <span className="text-2xl font-bold text-amber-500 tabular-nums">{warnCount}</span>
-                    <span className="text-[10px] text-amber-400 font-medium mt-0.5">Warning</span>
-                  </div>
-                  <div className="flex flex-col items-center bg-red-50 rounded-xl py-3">
-                    <span className="text-2xl font-bold text-red-500 tabular-nums">{poorCount}</span>
-                    <span className="text-[10px] text-red-400 font-medium mt-0.5">Poor</span>
-                  </div>
-                </div>
-                {/* Stacked distribution bar */}
-                {audited.length > 0 && (
-                  <div className="mt-4 flex gap-0.5 h-2 rounded-full overflow-hidden bg-gray-100">
-                    {goodCount > 0 && (
-                      <div className="bg-green-500" style={{ flex: goodCount }} />
-                    )}
-                    {warnCount > 0 && (
-                      <div className="bg-amber-400" style={{ flex: warnCount }} />
-                    )}
-                    {poorCount > 0 && (
-                      <div className="bg-red-500" style={{ flex: poorCount }} />
-                    )}
-                    {notAudited > 0 && (
-                      <div className="bg-gray-200" style={{ flex: notAudited }} />
-                    )}
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-2">
-                  {notAudited > 0
-                    ? `${notAudited} site${notAudited !== 1 ? "s" : ""} not yet audited`
-                    : "All sites have been audited"}
-                </p>
-              </div>
-
-              {/* SEO Coverage */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-                <p className="text-xs font-medium text-muted-foreground mb-1">SEO Coverage</p>
-                <p className="text-2xl font-bold text-foreground mt-2 tabular-nums">
-                  {audited.length}
-                  <span className="text-sm font-normal text-muted-foreground"> / {sites.length} sites</span>
-                </p>
-                <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${sites.length > 0 ? (audited.length / sites.length) * 100 : 0}%`,
-                      background: brandColor,
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {audited.length === sites.length
-                    ? "All sites audited"
-                    : `${notAudited} site${notAudited !== 1 ? "s" : ""} need${notAudited === 1 ? "s" : ""} an audit`}
-                </p>
-                {poorCount > 0 && (
-                  <p className="text-xs font-semibold text-red-600 mt-2 flex items-center gap-1">
-                    <AlertCircle size={11} />
-                    {poorCount} site{poorCount !== 1 ? "s" : ""} need immediate attention
+          {/* Left: big avg score donut */}
+          <div className="md:col-span-2 flex flex-col items-center justify-center gap-3 p-8"
+            style={{ background: `linear-gradient(135deg, ${avgColor}08 0%, transparent 70%)` }}>
+            {avgScore != null ? (
+              <>
+                <ScoreRing score={avgScore} color={avgColor} size={160} />
+                <div className="text-center">
+                  <p className="text-base font-bold text-foreground">Avg SEO Score</p>
+                  <p className="text-sm font-semibold mt-0.5" style={{ color: avgColor }}>{avgLabel}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Across {audited.length} audited site{audited.length !== 1 ? "s" : ""}
                   </p>
-                )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-32 h-32 rounded-full border-8 border-gray-100 flex items-center justify-center">
+                  <Globe size={28} className="text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="text-base font-bold text-foreground">No Audit Data</p>
+                  <p className="text-xs text-muted-foreground mt-1">Run an audit to see SEO scores</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Right: 4 stat tiles */}
+          <div className="md:col-span-3 grid grid-cols-2 gap-px bg-border">
+            <div className="bg-white p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground">Good Sites</span>
+                <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
+                  <CheckCircle2 size={13} className="text-green-600" />
+                </div>
+              </div>
+              <div>
+                <p className="text-4xl font-bold tabular-nums text-green-600">{goodCount}</p>
+                <p className="text-xs text-green-500 font-medium mt-1">Score 80 or above</p>
+              </div>
+              <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${audited.length > 0 ? (goodCount / audited.length) * 100 : 0}%` }} />
               </div>
             </div>
 
-            {/* ── Middle: Score comparison + Attention list ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-              {/* Horizontal bar chart — score per site */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-                <div className="flex items-center justify-between mb-0.5">
-                  <h3 className="text-sm font-semibold text-foreground">SEO Score by Site</h3>
-                  {audited.length > 10 && (
-                    <span className="text-[10px] text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
-                      Top 10 shown
-                    </span>
-                  )}
+            <div className="bg-white p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground">Warning</span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <AlertCircle size={13} className="text-amber-500" />
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">Current scores, sorted best to worst</p>
-                {audited.length === 0 ? (
-                  <div className="h-48 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <TrendingUp size={20} />
-                    <p className="text-xs">Run audits to see score comparison</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={Math.max(barData.length * 32, 120)}>
-                    <BarChart
-                      data={barData}
-                      layout="vertical"
-                      margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                      <XAxis
-                        type="number"
-                        domain={[0, 100]}
-                        tick={{ fontSize: 10, fill: "#9ca3af" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        tick={{ fontSize: 10, fill: "#6b7280" }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={90}
-                      />
-                      <Tooltip
-                        contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-                        formatter={(v) => [`${v}/100`, "SEO Score"]}
-                      />
-                      <Bar dataKey="score" radius={[0, 4, 4, 0]} maxBarSize={18}>
-                        {barData.map((entry, i) => (
-                          <Cell
-                            key={i}
-                            fill={entry.score >= 80 ? "#16a34a" : entry.score >= 50 ? "#d97706" : "#dc2626"}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
               </div>
-
-              {/* Sites Needing Attention */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-foreground">Sites Needing Attention</h3>
-                  {poorCount > 0 && (
-                    <span className="text-xs bg-red-50 text-red-600 font-semibold px-2 py-0.5 rounded-full">
-                      {poorCount} critical
-                    </span>
-                  )}
-                </div>
-
-                {attentionSites.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 gap-2">
-                    <CheckCircle2 size={24} className="text-green-500" />
-                    <p className="text-xs text-muted-foreground text-center">
-                      {audited.length === 0
-                        ? "Run audits to see site health"
-                        : "All audited sites have good SEO scores!"}
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    {attentionSites.map((site) => {
-                      const sc = site.latest_scores!.seo;
-                      const isCritical = sc < 50;
-                      return (
-                        <Link
-                          key={site.id}
-                          href={`/sites/${site.id}?tab=seo`}
-                          className="flex items-center justify-between py-2.5 border-b border-border last:border-0 -mx-5 px-5 hover:bg-gray-50 transition-colors group"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <AlertCircle
-                              size={14}
-                              className={`shrink-0 ${isCritical ? "text-red-500" : "text-amber-500"}`}
-                            />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate leading-tight">{site.name}</p>
-                              <p className="text-[11px] text-muted-foreground truncate">
-                                {site.url.replace(/^https?:\/\//, "")}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded-full ${
-                              isCritical ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
-                            }`}>
-                              {sc}
-                            </span>
-                            <ExternalLink size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </Link>
-                      );
-                    })}
-                    {attentionSites.length === 6 && (audited.filter(s => s.latest_scores!.seo < 80).length > 6) && (
-                      <p className="text-[11px] text-muted-foreground text-center pt-3">
-                        + {audited.filter(s => s.latest_scores!.seo < 80).length - 6} more — use the table below
-                      </p>
-                    )}
-                  </div>
-                )}
+              <div>
+                <p className="text-4xl font-bold tabular-nums text-amber-500">{warnCount}</p>
+                <p className="text-xs text-amber-400 font-medium mt-1">Score 50–79</p>
+              </div>
+              <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-amber-400 rounded-full transition-all"
+                  style={{ width: `${audited.length > 0 ? (warnCount / audited.length) * 100 : 0}%` }} />
               </div>
             </div>
 
-            {/* ── Filter tabs + search ── */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex items-center gap-1 bg-muted rounded-xl p-1 flex-wrap">
-                {filterTabs.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setFilter(key)}
-                    className={[
-                      "px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
-                      filter === key
-                        ? "bg-surface text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground",
-                    ].join(" ")}
-                  >
-                    {label}
-                    {key !== "all" && (
-                      <span className="ml-1.5 text-[10px] tabular-nums opacity-60">
-                        {sites.filter((s) => healthBucket(s.latest_scores?.seo) === key).length}
-                      </span>
-                    )}
-                  </button>
+            <div className="bg-white p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground">Poor SEO</span>
+                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+                  <TrendingUp size={13} className="text-red-500 rotate-180" />
+                </div>
+              </div>
+              <div>
+                <p className="text-4xl font-bold tabular-nums text-red-500">{poorCount}</p>
+                <p className="text-xs text-red-400 font-medium mt-1">Score below 50</p>
+              </div>
+              <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-red-500 rounded-full transition-all"
+                  style={{ width: `${audited.length > 0 ? (poorCount / audited.length) * 100 : 0}%` }} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground">Healthy Rate</span>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${brandColor}15` }}>
+                  <Zap size={13} style={{ color: brandColor }} />
+                </div>
+              </div>
+              <div>
+                <p className="text-4xl font-bold tabular-nums" style={{ color: brandColor }}>{goodPct}%</p>
+                <p className="text-xs text-muted-foreground font-medium mt-1">Sites scoring 80+</p>
+              </div>
+              <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${goodPct}%`, background: brandColor }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Charts row: distribution + histogram ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Distribution donut with legend */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-0.5">Score Distribution</h3>
+          <p className="text-xs text-muted-foreground mb-4">Sites by health status</p>
+          {audited.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-xs text-muted-foreground">Run audits to see distribution</div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie data={distPie} cx="50%" cy="50%"
+                    innerRadius={50} outerRadius={72}
+                    paddingAngle={distPie.length > 1 ? 3 : 0}
+                    dataKey="value" strokeWidth={0}>
+                    {distPie.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip content={<PieTip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 space-y-2">
+                {distPie.map(d => (
+                  <div key={d.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                      <span className="text-xs text-foreground">{d.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${(d.value / sites.length) * 100}%`, background: d.color }} />
+                      </div>
+                      <span className="text-xs font-bold tabular-nums text-foreground w-4 text-right">{d.value}</span>
+                    </div>
+                  </div>
                 ))}
               </div>
+            </>
+          )}
+        </div>
 
-              <div className="relative sm:ml-auto">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search sites…"
-                  className="pl-9 pr-3 py-2 text-sm bg-white border border-border rounded-xl outline-none focus:ring-2 transition w-56"
-                  style={{ "--tw-ring-color": `${brandColor}33` } as React.CSSProperties}
+        {/* Score buckets histogram */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-0.5">Score Ranges</h3>
+          <p className="text-xs text-muted-foreground mb-4">Sites per score bracket</p>
+          {audited.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-xs text-muted-foreground">No audit data yet</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart data={buckets} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="range" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+                  formatter={(v) => [v, "sites"]}
+                  labelFormatter={(l) => `Range: ${l}`}
                 />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {buckets.map((b, i) => <Cell key={i} fill={b.color} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Insights panel */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Key Insights</h3>
+          <div className="space-y-3">
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+              <div className="w-8 h-8 rounded-lg bg-white border border-border flex items-center justify-center shrink-0 shadow-xs">
+                <Award size={14} style={{ color: brandColor }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground">
+                  {goodPct}% of sites are healthy
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {goodCount} site{goodCount !== 1 ? "s" : ""} scoring 80 or above
+                </p>
               </div>
             </div>
 
-            {/* ── Sites table ── */}
-            <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
-              {filtered.length === 0 ? (
-                <div className="py-12 text-center text-sm text-muted-foreground">
-                  No sites match your filter.
+            {topSites[0] && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-green-50">
+                <div className="w-8 h-8 rounded-lg bg-white border border-green-200 flex items-center justify-center shrink-0 shadow-xs">
+                  <TrendingUp size={14} className="text-green-600" />
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b border-border bg-gray-50/60">
-                      <tr>
-                        <th className={th} onClick={() => toggleSort("name")}>
-                          <span className="flex items-center gap-1.5">
-                            Site <SortIcon col="name" sortBy={sortBy} dir={sortDir} />
-                          </span>
-                        </th>
-                        <th className={th} onClick={() => toggleSort("seo")}>
-                          <span className="flex items-center gap-1.5">
-                            SEO Score <SortIcon col="seo" sortBy={sortBy} dir={sortDir} />
-                          </span>
-                        </th>
-                        <th className={th}>Status</th>
-                        <th className={th}>Uptime</th>
-                        <th className={th} onClick={() => toggleSort("last_scan")}>
-                          <span className="flex items-center gap-1.5">
-                            Last Audit <SortIcon col="last_scan" sortBy={sortBy} dir={sortDir} />
-                          </span>
-                        </th>
-                        <th className="px-4 py-3 w-8" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {filtered.map((site) => {
-                        const score = site.latest_scores?.seo;
-                        const hex = score != null ? scoreHex(score) : "#9ca3af";
-                        return (
-                          <tr key={site.id} className="hover:bg-gray-50/60 transition-colors group">
-                            <td className="px-4 py-3">
-                              <div className="min-w-0">
-                                <Link
-                                  href={`/sites/${site.id}?tab=seo`}
-                                  className="text-sm font-semibold text-foreground hover:text-accent transition-colors truncate block max-w-[200px]"
-                                >
-                                  {site.name}
-                                </Link>
-                                <span className="text-xs text-muted-foreground truncate block max-w-[200px]">
-                                  {site.url.replace(/^https?:\/\//, "")}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              {score != null ? (
-                                <div className="flex items-center gap-2.5">
-                                  <span className="text-sm font-bold tabular-nums w-8" style={{ color: hex }}>
-                                    {score}
-                                  </span>
-                                  <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full"
-                                      style={{ width: `${score}%`, background: hex }}
-                                    />
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">No audit</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {score != null ? (
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${scoreBgTailwind(score)}`}>
-                                  {score >= 80 ? "Good" : score >= 50 ? "Warning" : "Poor"}
-                                </span>
-                              ) : (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-muted-foreground font-medium">
-                                  Not audited
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {site.uptime_status === "up" ? (
-                                <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                                  Online
-                                </span>
-                              ) : site.uptime_status === "down" ? (
-                                <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                                  Down
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {site.last_audit_at ? (
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(site.last_audit_at).toLocaleDateString("en-GB", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "2-digit",
-                                  })}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Link
-                                href={`/sites/${site.id}?tab=seo`}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-accent"
-                              >
-                                <ExternalLink size={14} />
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">Best: {topSites[0].name}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Score <span className="font-bold text-green-600">{topSites[0].latest_scores!.seo}/100</span>
+                  </p>
                 </div>
-              )}
+              </div>
+            )}
+
+            {bottomSites[0] && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50">
+                <div className="w-8 h-8 rounded-lg bg-white border border-red-200 flex items-center justify-center shrink-0 shadow-xs">
+                  <AlertCircle size={14} className="text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">Needs Work: {bottomSites[0].name}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Score <span className="font-bold text-red-600">{bottomSites[0].latest_scores!.seo}/100</span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {notAudited > 0 && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50">
+                <div className="w-8 h-8 rounded-lg bg-white border border-amber-200 flex items-center justify-center shrink-0 shadow-xs">
+                  <Globe size={14} className="text-amber-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">{notAudited} site{notAudited !== 1 ? "s" : ""} not audited</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Schedule an audit to get scores</p>
+                </div>
+              </div>
+            )}
+
+            {poorCount === 0 && audited.length > 0 && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-green-50">
+                <div className="w-8 h-8 rounded-lg bg-white border border-green-200 flex items-center justify-center shrink-0 shadow-xs">
+                  <CheckCircle2 size={14} className="text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">No critical issues!</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">All sites score above 50</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Full-width per-site comparison bar chart ── */}
+      {audited.length > 0 && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Site-by-Site SEO Comparison</h3>
+              <p className="text-xs text-muted-foreground">All {audited.length} audited sites ranked by score</p>
             </div>
-          </>
+            <div className="hidden sm:flex items-center gap-3 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />Good 80+</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" />Warning 50–79</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" />Poor &lt;50</span>
+            </div>
+          </div>
+          <div className="mt-4">
+            <ResponsiveContainer width="100%" height={Math.max(allBarData.length * 42, 120)}>
+              <BarChart data={allBarData} layout="vertical" margin={{ top: 0, right: 48, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false}
+                  ticks={[0, 20, 40, 50, 60, 80, 100]} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#6b7280" }}
+                  axisLine={false} tickLine={false} width={110} />
+                <Tooltip content={<BarTip />} cursor={{ fill: "#f8fafc" }} />
+                {/* Reference line at 80 */}
+                <Bar dataKey="score" radius={[0, 5, 5, 0]} maxBarSize={22}
+                  label={{ position: "right", fontSize: 11, fontWeight: 700, formatter: (v: number) => v }}>
+                  {allBarData.map((entry, i) => (
+                    <Cell key={i} fill={entry.score >= 80 ? "#16a34a" : entry.score >= 50 ? "#d97706" : "#dc2626"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* ── Top performers + Needs attention (2-col) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Top performers */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
+              <Award size={13} className="text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Top Performers</h3>
+              <p className="text-[11px] text-muted-foreground">Highest SEO scores</p>
+            </div>
+          </div>
+          {topSites.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">Run audits to see top performers</div>
+          ) : (
+            <div>
+              {topSites.map((site, i) => (
+                <SiteRow key={site.id} site={site} rank={i + 1} showRank />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Needs attention */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+                <AlertCircle size={13} className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Needs Attention</h3>
+                <p className="text-[11px] text-muted-foreground">Lowest scoring sites</p>
+              </div>
+            </div>
+            {poorCount > 0 && (
+              <span className="text-[10px] font-bold bg-red-50 text-red-600 px-2 py-1 rounded-full">
+                {poorCount} critical
+              </span>
+            )}
+          </div>
+          {bottomSites.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <CheckCircle2 size={20} className="text-green-500" />
+              <p className="text-xs text-muted-foreground">
+                {audited.length === 0 ? "Run audits to see site health" : "All sites have good SEO!"}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {bottomSites.map((site, i) => (
+                <SiteRow key={site.id} site={site} rank={i + 1} showRank />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Filter + search ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex items-center gap-1 bg-white border border-border rounded-xl p-1 shadow-xs flex-wrap">
+          {filterTabs.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={[
+                "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                filter === key
+                  ? "text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-gray-50",
+              ].join(" ")}
+              style={filter === key ? { background: brandColor } : {}}
+            >
+              {label}
+              {key !== "all" && (
+                <span className={`ml-1.5 text-[10px] tabular-nums ${filter === key ? "opacity-80" : "opacity-50"}`}>
+                  {sites.filter(s => healthBucket(s.latest_scores?.seo) === key).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative sm:ml-auto">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search sites…"
+            className="pl-9 pr-3 py-2 text-sm bg-white border border-border rounded-xl outline-none focus:border-accent/40 transition w-56 shadow-xs"
+          />
+        </div>
+      </div>
+
+      {/* ── Sites table ── */}
+      <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <p className="text-sm font-semibold text-foreground">All Sites</p>
+          <p className="text-xs text-muted-foreground">{filtered.length} site{filtered.length !== 1 ? "s" : ""}</p>
+        </div>
+        {filtered.length === 0 ? (
+          <div className="py-14 text-center text-sm text-muted-foreground">No sites match your filter.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b border-border bg-gray-50/70">
+                <tr>
+                  <th className={th} onClick={() => toggleSort("name")}>
+                    <span className="flex items-center gap-1.5">Site <SortIcon col="name" sortBy={sortBy} dir={sortDir} /></span>
+                  </th>
+                  <th className={th} onClick={() => toggleSort("seo")}>
+                    <span className="flex items-center gap-1.5">SEO Score <SortIcon col="seo" sortBy={sortBy} dir={sortDir} /></span>
+                  </th>
+                  <th className={th}>Status</th>
+                  <th className={th}>Uptime</th>
+                  <th className={th} onClick={() => toggleSort("last_scan")}>
+                    <span className="flex items-center gap-1.5">Last Audit <SortIcon col="last_scan" sortBy={sortBy} dir={sortDir} /></span>
+                  </th>
+                  <th className="px-4 py-3 w-10" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filtered.map((site) => {
+                  const score = site.latest_scores?.seo;
+                  const hex   = score != null ? scoreHex(score) : "#9ca3af";
+                  const initials = site.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+                  return (
+                    <tr key={site.id} className="hover:bg-gray-50/70 transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                            style={{ background: hex }}>
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <Link
+                              href={`/sites/${site.id}?tab=seo`}
+                              className="text-sm font-semibold text-foreground hover:text-accent transition-colors truncate block max-w-[180px]"
+                            >
+                              {site.name}
+                            </Link>
+                            <span className="text-xs text-muted-foreground truncate block max-w-[180px]">
+                              {site.url.replace(/^https?:\/\//, "")}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {score != null ? (
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-sm font-bold tabular-nums w-8" style={{ color: hex }}>{score}</span>
+                            <div className="flex-1 max-w-[80px] h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, background: hex }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">No audit</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {score != null ? (
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${scoreBgTailwind(score)}`}>
+                            {score >= 80 ? "Good" : score >= 50 ? "Warning" : "Poor"}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-muted-foreground font-medium">
+                            Not audited
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {site.uptime_status === "up" ? (
+                          <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0 animate-pulse" />
+                            Online
+                          </span>
+                        ) : site.uptime_status === "down" ? (
+                          <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                            Down
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {site.last_audit_at ? (
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(site.last_audit_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/sites/${site.id}?tab=seo`}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground hover:text-accent inline-flex"
+                        >
+                          <ExternalLink size={13} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
