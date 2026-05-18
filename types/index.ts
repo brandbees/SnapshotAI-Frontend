@@ -28,6 +28,7 @@ export interface Site {
   plugin_connected: boolean;
   uptime_status: "up" | "down" | "unknown";
   uptime_percentage?: number;
+  avg_response_ms?: number;
   scan_schedule: "manual" | "weekly" | "monthly";
   last_audit_at?: string;
   created_at: string;

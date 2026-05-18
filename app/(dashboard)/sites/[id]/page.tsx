@@ -1338,7 +1338,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Monitor Stats</p>
           <div className="space-y-0">
             {([
-              { icon: <Activity size={14} />, label: "Avg Response Time", value: "—", color: "text-teal-500" },
+              { icon: <Activity size={14} />, label: "Avg Response Time", value: site.avg_response_ms != null ? `${site.avg_response_ms}ms` : "—", color: "text-teal-500" },
               { icon: <AlertCircle size={14} />, label: "Incidents (30d)", value: "—", color: "text-amber-500" },
               { icon: <Clock size={14} />, label: "Total Downtime", value: "—", color: "text-red-400" },
               { icon: <CheckCircle2 size={14} />, label: "Last Check", value: site.last_audit_at ? timeAgo(site.last_audit_at) : "—", color: "text-green-500" },
