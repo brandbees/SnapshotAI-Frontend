@@ -1108,7 +1108,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
         </div>
       </div>
 
-      {/* ── Middle: trend + checklist ── */}
+      {/* ── Middle: trend + issues ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* SEO Score Trend */}
         <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
@@ -1150,94 +1150,103 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
           )}
         </div>
 
-        {/* SEO Checklist */}
+        {/* SEO Issues */}
         <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">SEO Checklist</h3>
-          {checksArray.length === 0 ? (
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">SEO Issues</h3>
+            {checksArray.filter((c) => c.status !== "pass").length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {checksArray.filter((c) => c.status !== "pass").length} open issues
+              </span>
+            )}
+          </div>
+          {checksArray.filter((c) => c.status !== "pass").length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2">
+              <CheckCircle2 size={24} style={{ color: "var(--score-good)" }} />
               <p className="text-xs text-muted-foreground text-center">
-                Run an audit to see SEO checklist
+                {checksArray.length === 0 ? "Run an audit to see SEO issues" : "No issues found"}
               </p>
             </div>
           ) : (
-            <div>
-              {checksArray.map(({ id, label, status, detail }) => (
-                <div key={id} className="flex items-start justify-between py-2.5 border-b border-border last:border-0 gap-3">
-                  <div className="flex items-start gap-2 min-w-0">
-                    {status === "pass"
-                      ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-good)" }} />
-                      : status === "warn"
-                      ? <AlertCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-warn)" }} />
-                      : <XCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-bad)" }} />}
-                    <div className="min-w-0">
-                      <span className="text-sm text-foreground">{label}</span>
-                      {detail && <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>}
-                    </div>
-                  </div>
-                  <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    status === "pass" ? "bg-green-50 text-green-600" :
-                    status === "warn" ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
-                  }`}>
-                    {status === "pass" ? "Pass" : status === "warn" ? "Warn" : "Fail"}
-                  </span>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    {["Issue", "Severity", "Status", "Action"].map((h) => (
+                      <th key={h} className="text-left text-xs text-muted-foreground font-medium pb-2 pr-4 last:pr-0">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {checksArray
+                    .filter((c) => c.status !== "pass")
+                    .map(({ id, label, status, detail }) => (
+                      <tr key={id} className="border-b border-border last:border-0 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4">
+                          <p className="font-medium text-foreground">{label}</p>
+                          {detail && <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            status === "fail" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+                          }`}>
+                            {status === "fail" ? "Critical" : "Warning"}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className="text-xs font-semibold text-amber-500">Open</span>
+                        </td>
+                        <td className="py-3">
+                          <button className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold border border-border text-foreground hover:bg-gray-50 transition-colors">
+                            <Wrench size={10} /> Fix
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── SEO Issues table ── */}
-      {checksArray.filter((c) => c.status !== "pass").length > 0 && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground">SEO Issues</h3>
-            <span className="text-xs text-muted-foreground">
-              {checksArray.filter((c) => c.status !== "pass").length} open issues
-            </span>
+      {/* ── SEO Checklist ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-4">SEO Checklist</h3>
+        {checksArray.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <p className="text-xs text-muted-foreground text-center">
+              Run an audit to see SEO checklist
+            </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  {["Issue", "Severity", "Status", "Action"].map((h) => (
-                    <th key={h} className="text-left text-xs text-muted-foreground font-medium pb-2 pr-4 last:pr-0">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {checksArray
-                  .filter((c) => c.status !== "pass")
-                  .map(({ id, label, status, detail }) => (
-                    <tr key={id} className="border-b border-border last:border-0 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 pr-4">
-                        <p className="font-medium text-foreground">{label}</p>
-                        {detail && <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          status === "fail" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
-                        }`}>
-                          {status === "fail" ? "Critical" : "Warning"}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className="text-xs font-semibold text-amber-500">Open</span>
-                      </td>
-                      <td className="py-3">
-                        <button className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold border border-border text-foreground hover:bg-gray-50 transition-colors">
-                          <Wrench size={10} /> Fix
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+            {checksArray.map(({ id, label, status, detail }) => (
+              <div key={id} className="flex items-start justify-between py-2.5 border-b border-border last:border-0 gap-3">
+                <div className="flex items-start gap-2 min-w-0">
+                  {status === "pass"
+                    ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-good)" }} />
+                    : status === "warn"
+                    ? <AlertCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-warn)" }} />
+                    : <XCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--score-bad)" }} />}
+                  <div className="min-w-0">
+                    <span className="text-sm text-foreground">{label}</span>
+                    {detail && <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>}
+                  </div>
+                </div>
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  status === "pass" ? "bg-green-50 text-green-600" :
+                  status === "warn" ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
+                }`}>
+                  {status === "pass" ? "Pass" : status === "warn" ? "Warn" : "Fail"}
+                </span>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
