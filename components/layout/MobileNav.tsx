@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Menu, X, Wifi,
-  LayoutDashboard, Globe, Search, Zap, Shield, Bug, Activity,
+  LayoutDashboard, Globe, Search, Zap, Shield,
   FileText, Bot, Users, Settings, CreditCard, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,8 +17,6 @@ const navItems = [
   { href: "/seo", label: "SEO", icon: Search },
   { href: "/performance", label: "Performance", icon: Zap },
   { href: "/security", label: "Security", icon: Shield },
-  { href: "/malware", label: "Malware", icon: Bug },
-  { href: "/uptime", label: "Uptime", icon: Activity },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/agent", label: "AI Agent", icon: Bot },
