@@ -1,29 +1,31 @@
 "use client";
 
-import { scoreColor } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { PieChart, Pie, Cell } from "recharts";
 import { Shield } from "lucide-react";
+import { scoreHex, cn } from "@/lib/utils";
 
 interface ScoreGaugeProps {
   score: number;
-  label: string;
+  label?: string;
   sublabel?: string;
   sublabelVariant?: "good" | "warn" | "bad" | "muted";
   size?: "sm" | "md" | "lg";
   isMalware?: boolean;
+  color?: string;
   className?: string;
 }
-
-const sizePx = { sm: 72, md: 104, lg: 136 };
-const strokeW = { sm: 6, md: 8, lg: 10 };
-const fontSizes = { sm: "text-xl", md: "text-3xl", lg: "text-4xl" };
-const labelSizes = { sm: "text-[10px]", md: "text-xs", lg: "text-sm" };
 
 const sublabelColors = {
   good: "text-green-600",
   warn: "text-amber-600",
-  bad: "text-red-600",
+  bad:  "text-red-600",
   muted: "text-muted-foreground",
+};
+
+const sizeConfig = {
+  sm: { px: 72,  inner: 22, outer: 32, cx: 34, numCls: "text-xl",  shield: 18, labelCls: "text-[10px]" },
+  md: { px: 88,  inner: 28, outer: 40, cx: 42, numCls: "text-2xl", shield: 22, labelCls: "text-xs"     },
+  lg: { px: 120, inner: 40, outer: 56, cx: 58, numCls: "text-3xl", shield: 30, labelCls: "text-sm"     },
 };
 
 export function ScoreGauge({
@@ -33,102 +35,64 @@ export function ScoreGauge({
   sublabelVariant = "muted",
   size = "md",
   isMalware = false,
+  color,
   className,
 }: ScoreGaugeProps) {
-  const px = sizePx[size];
-  const sw = strokeW[size];
-  const r = (px - sw * 2) / 2;
-  const cx = px / 2;
-  const cy = px / 2;
-  const circumference = 2 * Math.PI * r;
+  const cfg = sizeConfig[size];
   const clamped = Math.max(0, Math.min(100, score));
-  const offset = circumference - (clamped / 100) * circumference;
-  const color = scoreColor(clamped);
-
-  if (isMalware) {
-    const isClean = clamped >= 80;
-    return (
-      <div className={cn("flex flex-col items-center gap-2", className)}>
-        <div
-          className="flex flex-col items-center justify-center rounded-full"
-          style={{
-            width: px,
-            height: px,
-            background: isClean ? "var(--score-good-bg)" : "var(--score-bad-bg)",
-            border: `${sw}px solid ${isClean ? "var(--score-good-border)" : "var(--score-bad-border)"}`,
-          }}
-        >
-          <Shield
-            size={px * 0.28}
-            style={{ color: isClean ? "var(--score-good)" : "var(--score-bad)" }}
-          />
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className={cn("font-semibold uppercase tracking-wide text-foreground", labelSizes[size])}>
-            {label}
-          </span>
-          {sublabel && (
-            <span className={cn("font-medium", labelSizes[size], sublabelColors[sublabelVariant])}>
-              {sublabel}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const hex = scoreHex(clamped);
+  const ringColor = isMalware ? (clamped >= 80 ? "#16a34a" : "#dc2626") : (color ?? hex);
+  const pct = Math.max(4, Math.min(98, clamped));
 
   return (
-    <div className={cn("flex flex-col items-center gap-2", className)}>
-      <div className="relative" style={{ width: px, height: px }}>
-        {/* Track ring */}
-        <svg
-          width={px}
-          height={px}
-          viewBox={`0 0 ${px} ${px}`}
-          className="-rotate-90 absolute inset-0"
-        >
-          <circle
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill="none"
-            stroke="var(--border)"
-            strokeWidth={sw}
-          />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={sw}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1)" }}
-          />
-        </svg>
-        {/* Score */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            className={cn("font-bold tabular-nums leading-none", fontSizes[size])}
-            style={{ color }}
+    <div className={cn("flex flex-col items-center", className)}>
+      {/* Donut ring */}
+      <div className="relative shrink-0" style={{ width: cfg.px, height: cfg.px }}>
+        <PieChart width={cfg.px} height={cfg.px}>
+          <Pie
+            data={[{ value: pct }, { value: 100 - pct }]}
+            cx={cfg.cx}
+            cy={cfg.cx}
+            innerRadius={cfg.inner}
+            outerRadius={cfg.outer}
+            startAngle={90}
+            endAngle={-270}
+            dataKey="value"
+            strokeWidth={0}
           >
-            {clamped}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-col items-center gap-0.5">
-        <span className={cn("font-semibold uppercase tracking-wide text-foreground", labelSizes[size])}>
-          {label}
-        </span>
-        {sublabel && (
-          <span className={cn("font-medium", labelSizes[size], sublabelColors[sublabelVariant])}>
-            {sublabel}
-          </span>
+            <Cell fill={ringColor} />
+            <Cell fill="#f3f4f6" />
+          </Pie>
+        </PieChart>
+        {/* Shield icon in center for malware */}
+        {isMalware && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Shield size={cfg.shield} style={{ color: ringColor }} />
+          </div>
         )}
       </div>
+
+      {/* Score number */}
+      <p
+        className={cn("font-bold tabular-nums leading-tight mt-2", cfg.numCls)}
+        style={{ color: ringColor }}
+      >
+        {clamped}
+      </p>
+
+      {/* Label */}
+      {label && (
+        <p className={cn("font-semibold uppercase tracking-wide text-foreground mt-0.5", cfg.labelCls)}>
+          {label}
+        </p>
+      )}
+
+      {/* Sublabel */}
+      {sublabel && (
+        <p className={cn("font-medium mt-0.5", cfg.labelCls, sublabelColors[sublabelVariant])}>
+          {sublabel}
+        </p>
+      )}
     </div>
   );
 }
