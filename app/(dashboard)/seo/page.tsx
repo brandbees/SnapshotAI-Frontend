@@ -73,11 +73,11 @@ function ScoreRing({ score, color, size }: { score: number; color: string; size:
 function BarTip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { fullName: string; score: number } }> }) {
   if (!active || !payload?.length) return null;
   const { fullName, score } = payload[0].payload;
-  const c = score >= 80 ? "#16a34a" : score >= 50 ? "#d97706" : "#dc2626";
+  const color = score >= 80 ? "#16a34a" : score >= 50 ? "#d97706" : "#dc2626";
   return (
     <div className="bg-white border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
       <p className="font-semibold text-foreground">{fullName}</p>
-      <p className="font-bold mt-0.5" style={{ color }}>Score: {score}/100</p>
+      <p className="font-bold mt-0.5" style={{ color: color }}>Score: {score}/100</p>
     </div>
   );
 }
@@ -523,7 +523,7 @@ export default function SeoPage() {
                 <Tooltip content={<BarTip />} cursor={{ fill: "#f8fafc" }} />
                 {/* Reference line at 80 */}
                 <Bar dataKey="score" radius={[0, 5, 5, 0]} maxBarSize={22}
-                  label={{ position: "right", fontSize: 11, fontWeight: 700, formatter: (v: number) => v }}>
+                  label={{ position: "right", fontSize: 11, fontWeight: 700, formatter: (v: unknown) => String(v) }}>
                   {allBarData.map((entry, i) => (
                     <Cell key={i} fill={entry.score >= 80 ? "#16a34a" : entry.score >= 50 ? "#d97706" : "#dc2626"} />
                   ))}
