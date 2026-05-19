@@ -22,6 +22,8 @@ export interface RawSite {
   plugin_version?: string;
   active_plugins?: RawPlugin[];
   active_plugins_count?: number;
+  inactive_plugins?: RawPlugin[];
+  inactive_plugins_count?: number;
   active_theme?: string;
   memory_limit?: string | null;
   mysql_version?: string | null;
@@ -178,17 +180,26 @@ export function mapSite(raw: RawSite): Site {
     }
   }
 
-  const plugins = mapPlugins(raw.active_plugins).map((p) => ({
+  const activePlugins = mapPlugins(raw.active_plugins).map((p) => ({
     ...p,
     update_available: updateMap.has(p.name),
     new_version: updateMap.get(p.name) || undefined,
   }));
+
+  const inactivePlugins = mapPlugins(raw.inactive_plugins ?? []).map((p) => ({
+    ...p,
+    status: "inactive" as const,
+    update_available: false,
+  }));
+
+  const plugins = [...activePlugins, ...inactivePlugins];
 
   const pluginData: PluginData | undefined = raw.plugin_connected
     ? {
         wp_version: raw.wp_version,
         php_version: raw.php_version,
         active_plugins_count: raw.active_plugins_count,
+        inactive_plugins_count: raw.inactive_plugins_count,
         server_software: raw.server_software,
         xmlrpc_enabled: raw.xml_rpc_enabled ?? undefined,
         file_editor_enabled: raw.file_editor_enabled ?? undefined,

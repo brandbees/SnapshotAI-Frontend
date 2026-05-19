@@ -24,7 +24,7 @@ import { LoadingPage } from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
-import type { Site, Audit, ScanResult, AlertSettings } from "@/types";
+import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin } from "@/types";
 
 const AVATAR_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
 function siteAvatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length]; }
@@ -1913,59 +1913,119 @@ function MalwareTab({
 
 // ── Plugins Tab ───────────────────────────────────────────────────────────────
 
+function PluginTable({
+  plugins, brandColor, showUpdateStatus,
+}: {
+  plugins: SitePlugin[];
+  brandColor: string;
+  showUpdateStatus: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-border bg-gray-50/50">
+            <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Plugin</th>
+            <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Version</th>
+            {showUpdateStatus && (
+              <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Status</th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {plugins.map((plugin) => (
+            <tr key={plugin.name} className="border-b border-border last:border-0 hover:bg-gray-50/60 transition-colors">
+              <td className="px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{ background: brandColor + "18", color: brandColor }}>
+                    {plugin.name[0]?.toUpperCase() ?? "?"}
+                  </div>
+                  <span className="text-sm font-medium text-foreground">{plugin.name}</span>
+                </div>
+              </td>
+              <td className="px-5 py-3">
+                <span className="text-sm font-mono text-muted-foreground">{plugin.version || "—"}</span>
+              </td>
+              {showUpdateStatus && (
+                <td className="px-5 py-3">
+                  {plugin.update_available ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                      <RefreshCw size={9} />
+                      Update → v{plugin.new_version || "?"}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
+                      <CheckCircle2 size={9} />
+                      Up to date
+                    </span>
+                  )}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
-  const plugins     = site.plugin_data?.plugins ?? [];
-  const outdated12m = site.plugins_outdated_12m ?? [];
-  const upToDate    = plugins.filter((p) => !p.update_available).length;
-  const needsUpdate = plugins.filter((p) => p.update_available).length;
+  const allPlugins     = site.plugin_data?.plugins ?? [];
+  const activePlugins  = allPlugins.filter((p) => p.status === "active");
+  const inactPlugins   = allPlugins.filter((p) => p.status === "inactive");
+  const needsUpdate    = activePlugins.filter((p) => p.update_available).length;
+  const outdated12m    = site.plugins_outdated_12m ?? [];
+
+  if (allPlugins.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-border shadow-sm flex flex-col items-center justify-center py-16 gap-3">
+        <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+          <Package size={24} className="text-muted-foreground" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-foreground">No plugin data</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {site.plugin_connected
+              ? "Data will appear after the next plugin sync"
+              : "Connect the WordPress plugin to view installed plugins"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
 
       {/* ── Stats strip ── */}
-      {plugins.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {([
-            { label: "Total Plugins", value: plugins.length,      color: brandColor,  icon: <Package size={15} /> },
-            { label: "Up to Date",    value: upToDate,             color: "#10b981",   icon: <CheckCircle2 size={15} /> },
-            { label: "Need Updates",  value: needsUpdate,          color: "#f59e0b",   icon: <RefreshCw size={15} /> },
-            { label: "Abandoned",     value: outdated12m.length,   color: "#ef4444",   icon: <AlertCircle size={15} /> },
-          ] as { label: string; value: number; color: string; icon: React.ReactNode }[]).map(({ label, value, color, icon }) => (
-            <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: color + "18", color }}>
-                {icon}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground truncate">{label}</p>
-                <p className="text-xl font-bold text-foreground tabular-nums">{value}</p>
-              </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {([
+          { label: "Total Plugins",  value: allPlugins.length,    color: brandColor,  icon: <Package size={15} /> },
+          { label: "Active",         value: activePlugins.length, color: "#10b981",   icon: <CheckCircle2 size={15} /> },
+          { label: "Inactive",       value: inactPlugins.length,  color: "#6366f1",   icon: <Package size={15} /> },
+          { label: "Need Updates",   value: needsUpdate,          color: "#f59e0b",   icon: <RefreshCw size={15} /> },
+        ] as { label: string; value: number; color: string; icon: React.ReactNode }[]).map(({ label, value, color, icon }) => (
+          <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: color + "18", color }}>
+              {icon}
             </div>
-          ))}
-        </div>
-      )}
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground truncate">{label}</p>
+              <p className="text-xl font-bold text-foreground tabular-nums">{value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* ── Active Plugins ── */}
-      {plugins.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-border shadow-sm flex flex-col items-center justify-center py-16 gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
-            <Package size={24} className="text-muted-foreground" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-foreground">No plugin data</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {site.plugin_connected
-                ? "Data will appear after the next plugin sync"
-                : "Connect the WordPress plugin to view installed plugins"}
-            </p>
-          </div>
-        </div>
-      ) : (
+      {activePlugins.length > 0 && (
         <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Active Plugins</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{plugins.length} plugins installed</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{activePlugins.length} plugins running</p>
             </div>
             {needsUpdate > 0 && (
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
@@ -1973,48 +2033,23 @@ function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
               </span>
             )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-gray-50/50">
-                  {["Plugin", "Version", "Status"].map((h) => (
-                    <th key={h} className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {plugins.map((plugin) => (
-                  <tr key={plugin.name} className="border-b border-border last:border-0 hover:bg-gray-50/60 transition-colors">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
-                          style={{ background: brandColor + "18", color: brandColor }}>
-                          {plugin.name[0]?.toUpperCase() ?? "?"}
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{plugin.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="text-sm font-mono text-muted-foreground">{plugin.version || "—"}</span>
-                    </td>
-                    <td className="px-5 py-3">
-                      {plugin.update_available ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-                          <RefreshCw size={9} />
-                          Update → v{plugin.new_version || "?"}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
-                          <CheckCircle2 size={9} />
-                          Up to date
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <PluginTable plugins={activePlugins} brandColor={brandColor} showUpdateStatus />
+        </div>
+      )}
+
+      {/* ── Inactive Plugins ── */}
+      {inactPlugins.length > 0 && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Inactive Plugins</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{inactPlugins.length} installed but not active</p>
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              {inactPlugins.length} plugin{inactPlugins.length !== 1 ? "s" : ""}
+            </span>
           </div>
+          <PluginTable plugins={inactPlugins} brandColor="#6366f1" showUpdateStatus={false} />
         </div>
       )}
 

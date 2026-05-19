@@ -186,6 +186,7 @@ export interface PluginData {
   wp_version?: string;
   php_version?: string;
   active_plugins_count?: number;
+  inactive_plugins_count?: number;
   server_software?: string;
   xmlrpc_enabled?: boolean;
   file_editor_enabled?: boolean;
