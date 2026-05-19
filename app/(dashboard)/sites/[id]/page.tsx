@@ -2049,7 +2049,7 @@ function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
               {inactPlugins.length} plugin{inactPlugins.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <PluginTable plugins={inactPlugins} brandColor="#6366f1" showUpdateStatus={false} />
+          <PluginTable plugins={inactPlugins} brandColor="#6366f1" showUpdateStatus={true} />
         </div>
       )}
 

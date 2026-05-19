@@ -189,7 +189,8 @@ export function mapSite(raw: RawSite): Site {
   const inactivePlugins = mapPlugins(raw.inactive_plugins ?? []).map((p) => ({
     ...p,
     status: "inactive" as const,
-    update_available: false,
+    update_available: updateMap.has(p.name),
+    new_version: updateMap.get(p.name) || undefined,
   }));
 
   const plugins = [...activePlugins, ...inactivePlugins];
