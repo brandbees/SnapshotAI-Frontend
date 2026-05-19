@@ -17,6 +17,7 @@ export interface RawSite {
   uptime_status?: "up" | "down" | "unknown";
   uptime_percentage?: number | null;
   avg_response_ms?: number | null;
+  last_uptime_check_at?: string | null;
   // WP / server environment
   wp_version?: string;
   php_version?: string;
@@ -225,6 +226,7 @@ export function mapSite(raw: RawSite): Site {
     uptime_status: (raw.uptime_status as Site["uptime_status"]) ?? "unknown",
     uptime_percentage: raw.uptime_percentage ?? undefined,
     avg_response_ms: raw.avg_response_ms ?? undefined,
+    last_uptime_check_at: raw.last_uptime_check_at ?? null,
     scan_schedule: (raw.audit_schedule as Site["scan_schedule"]) || "manual",
     last_audit_at: raw.last_audit_at ?? undefined,
     created_at: raw.created_at,

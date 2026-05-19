@@ -29,6 +29,7 @@ export interface Site {
   uptime_status: "up" | "down" | "unknown";
   uptime_percentage?: number;
   avg_response_ms?: number;
+  last_uptime_check_at?: string | null;
   scan_schedule: "manual" | "weekly" | "monthly";
   last_audit_at?: string;
   created_at: string;

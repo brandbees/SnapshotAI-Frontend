@@ -234,28 +234,25 @@ function StepInstallPlugin({
           </div>
         </div>
 
-        {/* Status */}
-        <div className="flex items-center justify-center gap-2 py-2">
-          {connected ? (
-            <>
-              <Check size={16} className="text-green-500" />
-              <span className="text-sm font-semibold text-green-600">Plugin connected!</span>
-            </>
-          ) : (
-            <>
-              <Loader2 size={14} className="animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                Waiting for plugin connection…
-              </span>
-            </>
-          )}
-        </div>
+        {/* Connection status */}
+        {connected ? (
+          <div className="flex items-center justify-center gap-2 py-2">
+            <Check size={16} className="text-green-500" />
+            <span className="text-sm font-semibold text-green-600">Plugin connected!</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-pulse" />
+            <span className="text-xs">Checking automatically — connect the plugin above to continue</span>
+          </div>
+        )}
 
+        {/* Skip — goes directly to dashboard */}
         <button
           onClick={onSkip}
-          className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
         >
-          <SkipForward size={12} /> Skip for now
+          <SkipForward size={13} /> Skip for now — I&apos;ll connect later
         </button>
       </div>
     </div>
@@ -264,7 +261,9 @@ function StepInstallPlugin({
 
 // ── Step 4 — First scan ───────────────────────────────────────────────────────
 
-type ScanState = "scanning" | "ready" | "failed";
+type ScanState = "scanning" | "slow" | "ready" | "failed";
+
+const SLOW_THRESHOLD_MS = 90_000;
 
 function StepFirstScan({
   site,
@@ -274,8 +273,8 @@ function StepFirstScan({
   onComplete: () => void;
 }) {
   const [state, setState] = useState<ScanState>("scanning");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const auditFiredRef = useRef(false);
+  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const checkAudit = useCallback(async () => {
     try {
@@ -283,10 +282,12 @@ function StepFirstScan({
       const audits = data.audits ?? [];
       if (audits.some((a) => a.status === "completed")) {
         setState("ready");
-        if (pollRef.current) clearInterval(pollRef.current);
+        if (pollRef.current)    clearInterval(pollRef.current);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
       } else if (audits.length > 0 && audits.every((a) => a.status === "failed")) {
         setState("failed");
-        if (pollRef.current) clearInterval(pollRef.current);
+        if (pollRef.current)    clearInterval(pollRef.current);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
       }
     } catch {
       // silently ignore poll errors
@@ -294,16 +295,15 @@ function StepFirstScan({
   }, [site.id]);
 
   useEffect(() => {
-    if (!auditFiredRef.current) {
-      auditFiredRef.current = true;
-      api.post(`/audits/${site.id}/run`).catch(() => {});
-    }
-
-    pollRef.current = setInterval(checkAudit, 3000);
+    // The audit is already queued automatically when the site was created —
+    // no need to fire another one here.
+    pollRef.current    = setInterval(checkAudit, 3000);
+    timeoutRef.current = setTimeout(() => setState("slow"), SLOW_THRESHOLD_MS);
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current)    clearInterval(pollRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [checkAudit, site.id]);
+  }, [checkAudit]);
 
   return (
     <div className="flex flex-col items-center text-center gap-6 max-w-sm mx-auto">
@@ -343,7 +343,8 @@ function StepFirstScan({
               Audit couldn&apos;t complete
             </h2>
             <p className="text-sm text-muted-foreground">
-              We couldn&apos;t reach <span className="font-medium text-foreground">{site.name}</span> right now.
+              We couldn&apos;t reach{" "}
+              <span className="font-medium text-foreground">{site.name}</span> right now.
               You can run a manual audit from your dashboard once the site is live.
             </p>
           </div>
@@ -356,7 +357,7 @@ function StepFirstScan({
         </>
       )}
 
-      {state === "scanning" && (
+      {(state === "scanning" || state === "slow") && (
         <>
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
@@ -370,25 +371,33 @@ function StepFirstScan({
             </h2>
             <p className="text-sm text-muted-foreground">
               We&apos;re scanning{" "}
-              <span className="font-medium text-foreground">{site.name}</span> right
-              now. This usually takes 30–60 seconds.
+              <span className="font-medium text-foreground">{site.name}</span>.
+              {state === "slow"
+                ? " This is taking a little longer than usual."
+                : " This usually takes 30–60 seconds."}
             </p>
           </div>
-          <div className="flex gap-1.5">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="w-2 h-2 rounded-full animate-bounce"
-                style={{ background: "var(--accent)", animationDelay: `${i * 0.15}s` }}
-              />
-            ))}
-          </div>
-          <button
-            onClick={onComplete}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Go to dashboard anyway
-          </button>
+
+          {state === "scanning" && (
+            <div className="flex gap-1.5">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 rounded-full animate-bounce"
+                  style={{ background: "var(--accent)", animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </div>
+          )}
+
+          {state === "slow" && (
+            <Button
+              onClick={onComplete}
+              className="px-8 h-11 rounded-xl font-bold text-sm flex items-center gap-2"
+            >
+              <LayoutDashboard size={15} /> Go to dashboard
+            </Button>
+          )}
         </>
       )}
     </div>
@@ -497,7 +506,7 @@ export default function OnboardingPage() {
             <StepInstallPlugin
               site={site}
               onConnected={() => setStep(3)}
-              onSkip={() => setStep(3)}
+              onSkip={markComplete}
             />
           )}
           {step === 3 && site && (

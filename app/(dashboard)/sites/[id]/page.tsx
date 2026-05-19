@@ -1354,7 +1354,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
               { icon: <Activity size={14} />, label: "Avg Response Time", value: site.avg_response_ms != null ? `${site.avg_response_ms}ms` : "—", color: "text-teal-500" },
               { icon: <AlertCircle size={14} />, label: "Incidents (30d)", value: "—", color: "text-amber-500" },
               { icon: <Clock size={14} />, label: "Total Downtime", value: "—", color: "text-red-400" },
-              { icon: <CheckCircle2 size={14} />, label: "Last Check", value: site.last_audit_at ? timeAgo(site.last_audit_at) : "—", color: "text-green-500" },
+              { icon: <CheckCircle2 size={14} />, label: "Last Check", value: site.last_uptime_check_at ? timeAgo(site.last_uptime_check_at) : "—", color: "text-green-500" },
             ] as { icon: React.ReactNode; label: string; value: string; color: string }[]).map(({ icon, label, value, color }) => (
               <div key={label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
                 <div className="flex items-center gap-2.5">
@@ -2491,7 +2491,7 @@ function BoolRow({ label, value, good, bad }: { label: string; value: boolean | 
   );
 }
 
-function SiteHealthTab({ site, brandColor }: { site: Site; brandColor: string }) {
+function SiteHealthTab({ site }: { site: Site }) {
   const h: SiteHealth | null = site.site_health ?? null;
 
   if (!site.plugin_connected || !h) {
@@ -2982,7 +2982,7 @@ export default function SiteDetailPage() {
         {activeTab === "plugins"     && <PluginsTab site={site} brandColor={brandColor} />}
         {activeTab === "woocommerce" && <WooCommerceTab site={site} brandColor={brandColor} />}
         {activeTab === "cron"        && <CronTab site={site} brandColor={brandColor} />}
-        {activeTab === "health"      && <SiteHealthTab site={site} brandColor={brandColor} />}
+        {activeTab === "health"      && <SiteHealthTab site={site} />}
       </div>
     </div>
   );
