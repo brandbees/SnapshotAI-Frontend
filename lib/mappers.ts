@@ -1,6 +1,7 @@
 import type {
   Site, Audit, PillarScores, PluginData, Plugin,
   ScanResult, SeoData, PerformanceData, SecurityData, PluginOutdated,
+  CronEvent, SiteHealth,
 } from "@/types";
 
 // ── Raw shapes returned by the backend ───────────────────────────────────────
@@ -55,6 +56,9 @@ export interface RawSite {
   plugins_needing_updates?: number | null;
   plugins_update_list?: Array<{ name: string; current_version?: string; new_version?: string } | string>;
   plugins_outdated_12m?: unknown;
+  // Cron events & site health
+  cron_events?: unknown;
+  site_health?: unknown;
   // Content counts & DB health
   database_table_count?: number | null;
   autoloaded_options_kb?: number | null;
@@ -277,6 +281,18 @@ export function mapSite(raw: RawSite): Site {
     total_media: raw.total_media ?? null,
     total_comments: raw.total_comments ?? null,
     last_published_at: raw.last_published_at ?? null,
+
+    cron_events: Array.isArray(raw.cron_events)
+      ? (raw.cron_events as CronEvent[])
+      : typeof raw.cron_events === "string"
+        ? (() => { try { return JSON.parse(raw.cron_events as string) as CronEvent[]; } catch { return null; } })()
+        : null,
+
+    site_health: raw.site_health && typeof raw.site_health === "object" && !Array.isArray(raw.site_health)
+      ? (raw.site_health as SiteHealth)
+      : typeof raw.site_health === "string"
+        ? (() => { try { return JSON.parse(raw.site_health as string) as SiteHealth; } catch { return null; } })()
+        : null,
   };
 }
 

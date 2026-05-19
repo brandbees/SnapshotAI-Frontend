@@ -7,7 +7,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp,
   Shield, Package, ShoppingCart, Wifi, Key, Copy, Eye, EyeOff,
   Activity, Wrench, TrendingUp, Clock, Zap, Server, Database, LayoutGrid,
-  Bell, DollarSign, BarChart2,
+  Bell, DollarSign, BarChart2, CalendarClock, HeartPulse, Search,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -24,7 +24,7 @@ import { LoadingPage } from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
-import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin } from "@/types";
+import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth } from "@/types";
 
 const AVATAR_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
 function siteAvatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length]; }
@@ -39,7 +39,9 @@ type Tab =
   | "malware"
   | "uptime"
   | "plugins"
-  | "woocommerce";
+  | "woocommerce"
+  | "cron"
+  | "health";
 
 const BASE_TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "overview",    label: "Overview",    icon: <LayoutGrid size={13} /> },
@@ -50,6 +52,8 @@ const BASE_TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "uptime",      label: "Uptime",      icon: <Wifi size={13} /> },
   { key: "plugins",     label: "Plugins",     icon: <Package size={13} /> },
   { key: "woocommerce", label: "WooCommerce", icon: <ShoppingCart size={13} /> },
+  { key: "cron",        label: "Cron Events", icon: <CalendarClock size={13} /> },
+  { key: "health",      label: "Site Health", icon: <HeartPulse size={13} /> },
 ];
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -2264,6 +2268,380 @@ function WooCommerceTab({ site, brandColor }: { site: Site; brandColor: string }
   );
 }
 
+// ── Cron Tab ──────────────────────────────────────────────────────────────────
+
+type CronFilter = "all" | "wp-cron" | "action-scheduler" | "pending" | "running" | "complete" | "failed" | "canceled";
+
+const STATUS_COLOR: Record<string, string> = {
+  pending:   "bg-amber-50 text-amber-700 border-amber-200",
+  running:   "bg-blue-50 text-blue-700 border-blue-200",
+  complete:  "bg-green-50 text-green-700 border-green-200",
+  completed: "bg-green-50 text-green-700 border-green-200",
+  failed:    "bg-red-50 text-red-700 border-red-200",
+  canceled:  "bg-gray-100 text-gray-500 border-gray-200",
+  due:       "bg-purple-50 text-purple-700 border-purple-200",
+};
+
+function cronStatusBadge(status: string) {
+  const cls = STATUS_COLOR[status.toLowerCase()] ?? "bg-gray-100 text-gray-500 border-gray-200";
+  return (
+    <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cls}`}>
+      {status}
+    </span>
+  );
+}
+
+function CronTab({ site, brandColor }: { site: Site; brandColor: string }) {
+  const events: CronEvent[] = site.cron_events ?? [];
+  const [filter, setFilter] = useState<CronFilter>("all");
+  const [search, setSearch] = useState("");
+
+  const wpCount   = events.filter((e) => e.source === "wp-cron").length;
+  const asCount   = events.filter((e) => e.source === "action-scheduler").length;
+  const failedCnt = events.filter((e) => e.status.toLowerCase() === "failed").length;
+
+  const now = Date.now();
+  const dueCnt = events.filter((e) => {
+    if (e.source !== "wp-cron" || !e.next_run) return false;
+    return new Date(e.next_run).getTime() <= now;
+  }).length;
+
+  const FILTER_TABS: { key: CronFilter; label: string; count?: number }[] = [
+    { key: "all",              label: "All",              count: events.length },
+    { key: "wp-cron",          label: "WP Cron",          count: wpCount },
+    { key: "action-scheduler", label: "Action Scheduler", count: asCount },
+    { key: "pending",          label: "Pending",          count: events.filter((e) => e.status.toLowerCase() === "pending").length },
+    { key: "running",          label: "Running",          count: events.filter((e) => e.status.toLowerCase() === "running").length },
+    { key: "complete",         label: "Complete",         count: events.filter((e) => ["complete","completed"].includes(e.status.toLowerCase())).length },
+    { key: "failed",           label: "Failed",           count: failedCnt },
+    { key: "canceled",         label: "Canceled",         count: events.filter((e) => e.status.toLowerCase() === "canceled").length },
+  ];
+
+  const filtered = events.filter((e) => {
+    if (filter === "wp-cron")          return e.source === "wp-cron";
+    if (filter === "action-scheduler") return e.source === "action-scheduler";
+    if (filter === "pending")          return e.status.toLowerCase() === "pending";
+    if (filter === "running")          return e.status.toLowerCase() === "running";
+    if (filter === "complete")         return ["complete","completed"].includes(e.status.toLowerCase());
+    if (filter === "failed")           return e.status.toLowerCase() === "failed";
+    if (filter === "canceled")         return e.status.toLowerCase() === "canceled";
+    return true;
+  }).filter((e) =>
+    !search || e.hook.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (!site.plugin_connected || events.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-10 flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+          <CalendarClock size={24} className="text-muted-foreground" />
+        </div>
+        <p className="text-sm font-semibold text-foreground">No cron data yet</p>
+        <p className="text-xs text-muted-foreground max-w-xs">
+          {site.plugin_connected
+            ? "No scheduled events found on this site."
+            : "Install and connect the plugin to collect WP Cron and Action Scheduler events."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total Events", value: events.length, color: brandColor },
+          { label: "WP Cron",      value: wpCount,       color: "#6366f1" },
+          { label: "Action Sched", value: asCount,       color: "#3b82f6" },
+          { label: "Failed",       value: failedCnt,     color: failedCnt > 0 ? "#ef4444" : "#10b981" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex flex-col gap-1.5">
+            <p className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {dueCnt > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+          <AlertCircle size={14} className="text-amber-500 shrink-0" />
+          <p className="text-xs font-medium text-amber-800">
+            {dueCnt} WP Cron event{dueCnt !== 1 ? "s are" : " is"} overdue (past scheduled run time).
+          </p>
+        </div>
+      )}
+
+      {/* Table card */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        {/* Filter + search */}
+        <div className="px-5 pt-4 pb-0 border-b border-border flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-sm font-semibold text-foreground">Scheduled Events</h3>
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search hook…"
+                className="text-xs pl-7 pr-3 py-1.5 rounded-lg border border-border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 w-44"
+                style={{ "--tw-ring-color": brandColor } as React.CSSProperties}
+              />
+            </div>
+          </div>
+          <div className="flex gap-0 overflow-x-auto min-w-max -mb-px">
+            {FILTER_TABS.map(({ key, label, count }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={[
+                  "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
+                  filter === key
+                    ? "border-b-2"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+                ].join(" ")}
+                style={filter === key ? { borderBottomColor: brandColor, color: brandColor } : undefined}
+              >
+                {label}
+                {count !== undefined && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filter === key ? "bg-opacity-20" : "bg-gray-100 text-muted-foreground"}`}
+                    style={filter === key ? { background: brandColor + "20", color: brandColor } : undefined}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border bg-gray-50/60">
+                <th className="text-left px-5 py-2.5 font-semibold text-muted-foreground">Hook</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Status</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Next Run</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Schedule</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Source</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">No events match this filter.</td>
+                </tr>
+              ) : (
+                filtered.map((ev, i) => {
+                  const nextRun = ev.next_run ? new Date(ev.next_run) : null;
+                  const isOverdue = nextRun && ev.source === "wp-cron" && nextRun.getTime() <= now;
+                  return (
+                    <tr key={i} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="px-5 py-3 font-mono text-[11px] text-foreground max-w-[260px] truncate" title={ev.hook}>
+                        {ev.hook}
+                      </td>
+                      <td className="px-4 py-3">{cronStatusBadge(ev.status)}</td>
+                      <td className={`px-4 py-3 tabular-nums ${isOverdue ? "text-amber-600 font-semibold" : "text-muted-foreground"}`}>
+                        {nextRun
+                          ? nextRun.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+                          : "—"}
+                        {isOverdue && <AlertCircle size={11} className="inline ml-1 text-amber-400" />}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {ev.schedule ?? ev.recurrence ?? (ev.interval ? `Every ${ev.interval}s` : "One-off")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          ev.source === "action-scheduler"
+                            ? "bg-purple-50 text-purple-700 border-purple-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}>
+                          {ev.source === "action-scheduler" ? "AS" : "WP"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-5 py-3 border-t border-border bg-gray-50/40 text-[10px] text-muted-foreground">
+          Showing {filtered.length} of {events.length} events · Last synced with plugin data push
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Site Health Tab ────────────────────────────────────────────────────────────
+
+function BoolRow({ label, value, good, bad }: { label: string; value: boolean | null | undefined; good: boolean; bad: boolean }) {
+  if (value === null || value === undefined) return null;
+  const isGood = value === good;
+  const isBad  = value === bad;
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={`inline-flex items-center gap-1 text-xs font-semibold ${isGood ? "text-green-600" : isBad ? "text-red-500" : "text-amber-500"}`}>
+        {isGood ? <CheckCircle2 size={12} /> : isBad ? <XCircle size={12} /> : <AlertCircle size={12} />}
+        {value ? "Yes" : "No"}
+      </span>
+    </div>
+  );
+}
+
+function SiteHealthTab({ site, brandColor }: { site: Site; brandColor: string }) {
+  const h: SiteHealth | null = site.site_health ?? null;
+
+  if (!site.plugin_connected || !h) {
+    return (
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-10 flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+          <HeartPulse size={24} className="text-muted-foreground" />
+        </div>
+        <p className="text-sm font-semibold text-foreground">No health data yet</p>
+        <p className="text-xs text-muted-foreground max-w-xs">
+          {site.plugin_connected
+            ? "Site health data will be available on the next plugin sync."
+            : "Install and connect the plugin to collect WordPress site health indicators."}
+        </p>
+      </div>
+    );
+  }
+
+  const ext = h.php_extensions ?? {};
+  const extKeys = Object.keys(ext);
+  const extMissing = extKeys.filter((k) => !ext[k]);
+
+  const wpChecks = [
+    { label: "HTTPS enabled",         value: h.is_https,            good: true,  bad: false },
+    { label: "WP update available",   value: h.wp_update_available, good: false, bad: true  },
+    { label: "Auto-updates enabled",  value: h.auto_updates_enabled,good: true,  bad: false },
+    { label: "WP_DEBUG_LOG on",       value: h.wp_debug_log,        good: false, bad: true  },
+    { label: "WP_DEBUG_DISPLAY on",   value: h.wp_debug_display,    good: false, bad: true  },
+    { label: "File mods disabled",    value: h.disallow_file_mods,  good: true,  bad: false },
+    { label: "WP Cron disabled",      value: h.wp_cron_disabled,    good: false, bad: false },
+    { label: "User registration open",value: h.users_can_register,  good: false, bad: true  },
+  ] as { label: string; value: boolean | null | undefined; good: boolean; bad: boolean }[];
+
+  const fsChecks = [
+    { label: "Uploads writable",  value: h.uploads_writable,  good: true, bad: false },
+    { label: "Plugins writable",  value: h.plugins_writable,  good: true, bad: false },
+    { label: "Themes writable",   value: h.themes_writable,   good: true, bad: false },
+  ] as { label: string; value: boolean | null | undefined; good: boolean; bad: boolean }[];
+
+  const issues = [
+    h.wp_update_available && "WordPress update available",
+    h.wp_debug_log && "WP_DEBUG_LOG is enabled (logs may leak sensitive data)",
+    h.wp_debug_display && "WP_DEBUG_DISPLAY is enabled (errors shown to visitors)",
+    h.users_can_register && "User registration is open",
+    extMissing.length > 0 && `Missing PHP extensions: ${extMissing.join(", ")}`,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Issues banner */}
+      {issues.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={14} className="text-amber-500 shrink-0" />
+            <p className="text-xs font-semibold text-amber-800">{issues.length} issue{issues.length !== 1 ? "s" : ""} detected</p>
+          </div>
+          <ul className="list-disc list-inside space-y-0.5 ml-4">
+            {issues.map((iss) => (
+              <li key={iss} className="text-xs text-amber-700">{iss}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* WordPress Checks */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <Shield size={14} className="text-blue-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">WordPress Checks</p>
+              {h.wp_latest_version && (
+                <p className="text-xs text-muted-foreground">Latest WP: {h.wp_latest_version}</p>
+              )}
+            </div>
+          </div>
+          <div className="px-5 py-1">
+            {wpChecks.map(({ label, value, good, bad }) => (
+              <BoolRow key={label} label={label} value={value} good={good} bad={bad} />
+            ))}
+            {h.permalink_structure && (
+              <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                <span className="text-xs text-muted-foreground">Permalink structure</span>
+                <span className="text-xs font-semibold text-foreground font-mono">{h.permalink_structure}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Filesystem Checks */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+              <Database size={14} className="text-amber-500" />
+            </div>
+            <p className="text-sm font-semibold text-foreground">Filesystem Access</p>
+          </div>
+          <div className="px-5 py-1">
+            {fsChecks.map(({ label, value, good, bad }) => (
+              <BoolRow key={label} label={label} value={value} good={good} bad={bad} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* PHP Extensions */}
+      {extKeys.length > 0 && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+              <Server size={14} className="text-green-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">PHP Extensions</p>
+              <p className="text-xs text-muted-foreground">
+                {extKeys.filter((k) => ext[k]).length} of {extKeys.length} loaded
+                {extMissing.length > 0 && ` · ${extMissing.length} missing`}
+              </p>
+            </div>
+          </div>
+          <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+            {extKeys.map((name) => {
+              const loaded = ext[name];
+              return (
+                <div
+                  key={name}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${
+                    loaded
+                      ? "bg-green-50/60 border-green-100"
+                      : "bg-red-50/60 border-red-100"
+                  }`}
+                >
+                  {loaded
+                    ? <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                    : <XCircle size={12} className="text-red-400 shrink-0" />}
+                  <span className={`text-xs font-medium font-mono truncate ${loaded ? "text-green-700" : "text-red-600"}`}>
+                    {name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SiteDetailPage() {
@@ -2545,8 +2923,8 @@ export default function SiteDetailPage() {
       </div>
 
       {/* ── Tab nav ────────────────────────────────────────────────────────── */}
-      <div className="border-b border-border bg-white px-6 overflow-x-auto">
-        <div className="flex gap-0 min-w-max">
+      <div className="bg-[#f1f4f8] border-b border-border px-4 py-2.5 overflow-x-auto">
+        <div className="flex items-center gap-1 min-w-max">
           {tabs.map(({ key, label, icon }) => {
             const isActive = activeTab === key;
             return (
@@ -2554,12 +2932,16 @@ export default function SiteDetailPage() {
                 key={key}
                 onClick={() => handleTabChange(key)}
                 className={[
-                  "flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap",
                   isActive
-                    ? "border-b-2"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+                    ? "shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/70",
                 ].join(" ")}
-                style={isActive ? { borderBottomColor: brandColor, color: brandColor } : undefined}
+                style={isActive ? {
+                  background: "white",
+                  color: brandColor,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
+                } : undefined}
               >
                 {icon}
                 {label}
@@ -2599,6 +2981,8 @@ export default function SiteDetailPage() {
         {activeTab === "uptime"      && <UptimeTab site={site} brandColor={brandColor} />}
         {activeTab === "plugins"     && <PluginsTab site={site} brandColor={brandColor} />}
         {activeTab === "woocommerce" && <WooCommerceTab site={site} brandColor={brandColor} />}
+        {activeTab === "cron"        && <CronTab site={site} brandColor={brandColor} />}
+        {activeTab === "health"      && <SiteHealthTab site={site} brandColor={brandColor} />}
       </div>
     </div>
   );

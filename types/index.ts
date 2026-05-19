@@ -78,6 +78,10 @@ export interface Site {
   total_media?: number | null;
   total_comments?: number | null;
   last_published_at?: string | null;
+
+  // Cron events & site health
+  cron_events?: CronEvent[] | null;
+  site_health?: SiteHealth | null;
 }
 
 export interface PillarScores {
@@ -199,6 +203,36 @@ export interface PluginOutdated {
   name: string;
   version?: string;
   last_updated?: string;
+}
+
+export interface CronEvent {
+  hook: string;
+  next_run?: string | null;
+  last_run?: string | null;
+  schedule?: string | null;
+  interval?: number | null;
+  status: string;
+  source: "wp-cron" | "action-scheduler";
+  args?: unknown;
+  group?: string | null;
+  recurrence?: string | null;
+}
+
+export interface SiteHealth {
+  is_https?: boolean | null;
+  wp_update_available?: boolean | null;
+  wp_latest_version?: string | null;
+  auto_updates_enabled?: boolean | null;
+  wp_debug_log?: boolean | null;
+  wp_debug_display?: boolean | null;
+  disallow_file_mods?: boolean | null;
+  wp_cron_disabled?: boolean | null;
+  uploads_writable?: boolean | null;
+  plugins_writable?: boolean | null;
+  themes_writable?: boolean | null;
+  users_can_register?: boolean | null;
+  permalink_structure?: string | null;
+  php_extensions?: Record<string, boolean>;
 }
 
 export interface Plugin {
