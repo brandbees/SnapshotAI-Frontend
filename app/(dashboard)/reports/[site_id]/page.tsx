@@ -242,7 +242,8 @@ function ReportCard({ report, onSend }: { report: Report; onSend: (r: Report) =>
               {report.pdf_url && (
                 <a
                   href={report.pdf_url}
-                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90 transition-opacity whitespace-nowrap"
                   style={{ background: "var(--accent)" }}
                 >
