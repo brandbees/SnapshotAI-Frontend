@@ -12,6 +12,8 @@ import { useSite } from "@/hooks/useSite";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { scoreHex, timeAgo } from "@/lib/utils";
+import { getToken } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/constants";
 import type { Report } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -140,7 +142,33 @@ function SendReportModal({ report, onClose, onSent }: { report: Report; onClose:
 
 function ReportCard({ report, onSend }: { report: Report; onSend: (r: Report) => void }) {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const portalUrl = `${PORTAL_BASE}/${report.portal_token}`;
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/reports/download/${report.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `snapshot-report-${new Date(report.created_at).toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // fallback: open direct URL in new tab
+      if (report.pdf_url) window.open(report.pdf_url, "_blank");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function copyLink() {
     try { await navigator.clipboard.writeText(portalUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }
@@ -240,16 +268,17 @@ function ReportCard({ report, onSend }: { report: Report; onSend: (r: Report) =>
             {/* Primary actions — text labels */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {report.pdf_url && (
-                <a
-                  href={report.pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90 transition-opacity whitespace-nowrap"
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60 transition-opacity whitespace-nowrap"
                   style={{ background: "var(--accent)" }}
                 >
-                  <Download size={12} />
-                  Download PDF
-                </a>
+                  {downloading
+                    ? <Loader2 size={12} className="animate-spin" />
+                    : <Download size={12} />}
+                  {downloading ? "Preparing…" : "Download PDF"}
+                </button>
               )}
               <button
                 onClick={() => onSend(report)}
