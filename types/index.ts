@@ -250,12 +250,18 @@ export interface Report {
   id: string;
   site_id: string;
   audit_id: string;
-  pdf_url: string;
+  pdf_url?: string | null;
   portal_token: string;
-  overall_score: number;
-  sent_to?: string;
-  sent_at?: string;
+  overall_score?: number | null;
+  status: "pending" | "completed" | "failed";
+  sent_to?: string | null;
+  sent_at?: string | null;
   created_at: string;
+  completed_at?: string | null;
+  performance_score?: number | null;
+  seo_score?: number | null;
+  security_score?: number | null;
+  malware_score?: number | null;
 }
 
 export interface Client {
