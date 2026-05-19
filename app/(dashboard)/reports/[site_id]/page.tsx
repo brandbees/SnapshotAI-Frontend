@@ -249,8 +249,7 @@ function ReportCard({ report, isPolling, onSend }: ReportCardProps) {
         {isCompleted && report.pdf_url && (
           <a
             href={report.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
+            download
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{ background: "var(--accent)" }}
           >
@@ -347,26 +346,30 @@ export default function SiteReportsPage() {
   function startPolling(reportId: string) {
     if (pollingRef.current.has(reportId)) return;
     pollingRef.current.add(reportId);
+    let consecutive_errors = 0;
 
     const timer = setInterval(async () => {
       try {
         const { data } = await api.get<RawReport>(`/reports/status/${reportId}`);
+        consecutive_errors = 0;
         if (data.status !== "pending") {
           clearInterval(timer);
           pollTimersRef.current.delete(reportId);
           pollingRef.current.delete(reportId);
-          // Refresh full list
           fetchReports();
-        } else {
-          // Update in-place so card shows spinner
-          setReports((prev) =>
-            prev.map((r) => (r.id === reportId ? { ...r, status: data.status } : r))
-          );
         }
+        // Always update in-place so the card stays in sync
+        setReports((prev) =>
+          prev.map((r) => (r.id === reportId ? { ...r, status: data.status } : r))
+        );
       } catch {
-        clearInterval(timer);
-        pollTimersRef.current.delete(reportId);
-        pollingRef.current.delete(reportId);
+        consecutive_errors++;
+        // Stop only after 5 consecutive failures
+        if (consecutive_errors >= 5) {
+          clearInterval(timer);
+          pollTimersRef.current.delete(reportId);
+          pollingRef.current.delete(reportId);
+        }
       }
     }, 4000);
 
