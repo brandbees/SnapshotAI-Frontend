@@ -22,6 +22,8 @@ export interface Site {
   id: string;
   agency_id: string;
   client_id?: string | null;
+  client_email?: string | null;
+  client_name?: string | null;
   name: string;
   url: string;
   site_token: string;

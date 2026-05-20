@@ -80,8 +80,16 @@ function ScorePip({ score }: { score: number | null | undefined }) {
 
 // ── Send modal ────────────────────────────────────────────────────────────────
 
-function SendReportModal({ report, onClose, onSent }: { report: Report; onClose: () => void; onSent: () => void }) {
-  const [email, setEmail] = useState(report.sent_to ?? "");
+function SendReportModal({
+  report, clientEmail, onClose, onSent,
+}: {
+  report: Report;
+  clientEmail?: string | null;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const defaultEmail = report.sent_to ?? clientEmail ?? "";
+  const [email, setEmail] = useState(defaultEmail);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,10 +112,15 @@ function SendReportModal({ report, onClose, onSent }: { report: Report; onClose:
       <div className="bg-white rounded-2xl shadow-xl border border-border w-full max-w-md mx-4 overflow-hidden">
         <div className="px-6 py-5 border-b border-border">
           <h2 className="text-base font-bold text-foreground">Send Report</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Email the PDF report to your client</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Email the client portal link to your client</p>
         </div>
         <div className="px-6 py-5">
-          <label className="text-xs font-semibold text-foreground block mb-1.5">Recipient email</label>
+          <label className="text-xs font-semibold text-foreground block mb-1.5">
+            Recipient email
+            {clientEmail && email === clientEmail && (
+              <span className="ml-2 text-[10px] font-medium text-accent normal-case">· from client profile</span>
+            )}
+          </label>
           <input
             type="email"
             value={email}
@@ -142,7 +155,7 @@ function SendReportModal({ report, onClose, onSent }: { report: Report; onClose:
 
 // ── Report card ───────────────────────────────────────────────────────────────
 
-function ReportCard({ report, onSend }: { report: Report; onSend: (r: Report) => void }) {
+function ReportCard({ report, clientEmail, onSend }: { report: Report; clientEmail?: string | null; onSend: (r: Report) => void }) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [notes, setNotes] = useState(report.annotations ?? "");
@@ -500,7 +513,7 @@ export default function SiteReportsPage() {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {reports.map((r) => (
-              <ReportCard key={r.id} report={r} onSend={setSendTarget} />
+              <ReportCard key={r.id} report={r} clientEmail={site.client_email} onSend={setSendTarget} />
             ))}
           </div>
         </>
@@ -509,6 +522,7 @@ export default function SiteReportsPage() {
       {sendTarget && (
         <SendReportModal
           report={sendTarget}
+          clientEmail={site.client_email}
           onClose={() => setSendTarget(null)}
           onSent={() => {
             setSendTarget(null);
