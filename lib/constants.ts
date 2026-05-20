@@ -1,5 +1,5 @@
 export const API_BASE_URL =
- process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+ process.env.NEXT_PUBLIC_API_URL || "https://snapshotai.vps.webdock.cloud/api";
 
 export const PLAN_LIMITS: Record<string, number> = {
   free: 1,
@@ -33,7 +33,7 @@ export const PLAN_FEATURES: Record<string, string[]> = {
   free: ["1 site", "1 seat", "Manual audits only", "Basic reports"],
   freemium: ["10 sites", "3 seats", "Scheduled audits", "White-label reports", "Email alerts", "Team management"],
   premium: ["50 sites", "10 seats", "Everything in Starter", "PDF reports", "Client portal", "Priority support"],
-  agency_plus: ["Unlimited sites", "Unlimited seats", "Everything in Growth", "AI agent", "Custom domain", "Dedicated support"],
+  agency_plus: ["Unlimited sites", "Unlimited seats", "Everything in Growth", "Agent AI", "Custom domain", "Dedicated support"],
 };
 
 export const AUDIT_POLL_INTERVAL_MS = 3000;
