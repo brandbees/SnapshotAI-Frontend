@@ -33,6 +33,7 @@ interface RawReport {
   seo_score?: number | null;
   security_score?: number | null;
   malware_score?: number | null;
+  annotations?: string | null;
 }
 
 function mapReport(r: RawReport): Report {
@@ -52,6 +53,7 @@ function mapReport(r: RawReport): Report {
     seo_score: r.seo_score ?? null,
     security_score: r.security_score ?? null,
     malware_score: r.malware_score ?? null,
+    annotations: r.annotations ?? null,
   };
 }
 
@@ -143,7 +145,19 @@ function SendReportModal({ report, onClose, onSent }: { report: Report; onClose:
 function ReportCard({ report, onSend }: { report: Report; onSend: (r: Report) => void }) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [notes, setNotes] = useState(report.annotations ?? "");
+  const [notesSaving, setNotesSaving] = useState(false);
   const portalUrl = `${PORTAL_BASE}/${report.portal_token}`;
+
+  async function saveNotes() {
+    if (notes === (report.annotations ?? "")) return;
+    setNotesSaving(true);
+    try {
+      await api.patch(`/reports/annotate/${report.id}`, { annotations: notes });
+    } catch { /* ignore */ } finally {
+      setNotesSaving(false);
+    }
+  }
 
   async function handleDownload() {
     setDownloading(true);
@@ -322,6 +336,21 @@ function ReportCard({ report, onSend }: { report: Report; onSend: (r: Report) =>
             Generation failed — try generating again
           </p>
         )}
+      </div>
+
+      {/* Consultant notes */}
+      <div className="border-t border-border/50 px-4 py-3">
+        <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+          Consultant Notes {notesSaving && <span className="normal-case font-normal">· saving…</span>}
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={saveNotes}
+          placeholder="Internal notes about this report…"
+          rows={2}
+          className="w-full text-xs text-foreground bg-gray-50 rounded-lg border border-border px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent placeholder:text-muted-foreground/60"
+        />
       </div>
     </div>
   );

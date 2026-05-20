@@ -20,6 +20,7 @@ import { useRole } from "@/hooks/useRole";
 import { useAuth } from "@/hooks/useAuth";
 import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
 import { AuditHistoryTable } from "@/components/dashboard/AuditHistoryTable";
+import { TrendChart } from "@/components/dashboard/TrendChart";
 import { LoadingPage } from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/api";
@@ -256,16 +257,6 @@ function OverviewTab({
   if (sslDays !== null && sslDays < 30)
     issues.push({ label: `SSL expires in ${sslDays}d`, severity: sslDays < 7 ? "critical" : "warn" });
 
-  // Overall health trend
-  const completed = audits.filter((a) => a.status === "completed" && a.scores);
-  const trendPts = completed.slice(-10).map((a) => ({
-    date: new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    score: Math.round((a.scores!.performance + a.scores!.seo + a.scores!.security + a.scores!.malware) / 4),
-  }));
-  const displayTrend = trendPts.length === 1
-    ? [{ date: "—", score: trendPts[0].score }, trendPts[0]]
-    : trendPts;
-
   return (
     <div className="space-y-5">
 
@@ -356,43 +347,9 @@ function OverviewTab({
         <div className="lg:col-span-2 space-y-5">
           {/* Health Score Trend */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-semibold text-foreground">Health Score Trend</h3>
-              {trendPts.length >= 2 && (() => {
-                const delta = trendPts[trendPts.length - 1].score - trendPts[0].score;
-                return (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${delta >= 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
-                    {delta >= 0 ? "+" : ""}{delta} pts
-                  </span>
-                );
-              })()}
-            </div>
-            <p className="text-xs text-muted-foreground mb-4">Overall average across all pillars</p>
-            {displayTrend.length === 0 ? (
-              <div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
-                Run audits to build trend data
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={displayTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="overviewGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={brandColor} stopOpacity={0.2} />
-                      <stop offset="95%" stopColor={brandColor} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-                    formatter={(v) => [`${v}`, "Health Score"]}
-                  />
-                  <Area type="monotone" dataKey="score" stroke={brandColor} strokeWidth={2}
-                    fill="url(#overviewGrad)" dot={{ r: 3, fill: brandColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
+            <h3 className="text-sm font-semibold text-foreground mb-1">Health Score Trend</h3>
+            <p className="text-xs text-muted-foreground mb-4">Per-pillar breakdown · select range and pillars below</p>
+            <TrendChart siteId={site.id} />
           </div>
 
           {/* Audit History */}

@@ -262,6 +262,7 @@ export interface Report {
   seo_score?: number | null;
   security_score?: number | null;
   malware_score?: number | null;
+  annotations?: string | null;
 }
 
 export interface Client {
