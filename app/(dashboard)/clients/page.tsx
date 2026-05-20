@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import {
   Plus, Users, Globe, Mail, Building2, Trash2, Link2, Search,
-  ChevronRight,
+  ChevronRight, Pencil, Loader2, X,
 } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
 import { useRole } from "@/hooks/useRole";
@@ -32,6 +32,79 @@ function initials(name: string): string {
   return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
+// ── EditClientModal ───────────────────────────────────────────────────────────
+
+function EditClientModal({ client, onClose, onSaved }: { client: Client; onClose: () => void; onSaved: (updated: Client) => void }) {
+  const [name,    setName]    = useState(client.name);
+  const [email,   setEmail]   = useState(client.email ?? "");
+  const [company, setCompany] = useState(client.company ?? "");
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { data } = await api.put<{ client: Client }>(`/clients/${client.id}`, {
+        name: name.trim(),
+        email: email.trim() || null,
+        company: company.trim() || null,
+      });
+      onSaved(data.client);
+    } catch {
+      setError("Failed to update client");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl border border-border w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+          <div>
+            <h2 className="text-base font-bold text-foreground">Edit Client</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Update client details</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-foreground block mb-1.5">Name <span className="text-destructive">*</span></label>
+            <input value={name} onChange={e => setName(e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-foreground block mb-1.5">Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="client@example.com"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-foreground block mb-1.5">Company</label>
+            <input value={company} onChange={e => setCompany(e.target.value)}
+              placeholder="Company name (optional)"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </div>
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !name.trim()}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            style={{ background: "var(--accent)" }}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ClientCard ────────────────────────────────────────────────────────────────
 
 function ClientCard({
@@ -44,8 +117,10 @@ function ClientCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]           = useState(false);
   const [showAssign, setShowAssign]       = useState(false);
+  const [showEdit, setShowEdit]           = useState(false);
+  const [localClient, setLocalClient]     = useState(client);
   const { roleCanDo }                     = useRole();
-  const color                             = clientColor(client.name);
+  const color                             = clientColor(localClient.name);
 
   async function handleDelete() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -75,9 +150,9 @@ function ClientCard({
                 {initials(client.name)}
               </div>
               <div className="min-w-0">
-                <p className="font-bold text-sm text-foreground truncate leading-tight">{client.name}</p>
-                {client.company && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{client.company}</p>
+                <p className="font-bold text-sm text-foreground truncate leading-tight">{localClient.name}</p>
+                {localClient.company && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{localClient.company}</p>
                 )}
               </div>
             </div>
@@ -96,11 +171,18 @@ function ClientCard({
                     </button>
                   </>
                 ) : (
-                  <button onClick={handleDelete}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all"
-                    title="Delete client">
-                    <Trash2 size={13} />
-                  </button>
+                  <>
+                    <button onClick={() => setShowEdit(true)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-all"
+                      title="Edit client">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={handleDelete}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all"
+                      title="Delete client">
+                      <Trash2 size={13} />
+                    </button>
+                  </>
                 )}
               </div>
             )}
@@ -110,15 +192,15 @@ function ClientCard({
           <div className="flex items-center gap-4 py-3 px-3 bg-muted/40 rounded-xl mb-4">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Globe size={11} style={{ color }} />
-              <span className="font-semibold text-foreground">{client.site_count ?? 0}</span>
-              <span>{client.site_count === 1 ? "site" : "sites"}</span>
+              <span className="font-semibold text-foreground">{localClient.site_count ?? 0}</span>
+              <span>{localClient.site_count === 1 ? "site" : "sites"}</span>
             </div>
-            {client.email && (
+            {localClient.email && (
               <>
                 <div className="h-3 w-px bg-border" />
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
                   <Mail size={11} className="shrink-0" />
-                  <span className="truncate max-w-[130px]">{client.email}</span>
+                  <span className="truncate max-w-[130px]">{localClient.email}</span>
                 </div>
               </>
             )}
@@ -146,10 +228,18 @@ function ClientCard({
 
       {showAssign && (
         <AssignSitesModal
-          clientId={client.id}
-          clientName={client.name}
+          clientId={localClient.id}
+          clientName={localClient.name}
           onClose={() => setShowAssign(false)}
           onSaved={() => { setShowAssign(false); onSitesChanged(); }}
+        />
+      )}
+
+      {showEdit && (
+        <EditClientModal
+          client={localClient}
+          onClose={() => setShowEdit(false)}
+          onSaved={(updated) => { setLocalClient({ ...localClient, ...updated }); setShowEdit(false); }}
         />
       )}
     </>
