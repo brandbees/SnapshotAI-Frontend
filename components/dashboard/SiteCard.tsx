@@ -137,11 +137,11 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
           Audit Now
         </button>
         <button
-          onClick={(e) => nav(e, siteHref)}
+          onClick={(e) => nav(e, `/reports/${site.id}`)}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border border-border text-foreground hover:bg-gray-50 transition-colors"
         >
           <FileText size={13} />
-          Report
+          Reports
         </button>
         <button
           onClick={(e) => nav(e, siteHref)}

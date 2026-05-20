@@ -209,10 +209,10 @@ export function SiteQuickViewDrawer({ site, onClose }: Props) {
             Run Audit Now
           </button>
           <button
-            onClick={() => { window.location.href = `/sites/${site.id}`; }}
+            onClick={() => { window.location.href = `/reports/${site.id}`; }}
             className="px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-gray-50 transition-colors"
           >
-            View Report
+            View Reports
           </button>
         </div>
       </div>
