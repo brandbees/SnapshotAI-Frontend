@@ -13,6 +13,9 @@ export interface Agency {
   accent_color?: string;
   trial_ends_at?: string | null;
   onboarding_complete?: boolean;
+  created_at?: string;
+  last_seen_changelog?: string | null;
+  checklist_dismissed?: boolean;
   role?: TeamRole;
   member_id?: string;
   member_name?: string;

@@ -29,6 +29,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { AddSiteModal } from "@/components/sites/AddSiteModal";
+import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { Button } from "@/components/ui/Button";
 import { PLAN_LIMITS } from "@/lib/constants";
 import type { Site } from "@/types";
@@ -405,6 +406,11 @@ export default function DashboardPage() {
           Overview of all monitored sites and key metrics
         </p>
       </div>
+
+      {/* ── Onboarding checklist (new agencies only) */}
+      {agency && (
+        <OnboardingChecklist agency={agency} sites={sites} />
+      )}
 
       {/* ── 6 Stat Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">

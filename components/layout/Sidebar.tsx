@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,11 +18,14 @@ import {
   LogOut,
   Wifi,
   Users,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useRole } from "@/hooks/useRole";
+import { ChangelogModal } from "@/components/shared/ChangelogModal";
+import api from "@/lib/api";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -46,6 +50,14 @@ export function Sidebar() {
   const { agency, logout } = useAuth();
   const { logoUrl } = useBranding();
   const { roleCanDo } = useRole();
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    api.get<{ unread: number }>("/changelog")
+      .then(({ data }) => setUnreadCount(data.unread))
+      .catch(() => {});
+  }, []);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
@@ -146,6 +158,25 @@ export function Sidebar() {
         </div>
       </nav>
 
+      {/* What's new */}
+      <div className="px-3 pb-2">
+        <button
+          onClick={() => setChangelogOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors"
+        >
+          <Sparkles size={16} />
+          What's new
+          {unreadCount > 0 && (
+            <span
+              className="ml-auto text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+              style={{ background: "var(--accent)" }}
+            >
+              {unreadCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* User footer */}
       <div className="px-3 py-4 border-t border-border">
         {agency && (
@@ -174,6 +205,12 @@ export function Sidebar() {
           </div>
         )}
       </div>
+
+      <ChangelogModal
+        open={changelogOpen}
+        onClose={() => setChangelogOpen(false)}
+        onSeen={() => setUnreadCount(0)}
+      />
     </aside>
   );
 }
