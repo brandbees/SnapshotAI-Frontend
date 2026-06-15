@@ -20,6 +20,7 @@ const ROLE_OPTIONS: { value: Exclude<TeamRole, "owner">; label: string }[] = [
   { value: "admin",   label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "analyst", label: "Analyst" },
+  { value: "viewer",  label: "Viewer"  },
 ];
 
 const ROLE_STYLE: Record<TeamRole, string> = {
@@ -27,6 +28,7 @@ const ROLE_STYLE: Record<TeamRole, string> = {
   admin:   "bg-blue-100 text-blue-700",
   manager: "bg-green-100 text-green-700",
   analyst: "bg-gray-100 text-gray-600",
+  viewer:  "bg-sky-100 text-sky-700",
 };
 
 function RoleBadge({ role }: { role: TeamRole }) {
