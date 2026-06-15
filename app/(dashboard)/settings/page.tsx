@@ -46,6 +46,7 @@ const ROLE_COLOR: Record<string, { bg: string; text: string }> = {
   admin:   { bg: "#2563eb15", text: "#2563eb" },
   manager: { bg: "#16a34a15", text: "#16a34a" },
   analyst: { bg: "#71717a15", text: "#52525b" },
+  viewer:  { bg: "#0ea5e915", text: "#0284c7" },
 };
 
 const ROLE_STYLE: Record<TeamRole, string> = {
@@ -53,12 +54,14 @@ const ROLE_STYLE: Record<TeamRole, string> = {
   admin:   "bg-blue-100 text-blue-700",
   manager: "bg-green-100 text-green-700",
   analyst: "bg-gray-100 text-gray-600",
+  viewer:  "bg-sky-100 text-sky-700",
 };
 
 const ROLE_OPTIONS: { value: Exclude<TeamRole, "owner">; label: string }[] = [
   { value: "admin",   label: "Admin"   },
   { value: "manager", label: "Manager" },
   { value: "analyst", label: "Analyst" },
+  { value: "viewer",  label: "Viewer"  },
 ];
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
