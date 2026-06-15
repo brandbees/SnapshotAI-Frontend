@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, Fragment } from "react";
+import { useState, useRef, useEffect, Fragment, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -4414,6 +4414,14 @@ function SiteHealthTab({ site }: { site: Site }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SiteDetailPage() {
+  return (
+    <Suspense>
+      <SiteDetailContent />
+    </Suspense>
+  );
+}
+
+function SiteDetailContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
