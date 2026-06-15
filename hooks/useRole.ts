@@ -8,6 +8,7 @@ const ROLE_PERMISSIONS: Record<TeamRole, string[]> = {
   admin:   ["view", "run_audit", "run_scan", "generate_report", "manage_alerts", "manage_team", "add_site", "delete_site"],
   manager: ["view", "run_audit", "run_scan", "generate_report"],
   analyst: ["view"],
+  viewer:  ["view"],
 };
 
 export function useRole() {

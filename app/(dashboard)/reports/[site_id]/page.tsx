@@ -11,7 +11,7 @@ import api from "@/lib/api";
 import { useSite } from "@/hooks/useSite";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { scoreHex, timeAgo } from "@/lib/utils";
+import { scoreHex, timeAgo, isValidEmail } from "@/lib/utils";
 import { getToken } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/constants";
 import type { Report } from "@/types";
@@ -94,7 +94,10 @@ function SendReportModal({
   const [error, setError] = useState<string | null>(null);
 
   async function handleSend() {
-    if (!email.trim()) return;
+    if (!email.trim() || !isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setSending(true);
     setError(null);
     try {

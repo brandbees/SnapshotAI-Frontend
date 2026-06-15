@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UserPlus, Trash2, ChevronDown, Check, AlertCircle, X, Users, Lock } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { UserPlus, Trash2, ChevronDown, Users, Lock, AlertCircle, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Card } from "@/components/ui/Card";
@@ -11,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import api from "@/lib/api";
 import { PLAN_LABELS, PLAN_SEATS } from "@/lib/constants";
+import { isValidEmail } from "@/lib/utils";
 import type { TeamMember, TeamRole } from "@/types";
 
 const ROLE_OPTIONS: { value: Exclude<TeamRole, "owner">; label: string }[] = [
@@ -46,7 +49,6 @@ export default function TeamPage() {
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
@@ -56,11 +58,6 @@ export default function TeamPage() {
   const isPaidPlan = agency?.plan !== "free";
   const planLabel = agency ? PLAN_LABELS[agency.plan] : "";
   const seatLimit = agency ? (PLAN_SEATS[agency.plan] ?? 1) : 1;
-
-  function showToast(type: "success" | "error", msg: string) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }
 
   useEffect(() => {
     if (roleLoading || !roleCanDo("manage_team")) return;
@@ -85,7 +82,10 @@ export default function TeamPage() {
   }
 
   async function handleInvite() {
-    if (!inviteEmail) return;
+    if (!inviteEmail || !isValidEmail(inviteEmail)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
     setInviting(true);
     try {
       const { data: res } = await api.post<{ member: TeamMember }>("/team/invite", {
@@ -100,10 +100,10 @@ export default function TeamPage() {
       } : prev);
       setShowInvite(false);
       setInviteEmail(""); setInviteName(""); setInviteRole("analyst");
-      showToast("success", `Invite sent to ${inviteEmail}`);
+      toast.success(`Invite sent to ${inviteEmail}`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to send invite.";
-      showToast("error", msg);
+      toast.error(msg);
     } finally {
       setInviting(false);
     }
@@ -117,9 +117,9 @@ export default function TeamPage() {
         members: prev.members.filter((m) => m.id !== id),
         seats_used: prev.seats_used - 1,
       } : prev);
-      showToast("success", `${email} removed from team.`);
+      toast.success(`${email} removed from team.`);
     } catch {
-      showToast("error", "Failed to remove member.");
+      toast.error("Failed to remove member.");
     }
   }
 
@@ -131,7 +131,7 @@ export default function TeamPage() {
         members: prev.members.map((m) => m.id === id ? res.member : m),
       } : prev);
     } catch {
-      showToast("error", "Failed to update role.");
+      toast.error("Failed to update role.");
     }
   }
 
@@ -147,7 +147,7 @@ export default function TeamPage() {
           <p className="text-sm text-amber-700 max-w-sm">
             You&apos;re on the <strong>{planLabel}</strong> plan. Upgrade to Starter or above to invite team members.
           </p>
-          <a href="/billing" className="mt-2 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors" style={{ background: "var(--accent)" }}>View Plans</a>
+          <Link href="/billing" className="mt-2 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors" style={{ background: "var(--accent)" }}>View Plans</Link>
         </div>
       </div>
     );
@@ -158,19 +158,6 @@ export default function TeamPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <PageHeader title="Team" description="Invite and manage your team members." />
-
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
-          toast.type === "success"
-            ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
-            : "bg-red-50 border border-red-200 text-red-800"
-        }`}>
-          {toast.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {toast.msg}
-          <button onClick={() => setToast(null)} className="ml-2 opacity-60 hover:opacity-100"><X size={12} /></button>
-        </div>
-      )}
 
       {/* Header row */}
       <div className="flex items-center justify-between mb-5">
@@ -205,7 +192,7 @@ export default function TeamPage() {
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
           <AlertCircle size={15} className="shrink-0 text-amber-600" />
           Seat limit reached.{" "}
-          <a href="/billing" className="underline font-semibold">Upgrade your plan</a> to invite more members.
+          <Link href="/billing" className="underline font-semibold">Upgrade your plan</Link> to invite more members.
         </div>
       )}
 

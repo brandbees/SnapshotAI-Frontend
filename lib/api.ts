@@ -24,6 +24,20 @@ api.interceptors.response.use(
         window.location.href = "/login";
       }
     }
+    if (error.response?.status === 403 && getToken()) {
+      // Only redirect when mid-session (had a valid token). If no token, the
+      // 403 came from the login endpoint itself — let the catch block handle it.
+      clearToken();
+      if (typeof window !== "undefined") {
+        const msg = error.response?.data?.error ?? "Access denied.";
+        window.location.href = `/login?error=${encodeURIComponent(msg)}`;
+      }
+    }
+    if (error.response?.status === 503 && error.response?.data?.maintenance === true) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/maintenance";
+      }
+    }
     return Promise.reject(error);
   }
 );

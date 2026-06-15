@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { X, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import type { Site } from "@/types";
 
 interface AddSiteModalProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (siteId: string) => void;
 }
 
 export function AddSiteModal({ onClose, onSuccess }: AddSiteModalProps) {
@@ -27,11 +28,13 @@ export function AddSiteModal({ onClose, onSuccess }: AddSiteModalProps) {
       const { data } = await api.post<{ site: Site }>("/sites", { name, url });
       setSite(data.site);
       setStep("token");
+      toast.success("Site added successfully");
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data
           ?.error || "Failed to add site.";
       setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -152,13 +155,13 @@ export function AddSiteModal({ onClose, onSuccess }: AddSiteModalProps) {
 
               <div className="flex justify-end gap-2 pt-1">
                 <button
-                  onClick={onClose}
+                  onClick={() => onSuccess(site!.id)}
                   className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   I&apos;ll do this later
                 </button>
                 <button
-                  onClick={onSuccess}
+                  onClick={() => onSuccess(site!.id)}
                   className="px-4 py-2 text-sm font-semibold text-white rounded-md"
                   style={{ background: "var(--accent)" }}
                 >

@@ -21,7 +21,8 @@ export function TrialBanner() {
     setDismissed(sessionStorage.getItem(DISMISSED_KEY) === "1");
   }, []);
 
-  if (!agency?.trial_ends_at) return null;
+  // Never show for agencies on a paid plan
+  if (!agency?.trial_ends_at || (agency.plan && agency.plan !== "free")) return null;
 
   const days = getDaysRemaining(agency.trial_ends_at);
   const isExpired = days === 0;

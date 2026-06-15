@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   Plus, Users, Globe, Mail, Building2, Trash2, Link2, Search,
-  ChevronRight, Pencil, Loader2, X,
+  ChevronRight, Pencil, Loader2, X, Send, CheckCircle2, Clock,
 } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
 import { useRole } from "@/hooks/useRole";
@@ -52,8 +53,10 @@ function EditClientModal({ client, onClose, onSaved }: { client: Client; onClose
         company: company.trim() || null,
       });
       onSaved(data.client);
+      toast.success("Client updated successfully.");
     } catch {
       setError("Failed to update client");
+      toast.error("Failed to update client.");
     } finally {
       setSaving(false);
     }
@@ -119,16 +122,36 @@ function ClientCard({
   const [showAssign, setShowAssign]       = useState(false);
   const [showEdit, setShowEdit]           = useState(false);
   const [localClient, setLocalClient]     = useState(client);
+  const [inviting, setInviting]           = useState(false);
   const { roleCanDo }                     = useRole();
   const color                             = clientColor(localClient.name);
+
+  async function handleSendInvite() {
+    if (!localClient.email) {
+      toast.error("Add an email address to this client first.");
+      return;
+    }
+    setInviting(true);
+    try {
+      await api.post(`/clients/${localClient.id}/invite`);
+      toast.success(`Portal invite sent to ${localClient.email}`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || "Failed to send invite.");
+    } finally {
+      setInviting(false);
+    }
+  }
 
   async function handleDelete() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
     setDeleting(true);
     try {
       await api.delete(`/clients/${client.id}`);
+      toast.success(`${client.name} deleted.`);
       onDeleted();
     } catch {
+      toast.error("Failed to delete client.");
       setDeleting(false);
       setConfirmDelete(false);
     }
@@ -205,6 +228,40 @@ function ClientCard({
               </>
             )}
           </div>
+
+          {/* Portal invite status + action */}
+          {roleCanDo("add_site") && (
+            <div className="mb-3">
+              {localClient.invite_accepted ? (
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 border border-green-100 text-xs text-green-700 font-medium">
+                  <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                  Client portal active
+                </div>
+              ) : localClient.invite_token ? (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-amber-50 border border-amber-100">
+                  <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
+                    <Clock size={12} className="shrink-0" />
+                    Invite pending
+                  </div>
+                  <button onClick={handleSendInvite} disabled={inviting}
+                    className="text-xs text-amber-600 hover:text-amber-800 font-semibold disabled:opacity-50">
+                    {inviting ? "Sending…" : "Resend"}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={handleSendInvite} disabled={inviting || !localClient.email}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-dashed border-border hover:border-accent/40 hover:bg-accent/5 transition-all group/inv disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ color: "var(--accent)" }}
+                  title={!localClient.email ? "Add an email to this client first" : undefined}>
+                  <span className="flex items-center gap-1.5">
+                    {inviting ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                    {inviting ? "Sending invite…" : "Send portal invite"}
+                  </span>
+                  <ChevronRight size={12} className="opacity-50 group-hover/inv:opacity-100 group-hover/inv:translate-x-0.5 transition-all" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           {roleCanDo("add_site") ? (

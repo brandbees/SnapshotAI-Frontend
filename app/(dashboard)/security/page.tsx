@@ -541,6 +541,7 @@ export default function SecurityPage() {
                 <th className="px-3 py-2.5 text-center text-[10px] font-semibold tracking-widest text-muted-foreground uppercase whitespace-nowrap">PHP Upload</th>
                 <th className="px-3 py-2.5 text-center text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">SSL</th>
                 <th className="px-3 py-2.5 text-center text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">Malware</th>
+                <th className="px-3 py-2.5 text-center text-[10px] font-semibold tracking-widest text-muted-foreground uppercase whitespace-nowrap">Plugin CVEs</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -581,6 +582,14 @@ export default function SecurityPage() {
                     <td className="px-3 py-3 text-center"><SignalCell value={site.uploads_php_enabled} dangerous /></td>
                     <td className="px-3 py-3 text-center"><SslBadge date={site.ssl_expiry_date} /></td>
                     <td className="px-3 py-3 text-center"><MalwareBadge status={site.malware_status} /></td>
+                    <td className="px-3 py-3 text-center">
+                      {site.plugin_vuln_count == null
+                        ? <span className="text-muted-foreground/40 text-xs">—</span>
+                        : site.plugin_vuln_count > 0
+                          ? <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">{site.plugin_vuln_count}</span>
+                          : <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-50"><CheckCircle2 size={9} className="text-green-500" /></span>
+                      }
+                    </td>
                   </tr>
                 );
               })}
@@ -610,6 +619,14 @@ export default function SecurityPage() {
                 <td className="px-3 py-2.5 text-center text-[10px] font-bold">
                   {malwareCount > 0 ? <span className="text-red-600">{malwareCount}</span> : <span className="text-green-600">✓</span>}
                 </td>
+                {(() => {
+                  const total = sites.reduce((sum, s) => sum + (s.plugin_vuln_count ?? 0), 0);
+                  return (
+                    <td className="px-3 py-2.5 text-center text-[10px] font-bold">
+                      {total > 0 ? <span className="text-red-600">{total}</span> : <span className="text-green-600">✓</span>}
+                    </td>
+                  );
+                })()}
               </tr>
             </tfoot>
           </table>

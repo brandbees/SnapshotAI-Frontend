@@ -1,7 +1,7 @@
 import type {
   Site, Audit, PillarScores, PluginData, Plugin,
   ScanResult, SeoData, PerformanceData, SecurityData, PluginOutdated,
-  CronEvent, SiteHealth,
+  CronEvent, SiteHealth, WooFatalError, WooGateway,
 } from "@/types";
 
 // ── Raw shapes returned by the backend ───────────────────────────────────────
@@ -60,6 +60,18 @@ export interface RawSite {
   // Cron events & site health
   cron_events?: unknown;
   site_health?: unknown;
+  tags?: string[] | null;
+  // Google Analytics & Search Console (Phase 5 Sprint 3)
+  ga4_property_id?: string | null;
+  sc_property_url?: string | null;
+  google_connected?: boolean | null;
+  // Safe Updates (Phase 4 Sprint 1)
+  updates_enabled?: boolean | null;
+
+  // Safe Updates (Phase 4 Sprint 2)
+  update_window_day?: number | null;
+  update_window_hour?: number | null;
+  excluded_from_updates?: string[];
   // Content counts & DB health
   database_table_count?: number | null;
   autoloaded_options_kb?: number | null;
@@ -75,6 +87,13 @@ export interface RawSite {
   woocommerce_active?: boolean | null;
   woo_order_count?: number | null;
   woo_revenue?: number | null;
+  woo_orders_7d?: number | null;
+  woo_orders_30d?: number | null;
+  woo_revenue_7d?: number | null;
+  woo_revenue_30d?: number | null;
+  woo_failed_orders?: number | null;
+  woo_active_gateways?: WooGateway[] | null;
+  woo_fatal_errors?: WooFatalError[] | null;
   // Joined from latest audit (GET /api/sites only)
   performance_score?: number | null;
   seo_score?: number | null;
@@ -85,6 +104,7 @@ export interface RawSite {
   // Joined from latest scan (GET /api/sites only)
   is_clean?: boolean | null;
   threats?: unknown;
+  plugin_vuln_count?: number | null;
 }
 
 export interface RawAudit {
@@ -150,6 +170,7 @@ function mapPlugins(raw?: RawPlugin[]): Plugin[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((p) => ({
     name: p.name || p.plugin || "Unknown plugin",
+    slug: p.plugin ? p.plugin.split("/")[0] : (p.slug as string | undefined),
     version: String(p.version || ""),
     status: p.active !== false ? "active" : "inactive",
     update_available: false,
@@ -239,6 +260,7 @@ export function mapSite(raw: RawSite): Site {
         : raw.is_clean === false
         ? "threat"
         : undefined,
+    plugin_vuln_count: typeof raw.plugin_vuln_count === 'number' ? raw.plugin_vuln_count : undefined,
     plugin_data: pluginData,
 
     // Security signals (available on both list and detail endpoints)
@@ -267,6 +289,13 @@ export function mapSite(raw: RawSite): Site {
     woocommerce_active: raw.woocommerce_active ?? null,
     woo_order_count: raw.woo_order_count ?? null,
     woo_revenue: raw.woo_revenue ?? null,
+    woo_orders_7d: raw.woo_orders_7d ?? null,
+    woo_orders_30d: raw.woo_orders_30d ?? null,
+    woo_revenue_7d: raw.woo_revenue_7d ?? null,
+    woo_revenue_30d: raw.woo_revenue_30d ?? null,
+    woo_failed_orders: raw.woo_failed_orders ?? null,
+    woo_active_gateways: Array.isArray(raw.woo_active_gateways) ? (raw.woo_active_gateways as WooGateway[]) : null,
+    woo_fatal_errors: Array.isArray(raw.woo_fatal_errors) ? (raw.woo_fatal_errors as WooFatalError[]) : null,
 
     // Plugin intelligence
     plugins_needing_updates: raw.plugins_needing_updates ?? null,
@@ -295,10 +324,24 @@ export function mapSite(raw: RawSite): Site {
       : typeof raw.site_health === "string"
         ? (() => { try { return JSON.parse(raw.site_health as string) as SiteHealth; } catch { return null; } })()
         : null,
+    tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : null,
+    ga4_property_id: raw.ga4_property_id ?? null,
+    sc_property_url: raw.sc_property_url ?? null,
+    google_connected: raw.google_connected ?? false,
+    updates_enabled: raw.updates_enabled ?? false,
+    update_window_day:  raw.update_window_day  ?? null,
+    update_window_hour: raw.update_window_hour ?? null,
+    excluded_from_updates: Array.isArray(raw.excluded_from_updates) ? raw.excluded_from_updates : [],
   };
 }
 
 export function mapAudit(raw: RawAudit): Audit {
+  const parseJson = <T>(v: unknown): T | undefined => {
+    if (!v) return undefined;
+    if (typeof v === "string") { try { return JSON.parse(v) as T; } catch { return undefined; } }
+    return v as T;
+  };
+
   return {
     id: raw.id,
     site_id: raw.site_id,
@@ -309,6 +352,8 @@ export function mapAudit(raw: RawAudit): Audit {
     seo_data: raw.seo_data ?? null,
     performance_data: raw.performance_data ?? null,
     security_data: raw.security_data ?? null,
+    ai_narrative:      parseJson<Record<string, string>>(raw.ai_narrative),
+    ai_recommendations: parseJson<import("@/types").Recommendation[]>(raw.ai_recommendations),
     created_at: raw.created_at,
     completed_at: raw.completed_at,
   };

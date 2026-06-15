@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, AlertCircle, X, Lock, Mail, Webhook } from "lucide-react";
+import { toast } from "sonner";
+import { Lock, Mail, Webhook } from "lucide-react";
 import { useRole } from "@/hooks/useRole";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -37,7 +38,6 @@ export default function AlertsSettingsPage() {
   const [slackWebhook, setSlackWebhook] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   // Default to first site
   useEffect(() => {
@@ -67,11 +67,6 @@ export default function AlertsSettingsPage() {
       .finally(() => setLoading(false));
   }, [selectedSiteId]);
 
-  function showToast(type: "success" | "error", msg: string) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }
-
   async function save() {
     if (!selectedSiteId) return;
     setSaving(true);
@@ -85,9 +80,9 @@ export default function AlertsSettingsPage() {
         alert_email: channel === "email" ? alertEmail : undefined,
         slack_webhook_url: channel === "slack" ? slackWebhook : undefined,
       });
-      showToast("success", "Alert settings saved.");
+      toast.success("Alert settings saved.");
     } catch {
-      showToast("error", "Failed to save. Please try again.");
+      toast.error("Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -101,23 +96,6 @@ export default function AlertsSettingsPage() {
         title="Alert Settings"
         description="Configure score thresholds and notification channels per site."
       />
-
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
-            toast.type === "success"
-              ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
-              : "bg-red-50 border border-red-200 text-red-800"
-          }`}
-        >
-          {toast.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {toast.msg}
-          <button onClick={() => setToast(null)} className="ml-2 opacity-60 hover:opacity-100">
-            <X size={12} />
-          </button>
-        </div>
-      )}
 
       <div className="space-y-5">
         {/* Site selector */}

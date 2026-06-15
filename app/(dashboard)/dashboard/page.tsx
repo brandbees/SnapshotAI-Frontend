@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Globe,
   Search,
@@ -22,7 +23,7 @@ import {
   ScatterChart, Scatter, ZAxis, Cell,
   PieChart, Pie,
 } from "recharts";
-import { useSites } from "@/hooks/useSites";
+import { useSites, type PortfolioStats } from "@/hooks/useSites";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -122,9 +123,88 @@ function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366
   );
 }
 
+// ── Portfolio Health Score ────────────────────────────────────────────────────
+
+function PortfolioHealthScore({ portfolio }: { portfolio: PortfolioStats }) {
+  const { avg_score, total_sites, healthy, warning, critical, malware_detected, sites_down, ssl_expiring } = portfolio;
+
+  const scoreColor = avg_score == null ? "#6b7280" : avg_score >= 80 ? "#16a34a" : avg_score >= 50 ? "#d97706" : "#dc2626";
+  const scoreLabel = avg_score == null ? "No data" : avg_score >= 80 ? "Healthy" : avg_score >= 50 ? "Needs Attention" : "Critical";
+
+  const pct = (n: number) => total_sites > 0 ? Math.round((n / total_sites) * 100) : 0;
+
+  return (
+    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Portfolio Health</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Aggregate across all {total_sites} site{total_sites !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-3xl font-bold tabular-nums" style={{ color: scoreColor }}>
+            {avg_score ?? "—"}
+          </span>
+          <div className="text-right">
+            <p className="text-xs font-semibold" style={{ color: scoreColor }}>{scoreLabel}</p>
+            <p className="text-[10px] text-muted-foreground">avg score</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Status breakdown bar */}
+      <div className="flex rounded-full overflow-hidden h-2 mb-3 gap-0.5">
+        {healthy  > 0 && <div className="bg-green-500 transition-all" style={{ width: `${pct(healthy)}%` }} title={`${healthy} healthy`} />}
+        {warning  > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${pct(warning)}%` }} title={`${warning} warning`} />}
+        {critical > 0 && <div className="bg-red-500 transition-all"   style={{ width: `${pct(critical)}%` }} title={`${critical} critical`} />}
+        {total_sites === 0 && <div className="bg-gray-200 w-full" />}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="text-center">
+          <p className="text-lg font-bold text-green-600">{healthy}</p>
+          <p className="text-[10px] text-muted-foreground">Healthy</p>
+        </div>
+        <div className="text-center border-x border-border">
+          <p className="text-lg font-bold text-amber-500">{warning}</p>
+          <p className="text-[10px] text-muted-foreground">Warning</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold text-red-600">{critical}</p>
+          <p className="text-[10px] text-muted-foreground">Critical</p>
+        </div>
+      </div>
+
+      {/* Alert flags */}
+      <div className="flex flex-wrap gap-2">
+        {malware_detected > 0 && (
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+            {malware_detected} malware threat{malware_detected !== 1 ? "s" : ""}
+          </span>
+        )}
+        {sites_down > 0 && (
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+            {sites_down} site{sites_down !== 1 ? "s" : ""} down
+          </span>
+        )}
+        {ssl_expiring > 0 && (
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+            {ssl_expiring} SSL expiring soon
+          </span>
+        )}
+        {malware_detected === 0 && sites_down === 0 && ssl_expiring === 0 && total_sites > 0 && (
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
+            No active alerts
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Sites Overview table ───────────────────────────────────────────────────────
 
 function SitesOverviewCard({ sites }: { sites: Site[] }) {
+  const router = useRouter();
   const top = sites.slice(0, 5);
   return (
     <div className="bg-white rounded-2xl border border-border shadow-sm p-5 lg:col-span-2">
@@ -152,7 +232,7 @@ function SitesOverviewCard({ sites }: { sites: Site[] }) {
               return (
                 <tr
                   key={site.id}
-                  onClick={() => { window.location.href = `/sites/${site.id}`; }}
+                  onClick={() => { router.push(`/sites/${site.id}`); }}
                   className="border-b border-border last:border-0 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <td className="py-3 pr-3 font-medium text-foreground truncate max-w-[110px]">
@@ -275,7 +355,8 @@ function NeedsAttentionCard({ sites }: { sites: Site[] }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { sites, loading, error, refetch } = useSites();
+  const router = useRouter();
+  const { sites, portfolio, loading, error, refetch } = useSites();
   const { agency } = useAuth();
   const { roleCanDo } = useRole();
   const [showAdd, setShowAdd] = useState(false);
@@ -407,10 +488,13 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* ── Onboarding checklist (new agencies only) */}
-      {agency && (
+      {/* ── Onboarding checklist (agency/team only) */}
+      {agency && !agency.is_client_portal && (
         <OnboardingChecklist agency={agency} sites={sites} />
       )}
+
+      {/* ── Portfolio Health Score (agency/team only) */}
+      {portfolio && !agency?.is_client_portal && <PortfolioHealthScore portfolio={portfolio} />}
 
       {/* ── 6 Stat Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -593,7 +677,7 @@ export default function DashboardPage() {
       {showAdd && (
         <AddSiteModal
           onClose={() => setShowAdd(false)}
-          onSuccess={() => { setShowAdd(false); refetch(); }}
+          onSuccess={(siteId) => { setShowAdd(false); router.push(`/sites/${siteId}`); }}
         />
       )}
     </div>

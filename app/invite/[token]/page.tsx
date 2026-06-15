@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Shield } from "lucide-react";
 import { Input } from "@/components/ui/Input";
@@ -207,7 +208,7 @@ export default function InvitePage() {
 
         <p className="text-center text-xs text-muted-foreground mt-4">
           Already have an account?{" "}
-          <a href="/login" className="underline font-medium text-foreground">Sign in</a>
+          <Link href="/login" className="underline font-medium text-foreground">Sign in</Link>
         </p>
       </div>
     </div>

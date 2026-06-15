@@ -2,12 +2,15 @@
 
 import { useState, useRef, useEffect, Fragment } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowLeft, RefreshCw, ExternalLink, Trash2,
   CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronUp,
-  Shield, Package, ShoppingCart, Wifi, Key, Copy, Eye, EyeOff,
+  Shield, ShieldAlert, ShieldCheck, Package, ShoppingCart, Wifi, Key, Copy, Eye, EyeOff,
   Activity, Wrench, TrendingUp, Clock, Zap, Server, Database, LayoutGrid,
-  Bell, DollarSign, BarChart2, CalendarClock, HeartPulse, Search,
+  Bell, DollarSign, BarChart2, CalendarClock, HeartPulse, Search, AlertTriangle, Bot,
+  Loader2, ToggleLeft, ToggleRight, Ban, ImageIcon, X, CalendarDays,
+  HardDrive, RotateCcw, Download,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -22,10 +25,11 @@ import { ScoreGauge } from "@/components/dashboard/ScoreGauge";
 import { AuditHistoryTable } from "@/components/dashboard/AuditHistoryTable";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { LoadingPage } from "@/components/shared/LoadingSpinner";
+import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
-import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth } from "@/types";
+import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth, PluginVulnerability, WooFatalError, WooGateway } from "@/types";
 
 const AVATAR_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
 function siteAvatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length]; }
@@ -42,7 +46,8 @@ type Tab =
   | "plugins"
   | "woocommerce"
   | "cron"
-  | "health";
+  | "health"
+  | "backups";
 
 const BASE_TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "overview",    label: "Overview",    icon: <LayoutGrid size={13} /> },
@@ -52,6 +57,7 @@ const BASE_TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "malware",     label: "Malware",     icon: <Activity size={13} /> },
   { key: "uptime",      label: "Uptime",      icon: <Wifi size={13} /> },
   { key: "plugins",     label: "Plugins",     icon: <Package size={13} /> },
+  { key: "backups",     label: "Backups",     icon: <HardDrive size={13} /> },
   { key: "woocommerce", label: "WooCommerce", icon: <ShoppingCart size={13} /> },
   { key: "cron",        label: "Cron Events", icon: <CalendarClock size={13} /> },
   { key: "health",      label: "Site Health", icon: <HeartPulse size={13} /> },
@@ -211,6 +217,13 @@ function PluginDataPanel({ site }: { site: Site }) {
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
+interface Benchmarks {
+  performance: number | null;
+  seo: number | null;
+  security: number | null;
+  malware: number | null;
+}
+
 function OverviewTab({
   site,
   audits,
@@ -218,6 +231,7 @@ function OverviewTab({
   auditLoading,
   canRunAudit,
   brandColor,
+  benchmarks,
 }: {
   site: Site;
   audits: Audit[];
@@ -225,6 +239,7 @@ function OverviewTab({
   auditLoading: boolean;
   canRunAudit: boolean;
   brandColor: string;
+  benchmarks: Benchmarks | null;
 }) {
   const scores = site.latest_scores;
   const prevAudit = audits[1];
@@ -318,9 +333,22 @@ function OverviewTab({
             const sub = delta === undefined ? undefined : delta === 0 ? "No change" : `${delta > 0 ? "+" : ""}${delta} from last`;
             const variant: "good" | "warn" | "bad" =
               delta === 0 ? "warn" : key === "malware" ? (score >= 80 ? "good" : "bad") : score >= 80 ? "good" : score >= 50 ? "warn" : "bad";
+            const avg = benchmarks?.[key] ?? null;
+            const avgDiff = avg !== null ? score - avg : null;
             return (
-              <div key={key} className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center min-h-[190px]">
+              <div key={key} className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center min-h-[190px] gap-1">
                 <ScoreGauge score={score} label={label} sublabel={sub} sublabelVariant={variant} size="lg" isMalware={!!isMalware} />
+                {avg !== null && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[11px] text-muted-foreground">Industry avg:</span>
+                    <span className="text-[11px] font-bold text-muted-foreground">{avg}</span>
+                    {avgDiff !== null && (
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${avgDiff >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                        {avgDiff >= 0 ? `+${avgDiff}` : avgDiff}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -340,6 +368,93 @@ function OverviewTab({
         </div>
       )}
 
+      {/* AI Summary */}
+      {(() => {
+        const latestAudit = audits.find((a) => a.status === "completed");
+        const narrative = latestAudit?.ai_narrative;
+        const recs = latestAudit?.ai_recommendations;
+        if (!narrative?.overall) return null;
+        const EFFORT_STYLE: Record<string, string> = {
+          low:    "bg-green-50 text-green-700",
+          medium: "bg-amber-50 text-amber-700",
+          high:   "bg-red-50 text-red-700",
+        };
+        const PILLAR_STYLE: Record<string, string> = {
+          Security:    "bg-cyan-50 text-cyan-700",
+          Performance: "bg-indigo-50 text-indigo-700",
+          SEO:         "bg-pink-50 text-pink-700",
+          Malware:     "bg-purple-50 text-purple-700",
+          General:     "bg-gray-100 text-gray-600",
+        };
+        return (
+          <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: brandColor + "18" }}>
+                <Bot size={14} style={{ color: brandColor }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">AI Summary</p>
+                <p className="text-[11px] text-muted-foreground">Generated after last audit</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {/* Overall narrative */}
+              <p className="text-sm text-foreground leading-relaxed">{narrative.overall}</p>
+
+              {/* Per-pillar one-liners */}
+              {(["performance","seo","security","malware"] as const).some(k => narrative[k]) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(["performance","seo","security","malware"] as const).map(key => {
+                    const text = narrative[key];
+                    if (!text) return null;
+                    const labels: Record<string, string> = { performance: "Performance", seo: "SEO", security: "Security", malware: "Malware" };
+                    return (
+                      <div key={key} className="bg-gray-50 rounded-xl px-3.5 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{labels[key]}</p>
+                        <p className="text-xs text-foreground leading-relaxed">{text}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {recs && recs.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Recommended Actions</p>
+                  <div className="space-y-2">
+                    {recs.slice(0, 3).map((rec, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-border bg-gray-50/60">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold text-white mt-0.5"
+                          style={{ background: brandColor }}>
+                          {i + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <p className="text-xs font-semibold text-foreground">{rec.title}</p>
+                            {rec.pillar && (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PILLAR_STYLE[rec.pillar] ?? PILLAR_STYLE.General}`}>
+                                {rec.pillar}
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${EFFORT_STYLE[rec.effort] ?? EFFORT_STYLE.medium}`}>
+                              {rec.effort} effort
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{rec.description}</p>
+                          {rec.how && <p className="text-[11px] text-foreground mt-1 font-medium">{rec.how}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Main two-column section: left = trend + audit history, right = issues + environment */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
@@ -358,7 +473,7 @@ function OverviewTab({
               <h3 className="text-sm font-semibold text-foreground">Audit History</h3>
             </div>
             <div className="p-5">
-              <AuditHistoryTable audits={audits} />
+              <AuditHistoryTable audits={audits} siteId={site.id} />
             </div>
           </div>
         </div>
@@ -437,6 +552,7 @@ function SecurityTab({ site, audits, brandColor }: { site: Site; audits: Audit[]
     { label: "XML-RPC",              category: "Access",   safe: site.xml_rpc_enabled    === undefined ? null : !site.xml_rpc_enabled,    detail: site.xml_rpc_enabled    ? "Enabled — exposes attack surface" : "Disabled" },
     { label: "Default Login URL",    category: "Access",   safe: site.login_url_default  === undefined ? null : !site.login_url_default,  detail: site.login_url_default  ? "Using /wp-login.php — change it" : "Custom URL in use" },
     { label: "Admin Username",       category: "Accounts", safe: hasDefaultAdmin ? false : adminNames.length > 0 ? true : null,            detail: hasDefaultAdmin ? '"admin" username found — rename it' : adminNames.length > 0 ? "No default usernames" : "Unknown" },
+    { label: "Admin Account Count",  category: "Accounts", safe: site.admin_users_count == null ? null : site.admin_users_count <= 2,         detail: site.admin_users_count == null ? "Unknown" : site.admin_users_count <= 2 ? `${site.admin_users_count} admin${site.admin_users_count !== 1 ? "s" : ""} — acceptable` : `${site.admin_users_count} admins — review and reduce` },
     { label: "File Editor",          category: "Files",    safe: site.file_editor_enabled === undefined ? null : !site.file_editor_enabled, detail: site.file_editor_enabled ? "Enabled in admin panel" : "Disabled" },
     { label: "Debug Mode",           category: "Files",    safe: site.wp_debug_enabled    === undefined ? null : !site.wp_debug_enabled,    detail: site.wp_debug_enabled    ? "WP_DEBUG on — disable in production" : "Off" },
     { label: "wp-config.php",        category: "Files",    safe: site.wp_config_writable  === undefined ? null : !site.wp_config_writable,  detail: site.wp_config_writable  ? "Writable — fix file permissions" : "Protected" },
@@ -621,7 +737,8 @@ function SecurityTab({ site, audits, brandColor }: { site: Site; audits: Audit[]
             <h3 className="text-sm font-semibold text-foreground">Admin Accounts</h3>
             {site.admin_users_count != null && (
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                site.admin_users_count > 3 ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-600"
+                site.admin_users_count > 4 ? "bg-red-50 text-red-600" :
+                site.admin_users_count > 2 ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-600"
               }`}>
                 {site.admin_users_count} admin{site.admin_users_count !== 1 ? "s" : ""}
               </span>
@@ -977,11 +1094,294 @@ function PerformanceTab({ site, audits, brandColor }: { site: Site; audits: Audi
           )}
         </div>
       </div>
+
+      {/* ── Google Analytics ── */}
+      <GoogleAnalyticsSection site={site} brandColor={brandColor} />
+    </div>
+  );
+}
+
+// ── Google Analytics Section ─────────────────────────────────────────────────
+
+interface GA4Data {
+  sessions_7d: number; pageviews_7d: number; bounce_rate: number; avg_session_sec: number;
+  sessions_30d: number; pageviews_30d: number;
+  top_pages: { path: string; pageviews: number; sessions: number }[];
+}
+
+function GoogleAnalyticsSection({ site, brandColor }: { site: Site; brandColor: string }) {
+  const [status, setStatus]       = useState<{ connected: boolean; ga4_connected: boolean; ga4_property_id: string | null } | null>(null);
+  const [data, setData]           = useState<GA4Data | null>(null);
+  const [properties, setProps]    = useState<{ property_id: string; display_name: string; account_name: string }[] | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+  const [connecting, setConnecting]   = useState(false);
+  const [selectingProp, setSelectingProp] = useState(false);
+
+  useEffect(() => {
+    api.get<typeof status>(`/analytics/${site.id}/status`).then(({ data: s }) => {
+      setStatus(s);
+      if (s?.ga4_connected) {
+        setLoadingData(true);
+        api.get<GA4Data>(`/analytics/${site.id}/ga4`)
+          .then(({ data: d }) => setData(d))
+          .catch(() => {})
+          .finally(() => setLoadingData(false));
+      }
+    }).catch(() => {});
+  }, [site.id]);
+
+  async function connect() {
+    setConnecting(true);
+    try {
+      const { data: r } = await api.get<{ url: string }>(`/analytics/${site.id}/google/auth-url`);
+      window.location.href = r.url;
+    } catch { setConnecting(false); }
+  }
+
+  async function openPropertySelector() {
+    setSelectingProp(true);
+    try {
+      const { data: r } = await api.get<{ properties: typeof properties }>(`/analytics/${site.id}/ga4/properties`);
+      setProps(r.properties);
+    } catch { setSelectingProp(false); }
+  }
+
+  async function selectProperty(id: string) {
+    await api.post(`/analytics/${site.id}/ga4/property`, { property_id: id });
+    setProps(null); setSelectingProp(false);
+    const { data: s } = await api.get<typeof status>(`/analytics/${site.id}/status`);
+    setStatus(s);
+    if (s?.ga4_connected) {
+      setLoadingData(true);
+      api.get<GA4Data>(`/analytics/${site.id}/ga4`).then(({ data: d }) => setData(d)).catch(() => {}).finally(() => setLoadingData(false));
+    }
+  }
+
+  const fmtSec = (s: number) => s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`;
+
+  return (
+    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
+            <BarChart2 size={14} className="text-orange-500" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Google Analytics</h3>
+            {status?.ga4_connected && (
+              <p className="text-[11px] text-muted-foreground">Property: {status.ga4_property_id}</p>
+            )}
+          </div>
+        </div>
+        {status?.connected && !status.ga4_connected && (
+          <button onClick={openPropertySelector} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-gray-50 transition-colors">
+            Select property
+          </button>
+        )}
+        {!status?.connected && (
+          <button onClick={connect} disabled={connecting}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-60">
+            {connecting ? <RefreshCw size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+            {connecting ? "Redirecting…" : "Connect Google"}
+          </button>
+        )}
+      </div>
+
+      {/* Property selector modal */}
+      {properties !== null && (
+        <div className="px-5 py-4 border-b border-border bg-gray-50/50">
+          <p className="text-xs font-semibold text-foreground mb-2">Select your GA4 property</p>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {properties.map((p) => (
+              <button key={p.property_id} onClick={() => selectProperty(p.property_id)}
+                className="w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-white text-xs transition-colors">
+                <span className="font-semibold text-foreground">{p.display_name}</span>
+                <span className="text-muted-foreground ml-2">— {p.account_name}</span>
+                <span className="float-right text-muted-foreground font-mono">{p.property_id}</span>
+              </button>
+            ))}
+            {properties.length === 0 && <p className="text-xs text-muted-foreground py-2">No GA4 properties found for this Google account.</p>}
+          </div>
+          <button onClick={() => { setProps(null); setSelectingProp(false); }} className="mt-2 text-xs text-muted-foreground hover:underline">Cancel</button>
+        </div>
+      )}
+
+      {!status?.connected && (
+        <div className="px-5 py-10 flex flex-col items-center gap-2 text-center">
+          <BarChart2 size={24} className="text-muted-foreground/40" />
+          <p className="text-sm font-medium text-foreground">Connect Google Analytics</p>
+          <p className="text-xs text-muted-foreground max-w-xs">See sessions, pageviews, bounce rate and top pages alongside your performance score.</p>
+        </div>
+      )}
+
+      {status?.connected && !status.ga4_connected && properties === null && !selectingProp && (
+        <div className="px-5 py-8 flex flex-col items-center gap-2 text-center">
+          <p className="text-sm font-medium text-foreground">Google account connected</p>
+          <p className="text-xs text-muted-foreground">Select your GA4 property to start viewing traffic data.</p>
+        </div>
+      )}
+
+      {status?.ga4_connected && (
+        loadingData ? (
+          <div className="py-10 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: `${brandColor}30`, borderTopColor: brandColor }} />
+          </div>
+        ) : data ? (
+          <div className="p-5 space-y-5">
+            {/* Stats strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Sessions (7d)",   value: data.sessions_7d.toLocaleString()  },
+                { label: "Sessions (30d)",  value: data.sessions_30d.toLocaleString() },
+                { label: "Pageviews (7d)",  value: data.pageviews_7d.toLocaleString() },
+                { label: "Bounce Rate",     value: `${(data.bounce_rate * 100).toFixed(1)}%` },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl border border-border bg-gray-50/50 px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5 tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+            {/* Avg session duration */}
+            <p className="text-xs text-muted-foreground">Avg. session duration (7d): <span className="font-semibold text-foreground">{fmtSec(data.avg_session_sec)}</span></p>
+            {/* Top pages table */}
+            {data.top_pages.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-foreground mb-2">Top Pages (30d)</p>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-gray-50/50">
+                        <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Page</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">Views</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">Sessions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.top_pages.map((p, i) => (
+                        <tr key={i} className="border-b border-border last:border-0 hover:bg-gray-50/60">
+                          <td className="px-4 py-2.5 font-mono text-foreground truncate max-w-[240px]">{p.path}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{p.pageviews.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{p.sessions.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center">
+            <p className="text-xs text-muted-foreground">Could not load GA4 data. Check that this property has data.</p>
+          </div>
+        )
+      )}
     </div>
   );
 }
 
 // ── SEO Tab ───────────────────────────────────────────────────────────────────
+
+function BrokenLinksSection({ siteId, brandColor }: { siteId: string; brandColor: string }) {
+  const [links, setLinks]           = useState<{ url: string; status_code: number; found_on: string; checked_at: string }[]>([]);
+  const [checkedAt, setCheckedAt]   = useState<string | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [running, setRunning]       = useState(false);
+
+  useEffect(() => {
+    api.get<{ broken_links: typeof links; checked_at: string | null }>(`/sites/${siteId}/broken-links`)
+      .then(({ data }) => { setLinks(data.broken_links); setCheckedAt(data.checked_at); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [siteId]);
+
+  async function triggerRun() {
+    setRunning(true);
+    try {
+      await api.post(`/sites/${siteId}/broken-links/run`);
+    } catch {}
+    setRunning(false);
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Broken Links</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {checkedAt
+              ? `Last checked ${new Date(checkedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+              : "Not yet checked"}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {links.length > 0 && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+              {links.length} broken
+            </span>
+          )}
+          <button
+            onClick={triggerRun}
+            disabled={running}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={11} className={running ? "animate-spin" : ""} />
+            {running ? "Running…" : "Run check"}
+          </button>
+        </div>
+      </div>
+      {loading ? (
+        <div className="py-10 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: `${brandColor}30`, borderTopColor: brandColor }} />
+        </div>
+      ) : links.length === 0 ? (
+        <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
+          <CheckCircle2 size={24} className="text-green-500" />
+          <p className="text-sm font-semibold text-foreground">{checkedAt ? "No broken links found" : "No data yet"}</p>
+          <p className="text-xs text-muted-foreground">{checkedAt ? "All links are responding correctly" : "Run a check to scan up to 50 pages"}</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-gray-50/50">
+                {["Broken URL", "Status", "Found On"].map((h) => (
+                  <th key={h} className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((link, i) => (
+                <tr key={i} className="border-b border-border last:border-0 hover:bg-gray-50/60 transition-colors">
+                  <td className="px-5 py-3 max-w-[320px]">
+                    <a href={link.url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs font-mono text-foreground hover:underline break-all">
+                      {link.url}
+                    </a>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                      link.status_code === 404 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
+                    }`}>
+                      {link.status_code}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 max-w-[260px]">
+                    <a href={link.found_on} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground hover:underline truncate block max-w-full">
+                      {link.found_on.replace(/^https?:\/\/[^/]+/, "") || "/"}
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; brandColor: string }) {
   const score = site.latest_scores?.seo ?? null;
@@ -1173,6 +1573,12 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
         </div>
       </div>
 
+      {/* ── Broken Links ── */}
+      <BrokenLinksSection siteId={site.id} brandColor={brandColor} />
+
+      {/* ── Search Console ── */}
+      <SearchConsoleSection site={site} brandColor={brandColor} />
+
       {/* ── SEO Checklist ── */}
       <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
         <h3 className="text-sm font-semibold text-foreground mb-4">SEO Checklist</h3>
@@ -1216,10 +1622,17 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
 
 function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
   const [alertSettings, setAlertSettings] = useState<AlertSettings | null>(null);
+  const [responseHistory, setResponseHistory] = useState<{ day: string; avg_ms: number; uptime_pct: number }[]>([]);
 
   useEffect(() => {
     api.get<AlertSettings>(`/alerts/${site.id}`)
       .then(({ data }) => setAlertSettings(data))
+      .catch(() => {});
+  }, [site.id]);
+
+  useEffect(() => {
+    api.get<{ history: { day: string; avg_ms: number; uptime_pct: number }[] }>(`/sites/${site.id}/uptime-history`)
+      .then(({ data }) => setResponseHistory(data.history ?? []))
       .catch(() => {});
   }, [site.id]);
 
@@ -1346,24 +1759,77 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
         </div>
       </div>
 
-      {/* ── Response time chart placeholder ── */}
+      {/* ── Response time chart ── */}
       <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Response Time — Last 30 Days</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Average response time in ms</p>
           </div>
+          {responseHistory.length > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+              {responseHistory.length}d of data
+            </span>
+          )}
         </div>
-        <div className="h-48 flex flex-col items-center justify-center gap-3">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ background: brandColor + "14" }}>
-            <BarChart2 size={20} style={{ color: brandColor }} />
+        {responseHistory.length === 0 ? (
+          <div className="h-48 flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+              style={{ background: brandColor + "14" }}>
+              <Activity size={20} style={{ color: brandColor }} />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-foreground">No response time data yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Data will appear here as uptime monitoring collects pings</p>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-foreground">Response time monitoring coming soon</p>
-            <p className="text-xs text-muted-foreground mt-1">Historical latency data will display here once active monitoring is enabled</p>
+        ) : (
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={responseHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="rtGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={brandColor} stopOpacity={0.18} />
+                    <stop offset="95%" stopColor={brandColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis
+                  dataKey="day"
+                  tickFormatter={(v) => {
+                    const d = new Date(v);
+                    return `${d.getDate()}/${d.getMonth() + 1}`;
+                  }}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `${v}ms`}
+                  width={52}
+                />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+                  formatter={(val) => [`${val ?? 0} ms`, "Avg response"]}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="avg_ms"
+                  stroke={brandColor}
+                  strokeWidth={2}
+                  fill="url(#rtGrad)"
+                  dot={false}
+                  activeDot={{ r: 4, fill: brandColor }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── Incident log + Alert Settings ── */}
@@ -1430,6 +1896,180 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
           </a>
         </div>
       </div>
+
+    </div>
+  );
+}
+
+// ── Search Console Section ────────────────────────────────────────────────────
+
+interface SCData {
+  clicks: number; impressions: number; ctr: number; avg_position: number;
+  top_queries: { query: string; clicks: number; impressions: number; position: number }[];
+  top_pages:   { page: string;  clicks: number; impressions: number }[];
+}
+
+function SearchConsoleSection({ site, brandColor }: { site: Site; brandColor: string }) {
+  const [status, setStatus]   = useState<{ connected: boolean; sc_connected: boolean; sc_property_url: string | null } | null>(null);
+  const [data, setData]       = useState<SCData | null>(null);
+  const [scProps, setScProps] = useState<{ site_url: string; permission_level: string }[] | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+  const [connecting, setConnecting]   = useState(false);
+
+  useEffect(() => {
+    api.get<typeof status>(`/analytics/${site.id}/status`).then(({ data: s }) => {
+      setStatus(s);
+      if (s?.sc_connected) {
+        setLoadingData(true);
+        api.get<SCData>(`/analytics/${site.id}/search-console`)
+          .then(({ data: d }) => setData(d))
+          .catch(() => {})
+          .finally(() => setLoadingData(false));
+      }
+    }).catch(() => {});
+  }, [site.id]);
+
+  async function connect() {
+    setConnecting(true);
+    try {
+      const { data: r } = await api.get<{ url: string }>(`/analytics/${site.id}/google/auth-url`);
+      window.location.href = r.url;
+    } catch { setConnecting(false); }
+  }
+
+  async function openPropSelector() {
+    const { data: r } = await api.get<{ properties: typeof scProps }>(`/analytics/${site.id}/sc/properties`);
+    setScProps(r.properties);
+  }
+
+  async function selectSCProperty(url: string) {
+    await api.post(`/analytics/${site.id}/sc/property`, { site_url: url });
+    setScProps(null);
+    const { data: s } = await api.get<typeof status>(`/analytics/${site.id}/status`);
+    setStatus(s);
+    if (s?.sc_connected) {
+      setLoadingData(true);
+      api.get<SCData>(`/analytics/${site.id}/search-console`).then(({ data: d }) => setData(d)).catch(() => {}).finally(() => setLoadingData(false));
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Search size={14} className="text-blue-500" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Google Search Console</h3>
+            {status?.sc_connected && (
+              <p className="text-[11px] text-muted-foreground truncate max-w-[240px]">{status.sc_property_url}</p>
+            )}
+          </div>
+        </div>
+        {status?.connected && !status.sc_connected && (
+          <button onClick={openPropSelector} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-gray-50 transition-colors">
+            Select property
+          </button>
+        )}
+        {!status?.connected && (
+          <button onClick={connect} disabled={connecting}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-60">
+            {connecting ? <RefreshCw size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+            {connecting ? "Redirecting…" : "Connect Google"}
+          </button>
+        )}
+      </div>
+
+      {/* SC property selector */}
+      {scProps !== null && (
+        <div className="px-5 py-4 border-b border-border bg-gray-50/50">
+          <p className="text-xs font-semibold text-foreground mb-2">Select your Search Console property</p>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {scProps.map((p) => (
+              <button key={p.site_url} onClick={() => selectSCProperty(p.site_url)}
+                className="w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-white text-xs transition-colors">
+                <span className="font-semibold text-foreground">{p.site_url}</span>
+                <span className="text-muted-foreground ml-2 capitalize">{p.permission_level?.replace('_', ' ')}</span>
+              </button>
+            ))}
+            {scProps.length === 0 && <p className="text-xs text-muted-foreground py-2">No Search Console properties found. Make sure this site is verified in Google Search Console.</p>}
+          </div>
+          <button onClick={() => setScProps(null)} className="mt-2 text-xs text-muted-foreground hover:underline">Cancel</button>
+        </div>
+      )}
+
+      {!status?.connected && (
+        <div className="px-5 py-10 flex flex-col items-center gap-2 text-center">
+          <Search size={24} className="text-muted-foreground/40" />
+          <p className="text-sm font-medium text-foreground">Connect Search Console</p>
+          <p className="text-xs text-muted-foreground max-w-xs">See clicks, impressions, CTR, average position, and top search queries alongside your SEO score.</p>
+        </div>
+      )}
+
+      {status?.connected && !status.sc_connected && scProps === null && (
+        <div className="px-5 py-8 flex flex-col items-center gap-2 text-center">
+          <p className="text-sm font-medium text-foreground">Google account connected</p>
+          <p className="text-xs text-muted-foreground">Select your Search Console property to start viewing search data.</p>
+        </div>
+      )}
+
+      {status?.sc_connected && (
+        loadingData ? (
+          <div className="py-10 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: `${brandColor}30`, borderTopColor: brandColor }} />
+          </div>
+        ) : data ? (
+          <div className="p-5 space-y-5">
+            {/* Stats strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Clicks (28d)",      value: data.clicks.toLocaleString()           },
+                { label: "Impressions (28d)",  value: data.impressions.toLocaleString()      },
+                { label: "CTR",                value: `${(data.ctr * 100).toFixed(2)}%`      },
+                { label: "Avg. Position",      value: data.avg_position.toFixed(1)           },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl border border-border bg-gray-50/50 px-4 py-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5 tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+            {/* Top queries */}
+            {data.top_queries.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-foreground mb-2">Top Queries</p>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-gray-50/50">
+                        <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Query</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">Clicks</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">Impr.</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">Pos.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.top_queries.map((q, i) => (
+                        <tr key={i} className="border-b border-border last:border-0 hover:bg-gray-50/60">
+                          <td className="px-4 py-2.5 text-foreground">{q.query}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{q.clicks.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{q.impressions.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{q.position.toFixed(1)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center">
+            <p className="text-xs text-muted-foreground">Could not load Search Console data. Ensure this property is verified and has data.</p>
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -1834,8 +2474,8 @@ function MalwareTab({
                                   <tbody>
                                     {scan.threats.map((threat, i) => (
                                       <tr key={i} className="border-b border-red-100 last:border-0 bg-white">
-                                        <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground max-w-[240px] truncate">
-                                          {threat.url || threat.file_path || threat.description || "—"}
+                                        <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground max-w-[240px] truncate" title={threat.url || threat.file_path || threat.location || threat.description || ""}>
+                                          {threat.url || threat.file_path || threat.location || threat.description || "—"}
                                         </td>
                                         <td className="px-4 py-2.5 text-foreground font-medium">
                                           {threat.threat_type || threat.type || "Unknown"}
@@ -1874,13 +2514,297 @@ function MalwareTab({
 
 // ── Plugins Tab ───────────────────────────────────────────────────────────────
 
+// ── Plugin update button ──────────────────────────────────────────────────────
+
+function PluginUpdateButton({ plugin, siteId, updatesEnabled, alreadyUpdated, onComplete, onSuccess }: {
+  plugin: SitePlugin; siteId: string; updatesEnabled: boolean;
+  alreadyUpdated?: boolean; onComplete?: () => void; onSuccess?: (slug: string) => void;
+}) {
+  const [state, setState] = useState<"idle" | "running" | "done" | "failed" | "rolled_back">("idle");
+
+  // Show "Updated" if this session already updated this plugin
+  if (alreadyUpdated || state === "done") {
+    return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700"><CheckCircle2 size={9} />Updated</span>;
+  }
+
+  if (!plugin.update_available || !updatesEnabled) {
+    return plugin.update_available ? (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+        <RefreshCw size={9} />Update → v{plugin.new_version || "?"}
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
+        <CheckCircle2 size={9} />Up to date
+      </span>
+    );
+  }
+
+  const actualSlug = plugin.slug ?? plugin.name.toLowerCase().replace(/\s+/g, "-");
+
+  async function handleUpdate() {
+    if (state === "running") return;
+    setState("running");
+    try {
+      const { data: job } = await api.post(`/updates/${siteId}/run`, {
+        slug: actualSlug,
+        update_type: "plugin",
+        new_version: plugin.new_version,
+      });
+
+      // Poll for result (plugin runs synchronously, backend updates DB when done — up to ~120s)
+      let attempts = 0;
+      while (attempts < 50) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const { data: status } = await api.get(`/updates/${siteId}/${job.update_id}/status`);
+        if (status.status === "success") { setState("done"); toast.success(`${plugin.name} updated successfully`); onSuccess?.(actualSlug); onComplete?.(); return; }
+        if (status.status === "rolled_back") { setState("rolled_back"); toast.warning(`${plugin.name}: update rolled back — site health check failed`); onComplete?.(); return; }
+        if (status.status === "failed") { setState("failed"); toast.error(`${plugin.name} update failed: ${status.health_error ?? "unknown error"}`); onComplete?.(); return; }
+        attempts++;
+      }
+      setState("failed");
+      toast.error("Update timed out");
+      onComplete?.();
+    } catch {
+      setState("failed");
+      toast.error("Failed to trigger update");
+      onComplete?.();
+    }
+  }
+
+  if (state === "rolled_back") return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-50 text-orange-700"><AlertTriangle size={9} />Rolled back</span>;
+  if (state === "failed") return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600"><XCircle size={9} />Failed</span>;
+
+  return (
+    <button
+      onClick={handleUpdate}
+      disabled={state === "running"}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-60"
+    >
+      {state === "running" ? <><Loader2 size={9} className="animate-spin" />Updating…</> : <><RefreshCw size={9} />Update → v{plugin.new_version || "?"}</>}
+    </button>
+  );
+}
+
+// ── Update history panel ──────────────────────────────────────────────────────
+
+type HistoryRow = {
+  id: string; slug: string; update_type: string; old_version: string | null;
+  new_version: string | null; status: string; health_error: string | null;
+  rolled_back_at: string | null; created_at: string; completed_at: string | null;
+  screenshot_before_url: string | null; screenshot_after_url: string | null;
+  diff_percentage: number | null;
+};
+
+function UpdateHistoryPanel({ siteId, externalRefreshKey }: { siteId: string; externalRefreshKey?: number }) {
+  const [history, setHistory]     = useState<HistoryRow[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actioning, setActioning] = useState<string | null>(null);
+  const [screenshotRow, setScreenshotRow] = useState<HistoryRow | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    async function fetchHistory() {
+      try {
+        const { data } = await api.get(`/updates/${siteId}`);
+        if (cancelled) return;
+        const rows = data.history ?? [];
+        setHistory(rows);
+        setLoading(false);
+        setRefreshing(false);
+        const hasActive = rows.some((r: HistoryRow) =>
+          r.status === "pending" || r.status === "running" || r.status === "pending_review"
+        );
+        if (hasActive) timer = setTimeout(fetchHistory, 4000);
+      } catch {
+        if (!cancelled) { setLoading(false); setRefreshing(false); }
+      }
+    }
+
+    fetchHistory();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [siteId, refreshKey, externalRefreshKey]);
+
+  const statusBadge = (s: string) => {
+    if (s === "success")        return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700"><CheckCircle2 size={9} />Success</span>;
+    if (s === "rolled_back")    return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700"><AlertTriangle size={9} />Rolled back</span>;
+    if (s === "failed")         return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600"><XCircle size={9} />Failed</span>;
+    if (s === "pending_review") return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700"><Eye size={9} />Pending Review</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600"><Loader2 size={9} className="animate-spin" />Running</span>;
+  };
+
+  async function handleApprove(row: HistoryRow) {
+    setActioning(row.id);
+    try {
+      await api.post(`/updates/${siteId}/${row.id}/approve`);
+      toast.success(`${row.slug} update approved`);
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error("Failed to approve update");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function handleReject(row: HistoryRow) {
+    setActioning(row.id);
+    try {
+      await api.post(`/updates/${siteId}/${row.id}/reject`);
+      toast.success(`${row.slug} update rejected — rolling back`);
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error("Failed to reject update");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  if (loading) return <div className="py-6 flex justify-center"><Loader2 size={18} className="animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <div>
+      {/* Screenshot comparison modal */}
+      {screenshotRow && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setScreenshotRow(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Visual Comparison — {screenshotRow.slug}</p>
+                {screenshotRow.diff_percentage != null && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pixel difference: <span className={`font-semibold ${screenshotRow.diff_percentage > 5 ? "text-amber-600" : "text-green-600"}`}>{screenshotRow.diff_percentage}%</span>
+                  </p>
+                )}
+              </div>
+              <button onClick={() => setScreenshotRow(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4 p-5">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Before</p>
+                {screenshotRow.screenshot_before_url
+                  ? <img src={screenshotRow.screenshot_before_url} alt="Before" className="w-full rounded-lg border border-border object-top" />
+                  : <div className="w-full h-48 rounded-lg border border-border bg-gray-50 flex items-center justify-center text-xs text-muted-foreground">No screenshot</div>
+                }
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">After</p>
+                {screenshotRow.screenshot_after_url
+                  ? <img src={screenshotRow.screenshot_after_url} alt="After" className="w-full rounded-lg border border-border object-top" />
+                  : <div className="w-full h-48 rounded-lg border border-border bg-gray-50 flex items-center justify-center text-xs text-muted-foreground">No screenshot</div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={() => { setRefreshing(true); setRefreshKey((k) => k + 1); }}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
+      {history.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-4 text-center">No updates have been run yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border bg-gray-50/50">
+                {["Plugin", "From → To", "Status", "Diff", "Date", ""].map((h) => (
+                  <th key={h} className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((u) => (
+                <tr key={u.id} className="border-b border-border last:border-0 hover:bg-gray-50/60 transition-colors">
+                  <td className="px-5 py-3 text-sm font-medium text-foreground">{u.slug}</td>
+                  <td className="px-5 py-3 text-xs font-mono text-muted-foreground">{u.old_version ?? "?"} → {u.new_version ?? "?"}</td>
+                  <td className="px-5 py-3">
+                    {statusBadge(u.status)}
+                    {u.health_error && <p className="text-xs text-muted-foreground mt-1 max-w-xs truncate" title={u.health_error}>{u.health_error}</p>}
+                  </td>
+                  <td className="px-5 py-3">
+                    {u.diff_percentage != null ? (
+                      <button
+                        onClick={() => setScreenshotRow(u)}
+                        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full transition-colors hover:opacity-80 ${u.diff_percentage > 5 ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}
+                      >
+                        <ImageIcon size={9} />{u.diff_percentage}%
+                      </button>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-5 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(u.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </td>
+                  <td className="px-5 py-3">
+                    {u.status === "pending_review" && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleApprove(u)}
+                          disabled={actioning === u.id}
+                          className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                        >
+                          {actioning === u.id ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleReject(u)}
+                          disabled={actioning === u.id}
+                          className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                        >
+                          <XCircle size={10} />
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PluginTable({
-  plugins, brandColor, showUpdateStatus,
+  plugins, brandColor, showUpdateStatus, vulnMap, siteId, updatesEnabled, updatedSlugs,
+  excluded, onUpdateComplete, onUpdateSuccess, onExclude, onUnexclude,
 }: {
   plugins: SitePlugin[];
   brandColor: string;
   showUpdateStatus: boolean;
+  vulnMap?: Map<string, PluginVulnerability>;
+  siteId?: string;
+  updatesEnabled?: boolean;
+  updatedSlugs?: Set<string>;
+  excluded?: string[];
+  onUpdateComplete?: () => void;
+  onUpdateSuccess?: (slug: string) => void;
+  onExclude?: (slug: string) => void;
+  onUnexclude?: (slug: string) => void;
 }) {
+  const sevColor = (sev: string) => {
+    switch (sev.toLowerCase()) {
+      case "critical": return "bg-red-100 text-red-700";
+      case "high":     return "bg-red-50 text-red-600";
+      case "medium":   return "bg-amber-50 text-amber-700";
+      default:         return "bg-yellow-50 text-yellow-700";
+    }
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -1888,55 +2812,636 @@ function PluginTable({
           <tr className="border-b border-border bg-gray-50/50">
             <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Plugin</th>
             <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Version</th>
+            {vulnMap && (
+              <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Security</th>
+            )}
             {showUpdateStatus && (
-              <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Status</th>
+              <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Update</th>
+            )}
+            {updatesEnabled && (
+              <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">Exclude</th>
             )}
           </tr>
         </thead>
         <tbody>
-          {plugins.map((plugin) => (
-            <tr key={plugin.name} className="border-b border-border last:border-0 hover:bg-gray-50/60 transition-colors">
-              <td className="px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{ background: brandColor + "18", color: brandColor }}>
-                    {plugin.name[0]?.toUpperCase() ?? "?"}
-                  </div>
-                  <span className="text-sm font-medium text-foreground">{plugin.name}</span>
-                </div>
-              </td>
-              <td className="px-5 py-3">
-                <span className="text-sm font-mono text-muted-foreground">{plugin.version || "—"}</span>
-              </td>
-              {showUpdateStatus && (
+          {plugins.map((plugin) => {
+            const vuln = vulnMap ? vulnMap.get(plugin.name.toLowerCase()) : undefined;
+            return (
+              <tr key={plugin.name} className="border-b border-border last:border-0 hover:bg-gray-50/60 transition-colors">
                 <td className="px-5 py-3">
-                  {plugin.update_available ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-                      <RefreshCw size={9} />
-                      Update → v{plugin.new_version || "?"}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
-                      <CheckCircle2 size={9} />
-                      Up to date
-                    </span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{ background: brandColor + "18", color: brandColor }}>
+                      {plugin.name[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{plugin.name}</span>
+                  </div>
                 </td>
-              )}
-            </tr>
-          ))}
+                <td className="px-5 py-3">
+                  <span className="text-sm font-mono text-muted-foreground">{plugin.version || "—"}</span>
+                </td>
+                {vulnMap && (
+                  <td className="px-5 py-3">
+                    {vuln ? (
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full w-fit ${sevColor(vuln.severity)}`}>
+                          <ShieldAlert size={9} />
+                          {vuln.severity.charAt(0).toUpperCase() + vuln.severity.slice(1)}
+                        </span>
+                        {vuln.cve_id && (
+                          <span className="text-xs text-muted-foreground font-mono">{vuln.cve_id}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
+                        <ShieldCheck size={9} />
+                        Clean
+                      </span>
+                    )}
+                  </td>
+                )}
+                {showUpdateStatus && (
+                  <td className="px-5 py-3">
+                    {siteId
+                      ? (() => {
+                          const slug = plugin.slug ?? plugin.name.toLowerCase().replace(/\s+/g, "-");
+                          return <PluginUpdateButton
+                            plugin={plugin} siteId={siteId} updatesEnabled={updatesEnabled ?? false}
+                            alreadyUpdated={updatedSlugs?.has(slug)}
+                            onComplete={onUpdateComplete}
+                            onSuccess={onUpdateSuccess}
+                          />;
+                        })()
+                      : plugin.update_available
+                        ? <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700"><RefreshCw size={9} />Update → v{plugin.new_version || "?"}</span>
+                        : <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700"><CheckCircle2 size={9} />Up to date</span>
+                    }
+                  </td>
+                )}
+                {updatesEnabled && (() => {
+                  const slug = plugin.slug ?? plugin.name.toLowerCase().replace(/\s+/g, "-");
+                  const isExcluded = excluded?.includes(slug);
+                  return (
+                    <td className="px-5 py-3">
+                      {isExcluded ? (
+                        <button
+                          onClick={() => onUnexclude?.(slug)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                          title="Remove from exclusion list"
+                        >
+                          <Ban size={10} />Excluded
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onExclude?.(slug)}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors"
+                          title="Exclude from updates"
+                        >
+                          <Ban size={10} />Exclude
+                        </button>
+                      )}
+                    </td>
+                  );
+                })()}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
-  const allPlugins     = site.plugin_data?.plugins ?? [];
-  const activePlugins  = allPlugins.filter((p) => p.status === "active");
-  const inactPlugins   = allPlugins.filter((p) => p.status === "inactive");
-  const needsUpdate    = activePlugins.filter((p) => p.update_available).length;
-  const outdated12m    = site.plugins_outdated_12m ?? [];
+// ── BackupsTab ────────────────────────────────────────────────────────────────
+
+type BackupRecord = {
+  id: string;
+  type: "db" | "files" | "full";
+  status: "pending" | "running" | "completed" | "failed";
+  size_mb: number | null;
+  health_error: string | null;
+  created_at: string;
+  completed_at: string | null;
+  expires_at: string | null;
+};
+
+function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; brandColor: string; canUseAdvancedFeatures?: boolean }) {
+  const [backups, setBackups]           = useState<BackupRecord[]>([]);
+  const [schedule, setSchedule]         = useState<string>("manual");
+  const [loading, setLoading]           = useState(true);
+  const [running, setRunning]           = useState(false);
+  const [type, setType]                 = useState<"db" | "files" | "full">("full");
+  const [savingSched, setSavingSched]   = useState(false);
+  const [confirmRestore,   setConfirmRestore]   = useState<string | null>(null);
+  const [confirmDelete,    setConfirmDelete]    = useState<string | null>(null);
+  const [downloadLoading,  setDownloadLoading]  = useState<string | null>(null);
+  const [confirmEmergency, setConfirmEmergency] = useState<string | null>(null);
+  const [emergencyLoading, setEmergencyLoading] = useState<string | null>(null);
+  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevBackupsRef = useRef<BackupRecord[]>([]);
+
+  const fetchBackups = async () => {
+    try {
+      const { data } = await api.get(`/backups/${site.id}`);
+      setBackups(data.backups ?? []);
+      setSchedule(data.backup_schedule ?? "manual");
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    fetchBackups();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [site.id]);
+
+  // Poll while any backup is pending/running
+  useEffect(() => {
+    const hasActive = backups.some(b => b.status === "pending" || b.status === "running");
+    if (hasActive && !pollRef.current) {
+      pollRef.current = setInterval(fetchBackups, 4000);
+    } else if (!hasActive && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, [backups]);
+
+  // Toast on backup completion / failure
+  useEffect(() => {
+    const prev = prevBackupsRef.current;
+    if (prev.length > 0) {
+      for (const b of backups) {
+        const p = prev.find(x => x.id === b.id);
+        if (p && (p.status === "pending" || p.status === "running")) {
+          if (b.status === "completed") {
+            toast.success(`Backup completed${b.size_mb ? ` — ${b.size_mb} MB` : ""}`);
+          } else if (b.status === "failed") {
+            toast.error(`Backup failed${b.health_error ? `: ${b.health_error.slice(0, 120)}` : ""}`);
+          }
+        }
+      }
+    }
+    prevBackupsRef.current = backups;
+  }, [backups]);
+
+  const handleRun = async () => {
+    setRunning(true);
+    try {
+      await api.post(`/backups/${site.id}/run`, { type });
+      toast.success("Backup started");
+      await fetchBackups();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? "Failed to start backup");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleSchedule = async (val: string) => {
+    setSchedule(val);
+    setSavingSched(true);
+    try {
+      await api.patch(`/backups/${site.id}/schedule`, { backup_schedule: val });
+      toast.success("Backup schedule saved");
+    } catch {
+      toast.error("Failed to save schedule");
+    } finally {
+      setSavingSched(false);
+    }
+  };
+
+  const handleRestore = async (backup: BackupRecord) => {
+    if (confirmRestore !== backup.id) { setConfirmRestore(backup.id); setConfirmDelete(null); return; }
+    setConfirmRestore(null);
+    try {
+      await api.post(`/backups/${backup.id}/restore`);
+      toast.success("Restore initiated — site will be back online within a few minutes");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? "Restore failed");
+    }
+  };
+
+  const handleDownload = async (backup: BackupRecord) => {
+    setDownloadLoading(backup.id);
+    try {
+      const { data } = await api.get<{ url: string }>(`/backups/${backup.id}/download`);
+      window.open(data.url, "_blank");
+    } catch {
+      toast.error("Failed to generate download link");
+    } finally {
+      setDownloadLoading(null);
+    }
+  };
+
+  const handleEmergencyRestore = async (backup: BackupRecord) => {
+    if (confirmEmergency !== backup.id) {
+      setConfirmEmergency(backup.id);
+      setConfirmRestore(null);
+      setConfirmDelete(null);
+      return;
+    }
+    setConfirmEmergency(null);
+    setEmergencyLoading(backup.id);
+    try {
+      await api.post(`/backups/${backup.id}/emergency-restore`);
+      toast.success("Emergency restore initiated — site will recover via the bridge file within a few minutes");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? "Emergency restore failed");
+    } finally {
+      setEmergencyLoading(null);
+    }
+  };
+
+  const handleDelete = async (backup: BackupRecord) => {
+    if (confirmDelete !== backup.id) { setConfirmDelete(backup.id); setConfirmRestore(null); return; }
+    setConfirmDelete(null);
+    try {
+      await api.delete(`/backups/${backup.id}`);
+      toast.success("Backup deleted");
+      setBackups(prev => prev.filter(b => b.id !== backup.id));
+    } catch {
+      toast.error("Failed to delete backup");
+    }
+  };
+
+  const statusBadge = (status: BackupRecord["status"]) => {
+    const map: Record<string, string> = {
+      pending:   "bg-yellow-100 text-yellow-700",
+      running:   "bg-blue-100 text-blue-700",
+      completed: "bg-green-100 text-green-700",
+      failed:    "bg-red-100 text-red-700",
+    };
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${map[status]}`}>
+        {status === "running" && <Loader2 size={10} className="animate-spin" />}
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  const typeBadge = (t: string) => {
+    const map: Record<string, string> = { db: "bg-purple-100 text-purple-700", files: "bg-indigo-100 text-indigo-700", full: "bg-teal-100 text-teal-700" };
+    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[t] ?? ""}`}>{t.toUpperCase()}</span>;
+  };
+
+  if (!canUseAdvancedFeatures) {
+    return (
+      <div className="bg-white rounded-2xl border border-border shadow-sm flex flex-col items-center justify-center py-16 gap-4 text-center px-8">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+          <HardDrive size={22} className="text-amber-500" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">Backups &amp; Restores</p>
+          <p className="text-xs text-muted-foreground mt-1.5 max-w-[280px] mx-auto">
+            Automated backups, one-click restores, and retention management are available on the Growth plan and above.
+          </p>
+        </div>
+        <UpgradeBanner message="Upgrade to Growth or Agency+ to unlock Backups & Restores." compact />
+      </div>
+    );
+  }
+
+  if (!site.plugin_connected) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-2">
+        <HardDrive size={40} strokeWidth={1} />
+        <p className="text-sm">Plugin not connected — backups require the BrandBees plugin.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Controls row */}
+      <div className="flex flex-wrap items-end gap-4">
+        {/* Schedule */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500 font-medium">Backup Schedule</label>
+          <div className="flex items-center gap-2">
+            <select
+              value={schedule}
+              onChange={e => handleSchedule(e.target.value)}
+              className="text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2"
+              style={{ "--tw-ring-color": brandColor } as React.CSSProperties}
+            >
+              <option value="manual">Manual only</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            {savingSched && <Loader2 size={14} className="animate-spin text-gray-400" />}
+          </div>
+        </div>
+
+        {/* Type selector + run */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500 font-medium">Backup Type</label>
+          <div className="flex items-center gap-2">
+            <select
+              value={type}
+              onChange={e => setType(e.target.value as "db" | "files" | "full")}
+              className="text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2"
+              style={{ "--tw-ring-color": brandColor } as React.CSSProperties}
+            >
+              <option value="full">Full (DB + Files)</option>
+              <option value="db">Database only</option>
+              <option value="files">Files only</option>
+            </select>
+            <Button
+              size="sm"
+              onClick={handleRun}
+              disabled={running}
+              style={{ backgroundColor: brandColor }}
+              className="text-white"
+            >
+              {running ? <Loader2 size={13} className="animate-spin mr-1" /> : <HardDrive size={13} className="mr-1" />}
+              Run Backup
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Backup history table */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <HardDrive size={14} style={{ color: brandColor }} />
+            Backup History
+          </h3>
+          <span className="text-xs text-gray-400">{backups.length} backup{backups.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-gray-300" /></div>
+        ) : backups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-gray-400 gap-2">
+            <HardDrive size={36} strokeWidth={1} />
+            <p className="text-sm">No backups yet — run your first backup above.</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+              <tr>
+                <th className="px-4 py-2 text-left">Type</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2 text-left">Size</th>
+                <th className="px-4 py-2 text-left">Created</th>
+                <th className="px-4 py-2 text-left">Expires</th>
+                <th className="px-4 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {backups.map(backup => (
+                <tr key={backup.id} className="hover:bg-gray-50/50">
+                  <td className="px-4 py-3">{typeBadge(backup.type)}</td>
+                  <td className="px-4 py-3">
+                    {statusBadge(backup.status)}
+                    {backup.health_error && backup.status === "failed" && (
+                      <p className="text-xs text-red-500 mt-0.5 max-w-xs truncate" title={backup.health_error}>
+                        {backup.health_error}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {backup.size_mb != null ? `${backup.size_mb} MB` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{timeAgo(backup.created_at)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    {backup.expires_at ? new Date(backup.expires_at).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1 flex-wrap">
+                      {backup.status === "completed" && (
+                        <>
+                          {/* Normal restore — via WP plugin (requires WordPress to be working) */}
+                          <button
+                            onClick={() => handleRestore(backup)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                              confirmRestore === backup.id
+                                ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                : "text-orange-500 hover:bg-orange-50"
+                            }`}
+                          >
+                            <RotateCcw size={11} />
+                            {confirmRestore === backup.id ? "Confirm?" : "Restore"}
+                          </button>
+
+                          {/* Download — Tier 2: get the zip directly from R2 for manual restore */}
+                          <button
+                            onClick={() => handleDownload(backup)}
+                            disabled={downloadLoading === backup.id}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                          >
+                            {downloadLoading === backup.id
+                              ? <Loader2 size={11} className="animate-spin" />
+                              : <Download size={11} />}
+                            Download
+                          </button>
+
+                          {/* Emergency restore — Tier 1: bridge file at site root, bypasses WordPress */}
+                          <button
+                            onClick={() => handleEmergencyRestore(backup)}
+                            disabled={emergencyLoading === backup.id}
+                            title="Use this when WordPress is broken but the server is still running"
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                              confirmEmergency === backup.id
+                                ? "bg-red-100 text-red-700 hover:bg-red-200"
+                                : "text-gray-400 hover:bg-gray-100"
+                            }`}
+                          >
+                            {emergencyLoading === backup.id
+                              ? <Loader2 size={11} className="animate-spin" />
+                              : <AlertTriangle size={11} />}
+                            {confirmEmergency === backup.id ? "Confirm Emergency?" : "Emergency"}
+                          </button>
+                        </>
+                      )}
+                      {(backup.status === "completed" || backup.status === "failed") && (
+                        <button
+                          onClick={() => handleDelete(backup)}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                            confirmDelete === backup.id
+                              ? "bg-red-100 text-red-700 hover:bg-red-200"
+                              : "text-red-400 hover:bg-red-50"
+                          }`}
+                        >
+                          <Trash2 size={11} />
+                          {confirmDelete === backup.id ? "Confirm?" : "Delete"}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFeatures }: { site: Site; audits: Audit[]; brandColor: string; onSiteRefetch?: () => void; canUseAdvancedFeatures?: boolean }) {
+  const allPlugins        = site.plugin_data?.plugins ?? [];
+  const activePlugins     = allPlugins.filter((p) => p.status === "active");
+  const inactPlugins      = allPlugins.filter((p) => p.status === "inactive");
+  const activeNeedsUpdate = activePlugins.filter((p) => p.update_available).length;
+  const inactNeedsUpdate  = inactPlugins.filter((p) => p.update_available).length;
+  const outdated12m       = site.plugins_outdated_12m ?? [];
+
+  const latestAudit    = audits.find((a) => a.status === "completed");
+  const pluginVulns    = latestAudit?.security_data?.plugin_vulnerabilities ?? [];
+  const vulnMap        = new Map<string, PluginVulnerability>(
+    pluginVulns.map((v) => [v.plugin_name.toLowerCase(), v])
+  );
+
+  const [updatesEnabled, setUpdatesEnabled] = useState<boolean>(site.updates_enabled ?? false);
+  const [togglingUpdates, setTogglingUpdates] = useState(false);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [updatingAll, setUpdatingAll] = useState<"active" | "inactive" | null>(null);
+  const [updatedSlugs, setUpdatedSlugs] = useState<Set<string>>(new Set());
+
+  // Agency-level update settings
+  const [visualReview,  setVisualReview]  = useState(false);
+  const [updatesPaused, setUpdatesPaused] = useState(false);
+  const [togglingReview, setTogglingReview] = useState(false);
+  const [resumingKillSwitch, setResumingKillSwitch] = useState(false);
+
+  // Scheduled window
+  const [windowDay,    setWindowDay]    = useState<number | null>(site.update_window_day  ?? null);
+  const [windowHour,   setWindowHour]   = useState<number | null>(site.update_window_hour ?? null);
+  const [savingWindow, setSavingWindow] = useState(false);
+
+  // Exclusions
+  const [excluded,       setExcluded]       = useState<string[]>(site.excluded_from_updates ?? []);
+  const [excludingSlug,  setExcludingSlug]  = useState<string | null>(null);
+
+  // Load agency update settings on mount
+  useEffect(() => {
+    api.get("/settings/updates").then(({ data }) => {
+      setVisualReview(data.visual_review ?? false);
+      setUpdatesPaused(data.updates_paused ?? false);
+    }).catch(() => {});
+  }, []);
+
+  const bumpHistory = () => setHistoryVersion((v) => v + 1);
+  const markUpdated = (slug: string) => {
+    setUpdatedSlugs((prev) => new Set([...prev, slug]));
+    onSiteRefetch?.();
+  };
+
+  async function toggleUpdates() {
+    setTogglingUpdates(true);
+    try {
+      await api.patch(`/updates/${site.id}/toggle`, { enabled: !updatesEnabled });
+      setUpdatesEnabled((v) => !v);
+      toast.success(updatesEnabled ? "Safe updates disabled" : "Safe updates enabled");
+    } catch {
+      toast.error("Failed to update setting");
+    } finally {
+      setTogglingUpdates(false);
+    }
+  }
+
+  async function toggleVisualReview() {
+    setTogglingReview(true);
+    try {
+      await api.put("/settings/updates", { visual_review: !visualReview });
+      setVisualReview((v) => !v);
+      toast.success(!visualReview ? "Manual review enabled — updates with >5% visual diff will require approval" : "Manual review disabled");
+    } catch {
+      toast.error("Failed to update setting");
+    } finally {
+      setTogglingReview(false);
+    }
+  }
+
+  async function resumeUpdates() {
+    setResumingKillSwitch(true);
+    try {
+      await api.put("/settings/updates", { updates_paused: false });
+      setUpdatesPaused(false);
+      toast.success("Scheduled updates resumed");
+    } catch {
+      toast.error("Failed to resume updates");
+    } finally {
+      setResumingKillSwitch(false);
+    }
+  }
+
+  async function saveUpdateWindow() {
+    setSavingWindow(true);
+    try {
+      await api.patch(`/settings/sites/${site.id}/update-window`, {
+        update_window_day:  windowDay,
+        update_window_hour: windowHour,
+      });
+      toast.success(windowDay !== null ? "Update window saved" : "Update window cleared");
+    } catch {
+      toast.error("Failed to save update window");
+    } finally {
+      setSavingWindow(false);
+    }
+  }
+
+  async function handleExclude(slug: string) {
+    setExcludingSlug(slug);
+    try {
+      await api.post(`/updates/${site.id}/exclude`, { slug });
+      setExcluded((prev) => [...prev, slug]);
+      toast.success(`${slug} excluded from updates`);
+    } catch {
+      toast.error("Failed to exclude plugin");
+    } finally {
+      setExcludingSlug(null);
+    }
+  }
+
+  async function handleUnexclude(slug: string) {
+    setExcludingSlug(slug);
+    try {
+      await api.delete(`/updates/${site.id}/exclude/${encodeURIComponent(slug)}`);
+      setExcluded((prev) => prev.filter((s) => s !== slug));
+      toast.success(`${slug} removed from exclusion list`);
+    } catch {
+      toast.error("Failed to remove exclusion");
+    } finally {
+      setExcludingSlug(null);
+    }
+  }
+
+  async function handleUpdateAll(group: "active" | "inactive") {
+    const plugins = group === "active" ? activePlugins : inactPlugins;
+    const toUpdate = plugins.filter((p) => p.update_available && (p.slug || p.name));
+    if (!toUpdate.length || updatingAll) return;
+    setUpdatingAll(group);
+    let succeeded = 0, failed = 0;
+    for (const plugin of toUpdate) {
+      try {
+        const { data: job } = await api.post(`/updates/${site.id}/run`, {
+          slug: plugin.slug ?? plugin.name.toLowerCase().replace(/\s+/g, "-"),
+          update_type: "plugin",
+          new_version: plugin.new_version,
+        });
+        let done = false;
+        for (let i = 0; i < 50 && !done; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const { data: st } = await api.get(`/updates/${site.id}/${job.update_id}/status`);
+          if (["success", "failed", "rolled_back"].includes(st.status)) {
+            done = true;
+            if (st.status === "success") {
+              succeeded++;
+              markUpdated(plugin.slug ?? plugin.name.toLowerCase().replace(/\s+/g, "-"));
+            } else { failed++; }
+          }
+        }
+        if (!done) failed++;
+      } catch { failed++; }
+    }
+    setUpdatingAll(null);
+    bumpHistory();
+    if (failed === 0) toast.success(`All ${succeeded} plugin${succeeded !== 1 ? "s" : ""} updated successfully`);
+    else toast.warning(`${succeeded} succeeded, ${failed} failed`);
+  }
 
   if (allPlugins.length === 0) {
     return (
@@ -1959,13 +3464,154 @@ function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
   return (
     <div className="space-y-5">
 
+      {/* ── Kill switch paused banner ── */}
+      {updatesPaused && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700">Scheduled updates paused</p>
+              <p className="text-xs text-red-600 mt-0.5">
+                The portfolio kill switch fired because the update failure rate exceeded 5% in the last 24 hours.
+                Review recent update history before resuming.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={resumeUpdates}
+            disabled={resumingKillSwitch}
+            className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {resumingKillSwitch ? <Loader2 size={11} className="animate-spin" /> : null}
+            Resume Updates
+          </button>
+        </div>
+      )}
+
+      {/* ── Safe Updates settings card ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-5 space-y-5">
+        {!canUseAdvancedFeatures ? (
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Safe Updates</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                One-click plugin updates with automatic rollback protection.
+              </p>
+            </div>
+            <UpgradeBanner message="Safe plugin updates with auto-rollback require the Growth plan or above." compact />
+          </div>
+        ) : (
+        <>
+        {/* Enable / disable toggle row */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Safe Updates</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {updatesEnabled
+                ? "Updates are enabled — one-click plugin updates with auto-rollback protection."
+                : "Enable to allow one-click plugin updates with automatic rollback if the health check fails."}
+            </p>
+          </div>
+          <button
+            onClick={toggleUpdates}
+            disabled={togglingUpdates}
+            className="flex items-center gap-2 text-sm font-semibold shrink-0 disabled:opacity-50 transition-colors"
+            style={{ color: updatesEnabled ? "#10b981" : "#9ca3af" }}
+          >
+            {togglingUpdates ? <Loader2 size={22} className="animate-spin" /> : updatesEnabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+            {updatesEnabled ? "Enabled" : "Disabled"}
+          </button>
+        </div>
+
+        {updatesEnabled && (
+          <>
+            <div className="border-t border-border" />
+
+            {/* Visual review toggle row */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Manual Review Mode</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Hold updates for approval when the before/after screenshot diff exceeds 5%.
+                </p>
+              </div>
+              <button
+                onClick={toggleVisualReview}
+                disabled={togglingReview}
+                className="flex items-center gap-2 text-sm font-semibold shrink-0 disabled:opacity-50 transition-colors"
+                style={{ color: visualReview ? "#6366f1" : "#9ca3af" }}
+              >
+                {togglingReview ? <Loader2 size={22} className="animate-spin" /> : visualReview ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                {visualReview ? "On" : "Off"}
+              </button>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Scheduled update window */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarDays size={14} className="text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">Scheduled Update Window</p>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Automatically run pending updates at a specific day and hour (UTC). Leave blank to disable scheduling.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <select
+                  value={windowDay ?? ""}
+                  onChange={(e) => setWindowDay(e.target.value === "" ? null : Number(e.target.value))}
+                  className="text-sm border border-border rounded-lg px-3 py-1.5 bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">No schedule</option>
+                  {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((d, i) => (
+                    <option key={d} value={i}>{d}</option>
+                  ))}
+                </select>
+                <select
+                  value={windowHour ?? ""}
+                  onChange={(e) => setWindowHour(e.target.value === "" ? null : Number(e.target.value))}
+                  disabled={windowDay === null}
+                  className="text-sm border border-border rounded-lg px-3 py-1.5 bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-40"
+                >
+                  <option value="">Select hour (UTC)</option>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>{String(i).padStart(2, "0")}:00 UTC</option>
+                  ))}
+                </select>
+                <button
+                  onClick={saveUpdateWindow}
+                  disabled={savingWindow}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  {savingWindow ? <Loader2 size={11} className="animate-spin" /> : null}
+                  Save
+                </button>
+                {(windowDay !== null) && (
+                  <button
+                    onClick={() => { setWindowDay(null); setWindowHour(null); }}
+                    className="text-xs text-muted-foreground hover:text-red-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+        </>
+        )}
+      </div>
+
       {/* ── Stats strip ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {([
-          { label: "Total Plugins",  value: allPlugins.length,    color: brandColor,  icon: <Package size={15} /> },
-          { label: "Active",         value: activePlugins.length, color: "#10b981",   icon: <CheckCircle2 size={15} /> },
-          { label: "Inactive",       value: inactPlugins.length,  color: "#6366f1",   icon: <Package size={15} /> },
-          { label: "Need Updates",   value: needsUpdate,          color: "#f59e0b",   icon: <RefreshCw size={15} /> },
+          { label: "Total Plugins",  value: allPlugins.length,                      color: brandColor,  icon: <Package size={15} /> },
+          { label: "Active",         value: activePlugins.length,                   color: "#10b981",   icon: <CheckCircle2 size={15} /> },
+          { label: "Inactive",       value: inactPlugins.length,                    color: "#6366f1",   icon: <Package size={15} /> },
+          { label: "Need Updates",   value: activeNeedsUpdate + inactNeedsUpdate,   color: "#f59e0b",   icon: <RefreshCw size={15} /> },
+          { label: "Abandoned",      value: outdated12m.length,                     color: "#f97316",   icon: <AlertTriangle size={15} /> },
+          { label: "Vulnerable",     value: pluginVulns.length,                     color: "#ef4444",   icon: <ShieldAlert size={15} /> },
         ] as { label: string; value: number; color: string; icon: React.ReactNode }[]).map(({ label, value, color, icon }) => (
           <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -1983,34 +3629,58 @@ function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
       {/* ── Active Plugins ── */}
       {activePlugins.length > 0 && (
         <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Active Plugins</h3>
               <p className="text-xs text-muted-foreground mt-0.5">{activePlugins.length} plugins running</p>
             </div>
-            {needsUpdate > 0 && (
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                {needsUpdate} update{needsUpdate !== 1 ? "s" : ""} available
-              </span>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {activeNeedsUpdate > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                  {activeNeedsUpdate} update{activeNeedsUpdate !== 1 ? "s" : ""} available
+                </span>
+              )}
+              {activeNeedsUpdate > 0 && updatesEnabled && (
+                <button
+                  onClick={() => handleUpdateAll("active")}
+                  disabled={updatingAll !== null}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                >
+                  {updatingAll === "active" ? <><Loader2 size={11} className="animate-spin" />Updating…</> : <><RefreshCw size={11} />Update All</>}
+                </button>
+              )}
+            </div>
           </div>
-          <PluginTable plugins={activePlugins} brandColor={brandColor} showUpdateStatus />
+          <PluginTable plugins={activePlugins} brandColor={brandColor} showUpdateStatus vulnMap={vulnMap} siteId={site.id} updatesEnabled={updatesEnabled} updatedSlugs={updatedSlugs} excluded={excluded} onUpdateComplete={bumpHistory} onUpdateSuccess={markUpdated} onExclude={handleExclude} onUnexclude={handleUnexclude} />
         </div>
       )}
 
       {/* ── Inactive Plugins ── */}
       {inactPlugins.length > 0 && (
         <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Inactive Plugins</h3>
               <p className="text-xs text-muted-foreground mt-0.5">{inactPlugins.length} installed but not active</p>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-              {inactPlugins.length} plugin{inactPlugins.length !== 1 ? "s" : ""}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {inactNeedsUpdate > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                  {inactNeedsUpdate} update{inactNeedsUpdate !== 1 ? "s" : ""} available
+                </span>
+              )}
+              {inactNeedsUpdate > 0 && updatesEnabled && (
+                <button
+                  onClick={() => handleUpdateAll("inactive")}
+                  disabled={updatingAll !== null}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                >
+                  {updatingAll === "inactive" ? <><Loader2 size={11} className="animate-spin" />Updating…</> : <><RefreshCw size={11} />Update All</>}
+                </button>
+              )}
+            </div>
           </div>
-          <PluginTable plugins={inactPlugins} brandColor="#6366f1" showUpdateStatus={true} />
+          <PluginTable plugins={inactPlugins} brandColor="#6366f1" showUpdateStatus={true} vulnMap={vulnMap} siteId={site.id} updatesEnabled={updatesEnabled} updatedSlugs={updatedSlugs} excluded={excluded} onUpdateComplete={bumpHistory} onUpdateSuccess={markUpdated} onExclude={handleExclude} onUnexclude={handleUnexclude} />
         </div>
       )}
 
@@ -2059,28 +3729,38 @@ function PluginsTab({ site, brandColor }: { site: Site; brandColor: string }) {
           </div>
         </div>
       )}
+
+      {/* ── Update History ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">Update History</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">All plugin updates run from this dashboard</p>
+        </div>
+        <div className="p-5">
+          <UpdateHistoryPanel siteId={site.id} externalRefreshKey={historyVersion} />
+        </div>
+      </div>
+
     </div>
   );
 }
 
 // ── WooCommerce Tab ───────────────────────────────────────────────────────────
 
-function WooCommerceTab({ site, brandColor }: { site: Site; brandColor: string }) {
+function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; brandColor: string }) {
   const hasWoo       = site.woocommerce_active ?? false;
   const orderCount   = site.woo_order_count;
   const revenue      = site.woo_revenue;
-  const revenueStr   = revenue != null
-    ? `$${Number(revenue).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : "—";
+  const fatalErrors: WooFatalError[] = site.woo_fatal_errors ?? [];
+  const gateways: WooGateway[]       = site.woo_active_gateways ?? [];
 
-  const comingSoonTiles = [
-    { label: "Orders (7 days)",      icon: <ShoppingCart size={18} />, color: brandColor },
-    { label: "Orders (30 days)",     icon: <BarChart2     size={18} />, color: "#6366f1"  },
-    { label: "Revenue Trend",        icon: <TrendingUp    size={18} />, color: "#10b981"  },
-    { label: "Failed / Refunded",    icon: <XCircle       size={18} />, color: "#ef4444"  },
-    { label: "Avg Order Value",      icon: <DollarSign    size={18} />, color: "#f59e0b"  },
-    { label: "Payment Gateway Health", icon: <CheckCircle2 size={18} />, color: "#06b6d4" },
-  ];
+  const fmt = (v: number | null | undefined) =>
+    v != null ? `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
+  const revenueStr = fmt(revenue);
+
+  const hasExtended = site.woo_orders_7d != null || site.woo_orders_30d != null;
+
+  const wooNarrative = audits?.find(a => a.status === "completed")?.ai_narrative?.woocommerce;
 
   return (
     <div className="space-y-5">
@@ -2097,7 +3777,7 @@ function WooCommerceTab({ site, brandColor }: { site: Site; brandColor: string }
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {hasWoo
-                ? "Store data is being collected. Extended analytics coming soon."
+                ? "Store data is being collected from your WooCommerce installation."
                 : "No WooCommerce installation found. Connect the plugin to enable store tracking."}
             </p>
           </div>
@@ -2181,46 +3861,178 @@ function WooCommerceTab({ site, brandColor }: { site: Site; brandColor: string }
         </div>
       </div>
 
-      {/* ── Extended analytics coming soon ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Extended Analytics</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Detailed store metrics — coming soon</p>
-          </div>
-          <span className="text-xs font-bold px-3 py-1 rounded-full"
-            style={{ background: brandColor + "18", color: brandColor }}>
-            Coming soon
-          </span>
-        </div>
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {comingSoonTiles.map(({ label, icon, color }) => (
-            <div
-              key={label}
-              className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-border bg-gray-50/60"
-            >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: color + "14", color }}>
-                {icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-foreground">{label}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Awaiting plugin data</p>
-              </div>
-              <span className="text-[10px] font-bold text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-md shrink-0">
-                Soon
-              </span>
+      {/* ── WooCommerce Fatal Errors ── */}
+      {hasWoo && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Fatal Errors (last 24h)</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">PHP fatal errors from WooCommerce logs</p>
             </div>
-          ))}
+            {fatalErrors.length > 0 ? (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-red-700">
+                {fatalErrors.length} error{fatalErrors.length !== 1 ? "s" : ""}
+              </span>
+            ) : (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-100 text-green-700">Clean</span>
+            )}
+          </div>
+          {fatalErrors.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-sm text-muted-foreground">No fatal errors detected in the last 24 hours.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {fatalErrors.map((err: WooFatalError, i: number) => (
+                <div key={i} className="px-5 py-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-red-600 truncate">{err.error_type || "Fatal Error"}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {new Date(err.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground font-mono break-all leading-relaxed">{err.message}</p>
+                  {err.file && (
+                    <p className="text-[10px] text-muted-foreground truncate">{err.file}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="px-5 pb-5">
-          <div className="rounded-xl border border-dashed border-border bg-gray-50/60 p-4 text-center">
-            <p className="text-xs text-muted-foreground">
-              Orders 7d/30d, revenue trends, failed orders, and payment gateway health will be available once the plugin sends extended WooCommerce metrics.
-            </p>
+      )}
+
+      {/* ── AI Store Insight ── */}
+      {hasWoo && wooNarrative && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: brandColor + "18" }}>
+              <Bot size={14} style={{ color: brandColor }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">AI Store Insight</p>
+              <p className="text-[11px] text-muted-foreground">Generated after last audit</p>
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-sm text-foreground leading-relaxed">{wooNarrative}</p>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Extended analytics ── */}
+      {hasWoo && (
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Extended Analytics</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Windowed order and revenue metrics</p>
+            </div>
+            {!hasExtended && (
+              <span className="text-xs font-bold px-3 py-1 rounded-full"
+                style={{ background: brandColor + "18", color: brandColor }}>
+                Awaiting data
+              </span>
+            )}
+          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            {/* Orders 7d */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: brandColor + "18" }}>
+                  <ShoppingCart size={15} style={{ color: brandColor }} />
+                </div>
+                <p className="text-xs font-semibold text-foreground">Orders (7 days)</p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-foreground">
+                {site.woo_orders_7d != null ? site.woo_orders_7d.toLocaleString() : "—"}
+              </p>
+            </div>
+
+            {/* Orders 30d */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                  <BarChart2 size={15} className="text-indigo-500" />
+                </div>
+                <p className="text-xs font-semibold text-foreground">Orders (30 days)</p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-foreground">
+                {site.woo_orders_30d != null ? site.woo_orders_30d.toLocaleString() : "—"}
+              </p>
+            </div>
+
+            {/* Revenue 7d */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+                  <TrendingUp size={15} className="text-green-600" />
+                </div>
+                <p className="text-xs font-semibold text-foreground">Revenue (7 days)</p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-foreground">{fmt(site.woo_revenue_7d)}</p>
+            </div>
+
+            {/* Revenue 30d */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                  <DollarSign size={15} className="text-emerald-600" />
+                </div>
+                <p className="text-xs font-semibold text-foreground">Revenue (30 days)</p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-foreground">{fmt(site.woo_revenue_30d)}</p>
+            </div>
+
+            {/* Failed / Cancelled */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                  <XCircle size={15} className="text-red-500" />
+                </div>
+                <p className="text-xs font-semibold text-foreground">Failed / Cancelled (30d)</p>
+              </div>
+              <p className={`text-2xl font-bold tabular-nums ${(site.woo_failed_orders ?? 0) > 0 ? "text-red-600" : "text-foreground"}`}>
+                {site.woo_failed_orders != null ? site.woo_failed_orders.toLocaleString() : "—"}
+              </p>
+            </div>
+
+            {/* Active Gateways */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={15} className="text-cyan-600" />
+                </div>
+                <p className="text-xs font-semibold text-foreground">Payment Gateways</p>
+              </div>
+              {gateways.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {gateways.map((gw) => (
+                    <span key={gw.id} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">
+                      {gw.label}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-2xl font-bold tabular-nums text-foreground">—</p>
+              )}
+            </div>
+
+          </div>
+          {!hasExtended && (
+            <div className="px-5 pb-5">
+              <div className="rounded-xl border border-dashed border-border bg-gray-50/60 p-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Update the BrandBees plugin to the latest version to start sending windowed order and revenue metrics.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2609,6 +4421,7 @@ export default function SiteDetailPage() {
   const { site, loading, error, refetch } = useSite(id);
   const { agency } = useAuth();
   const brandColor = agency?.accent_color ?? "#6366f1";
+  const canUseAdvancedFeatures = agency?.plan === "premium" || agency?.plan === "agency_plus";
   const { roleCanDo } = useRole();
   const canRunAudit = roleCanDo("run_audit");
   const canDeleteSite = roleCanDo("delete_site");
@@ -2621,10 +4434,19 @@ export default function SiteDetailPage() {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const narrativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [benchmarks, setBenchmarks] = useState<Benchmarks | null>(null);
+
+  useEffect(() => {
+    api.get<Benchmarks>("/benchmarks")
+      .then(({ data }) => setBenchmarks(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     return () => {
       if (scanPollRef.current) clearInterval(scanPollRef.current);
+      if (narrativeTimerRef.current) clearTimeout(narrativeTimerRef.current);
     };
   }, []);
 
@@ -2638,11 +4460,25 @@ export default function SiteDetailPage() {
   const rawTab = searchParams.get("tab") as Tab | null;
   const [activeTab, setActiveTab] = useState<Tab>(rawTab ?? "overview");
 
+  useEffect(() => {
+    const connected = searchParams.get("connected");
+    const oauthError = searchParams.get("error");
+    if (connected === "google") toast.success("Google account connected successfully.");
+    if (oauthError === "oauth_failed") toast.error("Google OAuth failed. Please try again.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { done: auditDone } = useAuditStatus(pendingAuditId);
-  if (auditDone && pendingAuditId) {
+  useEffect(() => {
+    if (!auditDone) return;
     setPendingAuditId(null);
     refetch();
-  }
+    // Narrative is written async ~2-5s after audit completes — refetch again to pick it up.
+    // Use a ref so the timer survives the auditDone→false flip that runs effect cleanup.
+    if (narrativeTimerRef.current) clearTimeout(narrativeTimerRef.current);
+    narrativeTimerRef.current = setTimeout(() => refetch(), 8000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditDone]);
 
   function handleTabChange(tab: Tab) {
     setActiveTab(tab);
@@ -2918,6 +4754,7 @@ export default function SiteDetailPage() {
             auditLoading={auditLoading}
             canRunAudit={canRunAudit}
             brandColor={brandColor}
+            benchmarks={benchmarks}
           />
         )}
         {activeTab === "seo"         && <SeoTab site={site} audits={site.audits} brandColor={brandColor} />}
@@ -2936,10 +4773,11 @@ export default function SiteDetailPage() {
           />
         )}
         {activeTab === "uptime"      && <UptimeTab site={site} brandColor={brandColor} />}
-        {activeTab === "plugins"     && <PluginsTab site={site} brandColor={brandColor} />}
-        {activeTab === "woocommerce" && <WooCommerceTab site={site} brandColor={brandColor} />}
+        {activeTab === "plugins"     && <PluginsTab site={site} audits={site.audits} brandColor={brandColor} onSiteRefetch={refetch} canUseAdvancedFeatures={canUseAdvancedFeatures} />}
+        {activeTab === "woocommerce" && <WooCommerceTab site={site} audits={site.audits} brandColor={brandColor} />}
         {activeTab === "cron"        && <CronTab site={site} brandColor={brandColor} />}
         {activeTab === "health"      && <SiteHealthTab site={site} />}
+        {activeTab === "backups"     && <BackupsTab site={site} brandColor={brandColor} canUseAdvancedFeatures={canUseAdvancedFeatures} />}
       </div>
     </div>
   );

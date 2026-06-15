@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { User, Lock, Check, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -9,21 +10,6 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import api from "@/lib/api";
-
-function Toast({ type, msg }: { type: "success" | "error"; msg: string }) {
-  return (
-    <div
-      className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
-        type === "success"
-          ? "bg-green-50 border-green-200 text-green-700"
-          : "bg-red-50 border-red-200 text-red-700"
-      }`}
-    >
-      {type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-      {msg}
-    </div>
-  );
-}
 
 export default function ProfilePage() {
   const { agency, updateAgency } = useAuth();
@@ -36,7 +22,6 @@ export default function ProfilePage() {
 
   const [name, setName] = useState(displayName);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [profileToast, setProfileToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -44,33 +29,21 @@ export default function ProfilePage() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
-  const [passwordToast, setPasswordToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
-
-  function showProfileToast(type: "success" | "error", msg: string) {
-    setProfileToast({ type, msg });
-    setTimeout(() => setProfileToast(null), 3500);
-  }
-
-  function showPasswordToast(type: "success" | "error", msg: string) {
-    setPasswordToast({ type, msg });
-    setTimeout(() => setPasswordToast(null), 3500);
-  }
 
   async function handleSaveProfile() {
     if (!name.trim()) return;
     setProfileSaving(true);
     try {
       const { data } = await api.put<{ name: string }>("/auth/profile", { name: name.trim() });
-      // Update the cached agency so the sidebar name refreshes immediately
       if (isOwner) {
         updateAgency({ name: data.name });
       } else {
         updateAgency({ member_name: data.name });
       }
-      showProfileToast("success", "Profile updated.");
+      toast.success("Profile updated.");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to save.";
-      showProfileToast("error", msg);
+      toast.error(msg);
     } finally {
       setProfileSaving(false);
     }
@@ -78,15 +51,15 @@ export default function ProfilePage() {
 
   async function handleChangePassword() {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      showPasswordToast("error", "All fields are required.");
+      toast.error("All fields are required.");
       return;
     }
     if (newPassword.length < 8) {
-      showPasswordToast("error", "New password must be at least 8 characters.");
+      toast.error("New password must be at least 8 characters.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      showPasswordToast("error", "Passwords do not match.");
+      toast.error("Passwords do not match.");
       return;
     }
     setPasswordSaving(true);
@@ -95,10 +68,10 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      showPasswordToast("success", "Password changed successfully.");
+      toast.success("Password changed successfully.");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to change password.";
-      showPasswordToast("error", msg);
+      toast.error(msg);
     } finally {
       setPasswordSaving(false);
     }
@@ -163,8 +136,6 @@ export default function ProfilePage() {
               Email cannot be changed from here. Contact support if needed.
             </p>
           </div>
-
-          {profileToast && <Toast {...profileToast} />}
 
           <Button
             onClick={handleSaveProfile}
@@ -236,8 +207,6 @@ export default function ProfilePage() {
               onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
             />
           </div>
-
-          {passwordToast && <Toast {...passwordToast} />}
 
           <Button onClick={handleChangePassword} loading={passwordSaving}>
             Update password

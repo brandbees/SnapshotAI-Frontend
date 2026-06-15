@@ -11,7 +11,10 @@ export function useAuditStatus(auditId: string | null) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!auditId) return;
+    if (!auditId) {
+      setDone(false);
+      return;
+    }
     setDone(false);
 
     const poll = async () => {

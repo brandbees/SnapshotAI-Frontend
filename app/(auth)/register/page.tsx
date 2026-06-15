@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { cn, isValidEmail } from "@/lib/utils";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
+
+  useEffect(() => {
+    import("@/lib/auth").then(({ isLoggedIn }) => {
+      if (isLoggedIn()) router.replace("/dashboard");
+    });
+  }, [router]);
 
   const [agencyName, setAgencyName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,6 +33,10 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.BaseSyntheticEvent) {
     e.preventDefault();
     setError("");
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setLoading(true);
     try {
       await register(agencyName, email, password, coupon || undefined);

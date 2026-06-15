@@ -11,6 +11,7 @@ export interface Agency {
   brand_name?: string;
   brand_tagline?: string;
   accent_color?: string;
+  favicon_url?: string;
   trial_ends_at?: string | null;
   onboarding_complete?: boolean;
   created_at?: string;
@@ -19,6 +20,24 @@ export interface Agency {
   role?: TeamRole;
   member_id?: string;
   member_name?: string;
+  is_client_portal?: boolean;
+  ai_tokens_used?: number;
+  ai_tokens_extra?: number;
+  ai_tokens_reset_at?: string | null;
+  storage_used_bytes?: number;
+  storage_extra_bytes?: number;
+}
+
+export interface WooGateway {
+  id: string;
+  label: string;
+}
+
+export interface WooFatalError {
+  timestamp: string;
+  error_type: string;
+  message: string;
+  file?: string;
 }
 
 export interface Site {
@@ -40,6 +59,7 @@ export interface Site {
   created_at: string;
   latest_scores?: PillarScores;
   malware_status?: "clean" | "threat";
+  plugin_vuln_count?: number;
   plugin_data?: PluginData;
 
   // Security signals
@@ -68,6 +88,13 @@ export interface Site {
   woocommerce_active?: boolean | null;
   woo_order_count?: number | null;
   woo_revenue?: number | null;
+  woo_orders_7d?: number | null;
+  woo_orders_30d?: number | null;
+  woo_revenue_7d?: number | null;
+  woo_revenue_30d?: number | null;
+  woo_failed_orders?: number | null;
+  woo_active_gateways?: WooGateway[] | null;
+  woo_fatal_errors?: WooFatalError[] | null;
 
   // Plugin intelligence
   plugins_needing_updates?: number | null;
@@ -88,6 +115,22 @@ export interface Site {
   // Cron events & site health
   cron_events?: CronEvent[] | null;
   site_health?: SiteHealth | null;
+
+  // Tags
+  tags?: string[] | null;
+
+  // Google Analytics & Search Console (Phase 5 Sprint 3)
+  ga4_property_id?: string | null;
+  sc_property_url?: string | null;
+  google_connected?: boolean;
+
+  // Safe Updates (Phase 4 Sprint 1)
+  updates_enabled?: boolean;
+
+  // Safe Updates (Phase 4 Sprint 2)
+  update_window_day?: number | null;
+  update_window_hour?: number | null;
+  excluded_from_updates?: string[];
 }
 
 export interface PillarScores {
@@ -126,6 +169,15 @@ export interface PerformanceData {
   [key: string]: unknown;
 }
 
+export interface PluginVulnerability {
+  slug: string;
+  plugin_name: string;
+  severity: string;
+  vulnerability_title: string;
+  cve_id?: string | null;
+  fix_version?: string | null;
+}
+
 export interface SecurityData {
   issues?: SecurityIssue[];
   issues_count?: {
@@ -136,6 +188,7 @@ export interface SecurityData {
   };
   dns_checks?: unknown;
   threat_intel?: ScanThreat[];
+  plugin_vulnerabilities?: PluginVulnerability[];
   [key: string]: unknown;
 }
 
@@ -160,11 +213,16 @@ export interface Audit {
   plugin_data?: PluginData;
   completed_at?: string;
   created_at: string;
+  pdf_url?: string | null;
+  portal_token?: string | null;
 }
 
 export interface Recommendation {
   title: string;
   description: string;
+  pillar?: string;
+  why?: string;
+  how?: string;
   effort: "low" | "medium" | "high";
 }
 
@@ -188,6 +246,9 @@ export interface ScanThreat {
   description?: string;
   url?: string;
   source?: string;
+  // db_threat fields
+  location?: string;
+  excerpt?: string;
 }
 
 // ── Plugin data ───────────────────────────────────────────────────────────────
@@ -243,6 +304,7 @@ export interface SiteHealth {
 
 export interface Plugin {
   name: string;
+  slug?: string;
   version: string;
   status: "active" | "inactive";
   update_available: boolean;
@@ -278,9 +340,12 @@ export interface Client {
   company?: string;
   site_count?: number;
   created_at: string;
+  invite_token?: string | null;
+  invite_accepted?: boolean;
+  portal_last_login?: string | null;
 }
 
-export type TeamRole = "owner" | "admin" | "manager" | "analyst";
+export type TeamRole = "owner" | "admin" | "manager" | "analyst" | "viewer";
 
 export interface TeamMember {
   id: string;

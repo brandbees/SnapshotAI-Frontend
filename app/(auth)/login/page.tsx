@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
+import { getBranding } from "@/lib/auth";
+import { isValidEmail } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
+import type { StoredBranding } from "@/lib/auth";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -17,9 +22,38 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Start null so SSR and first client render match — populated in useEffect (client-only)
+  const [branding, setBranding] = useState<StoredBranding | null>(null);
+
+  useEffect(() => {
+    // Already logged in — skip login page
+    import("@/lib/auth").then(({ isLoggedIn }) => {
+      if (isLoggedIn()) { router.replace("/dashboard"); return; }
+    });
+
+    // Pre-fill error from ?error= param (e.g. redirected here after suspension)
+    const paramError = searchParams.get("error");
+    if (paramError) setError(paramError);
+
+    const stored = getBranding();
+    setBranding(stored);
+    if (stored?.accent_color) {
+      document.documentElement.style.setProperty("--accent", stored.accent_color);
+    }
+    // Redirect to maintenance page if platform is down
+    fetch(`${API_BASE_URL}/status`)
+      .then(r => r.json())
+      .then(d => { if (d.maintenance) window.location.href = "/maintenance"; })
+      .catch(() => {});
+  }, [router]);
+
   async function handleSubmit(e: React.BaseSyntheticEvent) {
     e.preventDefault();
     setError("");
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setLoading(true);
     try {
       await login(email, password);
@@ -34,6 +68,9 @@ export default function LoginPage() {
     }
   }
 
+  const brandName = branding?.brand_name ?? "BrandBees SnapshotAI";
+  const logoUrl   = branding?.logo_url   ?? null;
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
       style={{ background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8f9fb 100%)" }}
@@ -41,16 +78,19 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-md"
-            style={{ background: "var(--accent)" }}
-          >
-            <Camera size={22} className="text-white" />
-          </div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={brandName} className="h-12 w-auto object-contain mb-4" />
+          ) : (
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-md"
+              style={{ background: "var(--accent)" }}
+            >
+              <Camera size={22} className="text-white" />
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            to BrandBees SnapshotAI
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">to {brandName}</p>
         </div>
 
         {/* Card */}

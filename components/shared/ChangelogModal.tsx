@@ -10,6 +10,58 @@ interface ChangelogEntry {
   highlights: string[];
 }
 
+// Fallback used when the API is unreachable (e.g. backend not yet deployed)
+const FALLBACK_ENTRIES: ChangelogEntry[] = [
+  {
+    version: "1.4.0",
+    date: "2026-05-20",
+    highlights: [
+      "In-app changelog — stay up to date without leaving the dashboard",
+      "Onboarding checklist — guided steps for new agencies",
+      "Demo workspace — seed realistic data for client demos",
+    ],
+  },
+  {
+    version: "1.3.0",
+    date: "2026-05-10",
+    highlights: [
+      "Slack webhook alerts — get notified in your workspace",
+      "Weekly digest emails — one summary instead of many alerts",
+      "Score trend charts — 30 / 90 / 180 / 365 day range toggle",
+      "Report annotations — add internal notes to any PDF report",
+    ],
+  },
+  {
+    version: "1.2.0",
+    date: "2026-04-22",
+    highlights: [
+      "Client report portal — shareable branded link for each report",
+      "Per-client branding kits — individual logo and color per client",
+      "Standalone security audit PDF — one-click download from malware tab",
+      "Scheduled report delivery — weekly and monthly auto-send",
+    ],
+  },
+  {
+    version: "1.1.0",
+    date: "2026-04-05",
+    highlights: [
+      "PDF report generator — fully branded with agency logo and colors",
+      "WooCommerce tab — orders, revenue, and gateway data",
+      "Site detail tabs — Security, Performance, SEO, Malware, Plugins",
+    ],
+  },
+  {
+    version: "1.0.0",
+    date: "2026-03-15",
+    highlights: [
+      "BrandBees SnapshotAI is live — connect your first site",
+      "WordPress plugin — hourly push of 53 data points",
+      "Audit pipeline — scanner + uptime + score normalisation",
+      "Alert system — threshold-based email alerts",
+    ],
+  },
+];
+
 interface ChangelogModalProps {
   open: boolean;
   onClose: () => void;
@@ -25,10 +77,10 @@ export function ChangelogModal({ open, onClose, onSeen }: ChangelogModalProps) {
     setLoading(true);
     api.get<{ entries: ChangelogEntry[]; unread: number }>("/changelog")
       .then(({ data }) => setEntries(data.entries))
-      .catch(() => {})
+      .catch(() => setEntries(FALLBACK_ENTRIES))
       .finally(() => setLoading(false));
 
-    // Mark as seen when modal opens
+    // Best-effort — ignore if backend not yet deployed
     api.post("/changelog/seen").then(onSeen).catch(() => {});
   }, [open]);
 
@@ -66,7 +118,7 @@ export function ChangelogModal({ open, onClose, onSeen }: ChangelogModalProps) {
             </div>
           ) : (
             entries.map((entry, idx) => (
-              <div key={entry.version}>
+              <div key={`${entry.version}-${idx}`}>
                 <div className="flex items-center gap-3 mb-3">
                   <span
                     className="text-xs font-bold px-2 py-0.5 rounded-full text-white"

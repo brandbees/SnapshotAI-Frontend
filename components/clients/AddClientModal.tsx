@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import type { Client } from "@/types";
 
@@ -26,12 +27,14 @@ export function AddClientModal({ onClose, onSuccess }: AddClientModalProps) {
     setLoading(true);
     try {
       await api.post<{ client: Client }>("/clients", { name, email, company });
+      toast.success("Client added successfully");
       onSuccess();
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data
           ?.error || "Failed to add client.";
       setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

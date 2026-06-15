@@ -2,32 +2,39 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Menu, X, Wifi,
   LayoutDashboard, Globe, Search, Zap, Shield,
-  FileText, Bot, Users, Settings, CreditCard, LogOut,
+  Bug, Activity, FileText, Bot, Users, Settings, Bell, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { clearToken } from "@/lib/auth";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/sites", label: "Sites", icon: Globe },
-  { href: "/seo", label: "SEO", icon: Search },
-  { href: "/performance", label: "Performance", icon: Zap },
-  { href: "/security", label: "Security", icon: Shield },
-  { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/agent", label: "AI Agent", icon: Bot },
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/billing", label: "Billing", icon: CreditCard },
+const ALL_NAV = [
+  { href: "/dashboard",     label: "Dashboard",     icon: LayoutDashboard, clientVisible: true  },
+  { href: "/notifications", label: "Notifications", icon: Bell,            clientVisible: false },
+  { href: "/sites",         label: "Sites",         icon: Globe,           clientVisible: true  },
+  { href: "/seo",           label: "SEO",           icon: Search,          clientVisible: true  },
+  { href: "/performance",   label: "Performance",   icon: Zap,             clientVisible: true  },
+  { href: "/security",      label: "Security",      icon: Shield,          clientVisible: true  },
+  { href: "/malware",       label: "Malware",       icon: Bug,             clientVisible: true  },
+  { href: "/uptime",        label: "Uptime",        icon: Activity,        clientVisible: true  },
+  { href: "/reports",       label: "Reports",       icon: FileText,        clientVisible: false },
+  { href: "/clients",       label: "Clients",       icon: Users,           clientVisible: false },
+  { href: "/agent",         label: "AI Agent",      icon: Bot,             clientVisible: false },
+  { href: "/settings",      label: "Settings",      icon: Settings,        clientVisible: false },
 ];
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { agency, logout } = useAuth();
+
+  const isClientPortal = agency?.is_client_portal ?? false;
+  const navItems = ALL_NAV.filter(item => !isClientPortal || item.clientVisible);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
@@ -40,6 +47,16 @@ export function MobileNav() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  function handleLogout() {
+    setOpen(false);
+    if (isClientPortal) {
+      clearToken();
+      router.push("/client-portal/login");
+    } else {
+      logout();
+    }
+  }
 
   return (
     <div className="lg:hidden">
@@ -126,7 +143,7 @@ export function MobileNav() {
                     </p>
                   </div>
                   <button
-                    onClick={logout}
+                    onClick={handleLogout}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
                   >
                     <LogOut size={13} />

@@ -2,7 +2,9 @@
 
 import { RefreshCw, FileText, Settings, Activity, TrendingUp, Search, Shield, Bug } from "lucide-react";
 import { PieChart, Pie, Cell } from "recharts";
+import { useRouter } from "next/navigation";
 import { truncateUrl, scoreHex } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import type { Site } from "@/types";
 
 interface SiteCardProps {
@@ -43,12 +45,10 @@ function UptimeDonut({ pct }: { pct: number }) {
   );
 }
 
-function nav(e: React.MouseEvent, href: string) {
-  e.stopPropagation();
-  window.location.href = href;
-}
-
 export function SiteCard({ site, onClick }: SiteCardProps) {
+  const router = useRouter();
+  const { agency } = useAuth();
+  const isClientPortal = agency?.is_client_portal ?? false;
   const uptime = site.uptime_percentage ?? 0;
   const isOnline = site.uptime_status === "up";
   const isDown = site.uptime_status === "down";
@@ -126,30 +126,45 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
         </div>
       </div>
 
-      {/* Action buttons — stopPropagation on each button individually */}
-      <div className="flex items-center gap-2 px-3 pb-3 pt-0">
-        <button
-          onClick={(e) => nav(e, siteHref)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          style={{ background: "var(--accent)" }}
-        >
-          <RefreshCw size={13} />
-          Audit Now
-        </button>
-        <button
-          onClick={(e) => nav(e, `/reports/${site.id}`)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border border-border text-foreground hover:bg-gray-50 transition-colors"
-        >
-          <FileText size={13} />
-          Reports
-        </button>
-        <button
-          onClick={(e) => nav(e, siteHref)}
-          className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-gray-50 border border-border transition-colors"
-        >
-          <Settings size={14} />
-        </button>
-      </div>
+      {/* Client: single "View Details" button */}
+      {isClientPortal && (
+        <div className="px-3 pb-3 pt-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(siteHref); }}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ background: "var(--accent)" }}
+          >
+            View Details
+          </button>
+        </div>
+      )}
+
+      {/* Agency/team action buttons */}
+      {!isClientPortal && (
+        <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(siteHref); }}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ background: "var(--accent)" }}
+          >
+            <RefreshCw size={13} />
+            Audit Now
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(`/reports/${site.id}`); }}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border border-border text-foreground hover:bg-gray-50 transition-colors"
+          >
+            <FileText size={13} />
+            Reports
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(siteHref); }}
+            className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-gray-50 border border-border transition-colors"
+          >
+            <Settings size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

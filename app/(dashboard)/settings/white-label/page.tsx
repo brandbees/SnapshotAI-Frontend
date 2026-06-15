@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { HexColorPicker } from "react-colorful";
-import { Upload, Check, AlertCircle, X, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { Upload, Lock, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -57,7 +58,6 @@ export default function WhiteLabelPage() {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const faviconRef = useRef<HTMLInputElement>(null);
@@ -93,18 +93,13 @@ export default function WhiteLabelPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showPicker]);
 
-  function showToast(type: "success" | "error", msg: string) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }
-
   async function uploadFile(file: File) {
     if (!["image/png", "image/svg+xml", "image/jpeg"].includes(file.type)) {
-      showToast("error", "Only PNG, SVG, or JPG files are accepted.");
+      toast.error("Only PNG, SVG, or JPG files are accepted.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      showToast("error", "File must be under 2MB.");
+      toast.error("File must be under 2MB.");
       return;
     }
     const preview = URL.createObjectURL(file);
@@ -118,7 +113,7 @@ export default function WhiteLabelPage() {
       });
       setLogoUrl(data.logo_url);
     } catch {
-      showToast("error", "Logo upload failed. Try again.");
+      toast.error("Logo upload failed. Try again.");
       setLogoPreview(logoUrl);
     } finally {
       setUploading(false);
@@ -134,11 +129,11 @@ export default function WhiteLabelPage() {
   async function uploadFavicon(file: File) {
     const allowed = ["image/png", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml"];
     if (!allowed.includes(file.type)) {
-      showToast("error", "Only PNG, ICO, or SVG files are accepted for favicons.");
+      toast.error("Only PNG, ICO, or SVG files are accepted for favicons.");
       return;
     }
     if (file.size > 512 * 1024) {
-      showToast("error", "Favicon must be under 512KB.");
+      toast.error("Favicon must be under 512KB.");
       return;
     }
     setFaviconPreview(URL.createObjectURL(file));
@@ -151,7 +146,7 @@ export default function WhiteLabelPage() {
       });
       setFaviconUrl(data.favicon_url);
     } catch {
-      showToast("error", "Favicon upload failed. Try again.");
+      toast.error("Favicon upload failed. Try again.");
       setFaviconPreview(faviconUrl);
     } finally {
       setFaviconUploading(false);
@@ -211,9 +206,9 @@ export default function WhiteLabelPage() {
         accentColor: data.accent_color ?? null,
         faviconUrl: data.favicon_url ?? null,
       });
-      showToast("success", "Brand settings saved.");
+      toast.success("Brand settings saved.");
     } catch {
-      showToast("error", "Failed to save. Please try again.");
+      toast.error("Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -227,23 +222,6 @@ export default function WhiteLabelPage() {
         title="Brand Settings"
         description="Customise how your reports and portal look to clients."
       />
-
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
-            toast.type === "success"
-              ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
-              : "bg-red-50 border border-red-200 text-red-800"
-          }`}
-        >
-          {toast.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {toast.msg}
-          <button onClick={() => setToast(null)} className="ml-2 opacity-60 hover:opacity-100">
-            <X size={12} />
-          </button>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left — form */}

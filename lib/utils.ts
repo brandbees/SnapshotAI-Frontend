@@ -65,3 +65,9 @@ export function truncateUrl(url: string, max = 30): string {
   const clean = url.replace(/^https?:\/\//, "");
   return clean.length > max ? clean.slice(0, max) + "…" : clean;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+export function isValidEmail(email: string): boolean {
+  return EMAIL_RE.test(email.trim());
+}

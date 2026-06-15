@@ -4,6 +4,7 @@ import { X, ExternalLink, ChevronDown } from "lucide-react";
 import { PieChart, Pie, Cell } from "recharts";
 import { useState } from "react";
 import { scoreHex } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import type { Site } from "@/types";
 
 interface Props {
@@ -57,6 +58,8 @@ function UptimeRing({ pct }: { pct: number }) {
 
 export function SiteQuickViewDrawer({ site, onClose }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const { agency } = useAuth();
+  const isClientPortal = agency?.is_client_portal ?? false;
   const uptime = site.uptime_percentage ?? 0;
   const isOnline = site.uptime_status === "up";
   const scores = site.latest_scores;
@@ -201,19 +204,31 @@ export function SiteQuickViewDrawer({ site, onClose }: Props) {
 
         {/* Footer buttons */}
         <div className="px-5 py-4 border-t border-border shrink-0 flex gap-3">
-          <button
-            onClick={() => { window.location.href = `/sites/${site.id}`; }}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-            style={{ background: "var(--accent)" }}
-          >
-            Run Audit Now
-          </button>
-          <button
-            onClick={() => { window.location.href = `/reports/${site.id}`; }}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-gray-50 transition-colors"
-          >
-            View Reports
-          </button>
+          {isClientPortal ? (
+            <button
+              onClick={() => { window.location.href = `/sites/${site.id}`; }}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+              style={{ background: "var(--accent)" }}
+            >
+              View Site Details
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => { window.location.href = `/sites/${site.id}`; }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+                style={{ background: "var(--accent)" }}
+              >
+                Run Audit Now
+              </button>
+              <button
+                onClick={() => { window.location.href = `/reports/${site.id}`; }}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-gray-50 transition-colors"
+              >
+                View Reports
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>
