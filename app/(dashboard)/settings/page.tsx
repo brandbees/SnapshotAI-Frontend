@@ -10,7 +10,7 @@ import {
   Package, Lock, Eye, EyeOff, Palette,
   Mail, Webhook, UserPlus, Trash2, ChevronDown,
   Activity, RefreshCw, ChevronLeft, ChevronRight,
-  Check, AlertCircle, Tag, Zap, HardDrive, Brain, Receipt, ExternalLink,
+  Check, AlertCircle, Tag, Zap, HardDrive, Brain, Receipt,
 } from "lucide-react";
 import { HexColorPicker } from "react-colorful";
 import { useBranding } from "@/contexts/BrandingContext";
@@ -23,7 +23,7 @@ import { useRole } from "@/hooks/useRole";
 import { useSites } from "@/hooks/useSites";
 import { setAgency } from "@/lib/auth";
 import api from "@/lib/api";
-import { PLAN_LABELS, PLAN_LIMITS, PLAN_SEATS, PLAN_PRICES, PLAN_FEATURES, PLAN_STORAGE_LIMITS, API_BASE_URL } from "@/lib/constants";
+import { PLAN_LABELS, PLAN_LIMITS, PLAN_SEATS, PLAN_PRICES, PLAN_FEATURES, API_BASE_URL } from "@/lib/constants";
 import { isValidEmail } from "@/lib/utils";
 import type { AlertSettings, TeamMember, TeamRole, Site } from "@/types";
 
@@ -1126,14 +1126,18 @@ function BillingContent() {
       .then(({ data }) => setStoragePkgs(data.packages)).catch(() => {});
     api.get<{ limits: Record<string, PlanLimits> }>("/billing/limits")
       .then(({ data }) => setPlanLimits(data.limits)).catch(() => {});
-    api.get<{ history: BillingEvent[] }>("/billing/history")
-      .then(({ data }) => { setHistory(data.history); setHistoryLoaded(true); }).catch(() => setHistoryLoaded(true));
+    const fetchHistory = () =>
+      api.get<{ history: BillingEvent[] }>("/billing/history")
+        .then(({ data }) => { setHistory(data.history); setHistoryLoaded(true); })
+        .catch(() => setHistoryLoaded(true));
+
+    fetchHistory();
     refreshAgency();
 
-    const sessionId     = searchParams.get("session_id");
-    const tokensSuccess = searchParams.get("tokens") === "success";
+    const sessionId      = searchParams.get("session_id");
+    const tokensSuccess  = searchParams.get("tokens") === "success";
     const storageSuccess = searchParams.get("storage") === "success";
-    const planSuccess   = searchParams.get("plan") === "success";
+    const planSuccess    = searchParams.get("plan") === "success";
 
     if ((tokensSuccess || storageSuccess || planSuccess) && sessionId) {
       // Verify the Stripe session — credits the purchase if the webhook hasn't fired yet
@@ -1142,17 +1146,18 @@ function BillingContent() {
           if (tokensSuccess) {
             const { data: ts } = await api.get<TokenState>("/agent/tokens");
             setTokenState(ts);
-            toast.success("AI tokens added to your account! Your balance has been updated.");
-          } else if (storageSuccess) {
+          } else if (storageSuccess || planSuccess) {
             await refreshAgency();
-            toast.success("Storage added to your account! Your limit has been increased.");
-          } else if (planSuccess) {
-            await refreshAgency();
-            toast.success("Plan upgraded successfully! Welcome to your new plan.");
           }
+          // Refresh history so new entry appears without page reload
+          await fetchHistory();
+          if (tokensSuccess)  toast.success("AI tokens added to your account! Your balance has been updated.");
+          if (storageSuccess) toast.success("Storage added to your account! Your limit has been increased.");
+          if (planSuccess)    toast.success("Plan upgraded successfully! Welcome to your new plan.");
         })
-        .catch(() => {
-          // Webhook may have already processed it — still show confirmation
+        .catch(async () => {
+          // Webhook may have already processed it — still refresh history and show confirmation
+          await fetchHistory();
           if (tokensSuccess)  toast.success("AI tokens added to your account! Your balance has been updated.");
           if (storageSuccess) toast.success("Storage added to your account! Your limit has been increased.");
           if (planSuccess)    toast.success("Plan upgraded successfully! Welcome to your new plan.");
@@ -1388,7 +1393,7 @@ function BillingContent() {
         ) : history.length === 0 ? (
           <div className="text-center py-6">
             <Receipt size={26} className="text-muted-foreground/25 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No purchases yet — token and storage top-ups will appear here.</p>
+            <p className="text-sm text-muted-foreground">No purchase history yet — plan upgrades, token top-ups, and storage add-ons will appear here.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1422,13 +1427,6 @@ function BillingContent() {
                       </td>
                       <td className="py-2.5 text-right text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(tx.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                        {tx.stripe_session_id && (
-                          <a href={`https://dashboard.stripe.com/payments/${tx.stripe_session_id}`}
-                            target="_blank" rel="noreferrer"
-                            className="ml-1.5 inline-flex items-center opacity-40 hover:opacity-100 transition-opacity" title="View in Stripe">
-                            <ExternalLink size={10} />
-                          </a>
-                        )}
                       </td>
                     </tr>
                   );
