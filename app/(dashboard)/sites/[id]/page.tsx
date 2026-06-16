@@ -2935,8 +2935,9 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
   const [confirmRestore,   setConfirmRestore]   = useState<string | null>(null);
   const [confirmDelete,    setConfirmDelete]    = useState<string | null>(null);
   const [downloadLoading,  setDownloadLoading]  = useState<string | null>(null);
-  const [confirmEmergency, setConfirmEmergency] = useState<string | null>(null);
-  const [emergencyLoading, setEmergencyLoading] = useState<string | null>(null);
+  const [restoreProgress, setRestoreProgress]  = useState<Record<string, {
+    stage: string; progress: number; status: string;
+  }>>({});
   const [preflight, setPreflight] = useState<{
     storage: { used_mb: number; limit_mb: number; remaining_mb: number; pct_used: number };
     last_backup: { size_mb: number; type: string; created_at: string } | null;
@@ -2988,6 +2989,32 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
     prevBackupsRef.current = backups;
   }, [backups]);
 
+  // Poll restore progress for any active restores
+  useEffect(() => {
+    const activeIds = Object.keys(restoreProgress).filter(
+      id => !['completed', 'failed'].includes(restoreProgress[id].status)
+    );
+    if (activeIds.length === 0) return;
+
+    const interval = setInterval(async () => {
+      for (const id of activeIds) {
+        try {
+          const { data } = await api.get<{
+            restore_status: string; restore_progress: number; health_error: string | null;
+          }>(`/backups/${site.id}/${id}/restore-status`);
+
+          const s = data.restore_status ?? 'queued';
+          setRestoreProgress(prev => ({ ...prev, [id]: { stage: s, progress: data.restore_progress ?? 0, status: s } }));
+
+          if (s === 'completed') toast.success('Restore completed — site is back online');
+          else if (s === 'failed') toast.error(`Restore failed${data.health_error ? `: ${data.health_error.slice(0, 120)}` : ''}`);
+        } catch { /* silent — keep polling */ }
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [restoreProgress, site.id]);
+
   const doRunBackup = async () => {
     setRunning(true);
     try {
@@ -3034,7 +3061,8 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
     setConfirmRestore(null);
     try {
       await api.post(`/backups/${backup.id}/restore`);
-      toast.success("Restore initiated — site will be back online within a few minutes");
+      setRestoreProgress(prev => ({ ...prev, [backup.id]: { stage: 'queued', progress: 0, status: 'queued' } }));
+      toast.success("Restore queued — progress shown below");
     } catch (err: any) {
       toast.error(err?.response?.data?.error ?? "Restore failed");
     }
@@ -3049,25 +3077,6 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
       toast.error("Failed to generate download link");
     } finally {
       setDownloadLoading(null);
-    }
-  };
-
-  const handleEmergencyRestore = async (backup: BackupRecord) => {
-    if (confirmEmergency !== backup.id) {
-      setConfirmEmergency(backup.id);
-      setConfirmRestore(null);
-      setConfirmDelete(null);
-      return;
-    }
-    setConfirmEmergency(null);
-    setEmergencyLoading(backup.id);
-    try {
-      await api.post(`/backups/${backup.id}/emergency-restore`);
-      toast.success("Emergency restore initiated — site will recover via the bridge file within a few minutes");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? "Emergency restore failed");
-    } finally {
-      setEmergencyLoading(null);
     }
   };
 
@@ -3290,6 +3299,37 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
                         {backup.health_error}
                       </p>
                     )}
+                    {/* Live restore progress */}
+                    {(() => {
+                      const rp = restoreProgress[backup.id];
+                      if (!rp) return null;
+                      const stageLabel: Record<string, string> = {
+                        queued: "Queued…", downloading: "Downloading backup",
+                        extracting_db: "Restoring database", extracting_files: "Extracting files",
+                        completed: "Restored", failed: "Restore failed",
+                      };
+                      const label = stageLabel[rp.stage] ?? rp.stage;
+                      if (rp.status === 'completed') {
+                        return <p className="text-xs text-green-600 font-medium mt-1">Restore complete</p>;
+                      }
+                      if (rp.status === 'failed') {
+                        return <p className="text-xs text-red-500 mt-1">Restore failed</p>;
+                      }
+                      return (
+                        <div className="mt-1.5 w-36">
+                          <div className="flex items-center justify-between text-[10px] text-gray-500 mb-0.5">
+                            <span className="truncate">{label}</span>
+                            <span className="ml-1 shrink-0">{rp.progress}%</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${rp.progress}%`, backgroundColor: brandColor }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {backup.size_mb != null ? `${backup.size_mb} MB` : "—"}
@@ -3315,7 +3355,7 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
                             {confirmRestore === backup.id ? "Confirm?" : "Restore"}
                           </button>
 
-                          {/* Download — Tier 2: get the zip directly from R2 for manual restore */}
+                          {/* Download — get the zip directly from R2 for manual restore */}
                           <button
                             onClick={() => handleDownload(backup)}
                             disabled={downloadLoading === backup.id}
@@ -3325,23 +3365,6 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
                               ? <Loader2 size={11} className="animate-spin" />
                               : <Download size={11} />}
                             Download
-                          </button>
-
-                          {/* Emergency restore — Tier 1: bridge file at site root, bypasses WordPress */}
-                          <button
-                            onClick={() => handleEmergencyRestore(backup)}
-                            disabled={emergencyLoading === backup.id}
-                            title="Use this when WordPress is broken but the server is still running"
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                              confirmEmergency === backup.id
-                                ? "bg-red-100 text-red-700 hover:bg-red-200"
-                                : "text-gray-400 hover:bg-gray-100"
-                            }`}
-                          >
-                            {emergencyLoading === backup.id
-                              ? <Loader2 size={11} className="animate-spin" />
-                              : <AlertTriangle size={11} />}
-                            {confirmEmergency === backup.id ? "Confirm Emergency?" : "Emergency"}
                           </button>
                         </>
                       )}
