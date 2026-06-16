@@ -2937,6 +2937,11 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
   const [downloadLoading,  setDownloadLoading]  = useState<string | null>(null);
   const [confirmEmergency, setConfirmEmergency] = useState<string | null>(null);
   const [emergencyLoading, setEmergencyLoading] = useState<string | null>(null);
+  const [preflight, setPreflight] = useState<{
+    storage: { used_mb: number; limit_mb: number; remaining_mb: number; pct_used: number };
+    last_backup: { size_mb: number; type: string; created_at: string } | null;
+    warning: "low_storage" | "insufficient_storage" | null;
+  } | null>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevBackupsRef = useRef<BackupRecord[]>([]);
 
@@ -2983,7 +2988,7 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
     prevBackupsRef.current = backups;
   }, [backups]);
 
-  const handleRun = async () => {
+  const doRunBackup = async () => {
     setRunning(true);
     try {
       await api.post(`/backups/${site.id}/run`, { type });
@@ -2994,6 +2999,21 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
     } finally {
       setRunning(false);
     }
+  };
+
+  const handleRun = async () => {
+    setRunning(true);
+    try {
+      const { data } = await api.get(`/backups/${site.id}/preflight`);
+      if (data.warning) {
+        setPreflight(data);
+        setRunning(false);
+        return;
+      }
+    } catch {
+      // preflight failed — proceed without blocking the user
+    }
+    await doRunBackup();
   };
 
   const handleSchedule = async (val: string) => {
@@ -3111,6 +3131,76 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
 
   return (
     <div className="space-y-6">
+
+      {/* Storage pre-flight warning modal */}
+      {preflight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${preflight.warning === "insufficient_storage" ? "bg-red-50" : "bg-amber-50"}`}>
+                <HardDrive size={18} className={preflight.warning === "insufficient_storage" ? "text-red-500" : "text-amber-500"} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {preflight.warning === "insufficient_storage" ? "Insufficient Backup Storage" : "Low Backup Storage"}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {preflight.warning === "insufficient_storage"
+                    ? "This backup may exceed your remaining storage quota."
+                    : "You're running low on backup storage — this backup may not complete."}
+                </p>
+              </div>
+            </div>
+
+            {/* Storage bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Used: <strong className="text-gray-700">{preflight.storage.used_mb.toFixed(0)} MB</strong></span>
+                <span>Limit: <strong className="text-gray-700">{(preflight.storage.limit_mb / 1024).toFixed(0)} GB</strong></span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all ${preflight.storage.pct_used >= 90 ? "bg-red-500" : "bg-amber-400"}`}
+                  style={{ width: `${preflight.storage.pct_used}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                {preflight.storage.remaining_mb.toFixed(0)} MB remaining ({preflight.storage.pct_used}% used)
+              </p>
+            </div>
+
+            {preflight.last_backup && (
+              <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                Last backup was <strong>{preflight.last_backup.size_mb} MB</strong> — estimated size for this run.
+              </p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setPreflight(null)}
+                className="flex-1 text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              {preflight.warning === "low_storage" && (
+                <button
+                  onClick={() => { setPreflight(null); doRunBackup(); }}
+                  className="flex-1 text-sm px-4 py-2 rounded-lg text-white font-medium"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  Proceed Anyway
+                </button>
+              )}
+            </div>
+            {preflight.warning === "insufficient_storage" && (
+              <p className="text-xs text-center text-gray-400">
+                Delete old backups to free space, or upgrade your plan to continue.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Controls row */}
       <div className="flex flex-wrap items-end gap-4">
         {/* Schedule */}

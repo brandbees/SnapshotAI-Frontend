@@ -17,6 +17,7 @@
 
 # production
 /build
+lib/constants.ts
 
 # misc
 .DS_Store
