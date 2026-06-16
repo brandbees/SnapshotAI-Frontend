@@ -25,6 +25,10 @@ api.interceptors.response.use(
       }
     }
     if (error.response?.status === 403 && getToken()) {
+      // Plan-gate errors (upgrade_required) are handled inline by the page — don't log out.
+      if (error.response?.data?.upgrade_required) {
+        return Promise.reject(error);
+      }
       // Only redirect when mid-session (had a valid token). If no token, the
       // 403 came from the login endpoint itself — let the catch block handle it.
       clearToken();
