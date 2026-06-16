@@ -66,5 +66,14 @@ export function useSites() {
     return () => window.removeEventListener("bb:refresh", handleRefresh);
   }, [fetch]);
 
+  // Poll every 30s while any site is not yet connected so the dashboard
+  // reflects plugin connection without requiring a manual refresh.
+  useEffect(() => {
+    const hasDisconnected = sites.some((s) => !s.plugin_connected);
+    if (!hasDisconnected) return;
+    const id = setInterval(() => fetch(true), 30_000);
+    return () => clearInterval(id);
+  }, [sites, fetch]);
+
   return { sites, portfolio, loading, error, refetch: fetch };
 }

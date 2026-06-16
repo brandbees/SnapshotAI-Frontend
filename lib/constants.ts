@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://snapshotai.vps.webdock.cloud";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 export const PLAN_LIMITS: Record<string, number> = {
   free: 1,

@@ -16,30 +16,38 @@ export function useAuth() {
   }, []);
 
   async function login(email: string, password: string): Promise<void> {
-    const { data } = await api.post<AuthResponse>("/auth/login", {
-      email,
-      password,
-    });
+    const { data } = await api.post<AuthResponse>("/auth/login", { email, password });
     setToken(data.token);
     setAgency(data.agency);
     setAgencyState(data.agency);
   }
 
+  // Phase 1 — returns { pending: true, email } if OTP was sent, throws on error
   async function register(
     agencyName: string,
     email: string,
     password: string,
     coupon?: string
-  ): Promise<void> {
-    const { data } = await api.post<AuthResponse>("/auth/register", {
+  ): Promise<{ pending: boolean; email: string }> {
+    const { data } = await api.post<{ pending: boolean; email: string }>("/auth/register", {
       agency_name: agencyName,
       email,
       password,
-      coupon,
+      coupon_code: coupon,
     });
+    return data;
+  }
+
+  // Phase 2 — confirms OTP, receives token, logs in
+  async function verifyEmail(email: string, code: string): Promise<void> {
+    const { data } = await api.post<AuthResponse>("/auth/verify-email", { email, code });
     setToken(data.token);
     setAgency(data.agency);
     setAgencyState(data.agency);
+  }
+
+  async function resendCode(email: string): Promise<void> {
+    await api.post("/auth/resend-code", { email });
   }
 
   function logout(): void {
@@ -69,5 +77,9 @@ export function useAuth() {
 
   const isLoggedIn = !!getToken();
 
-  return { agency, loading, isLoggedIn, login, register, logout, updateAgency, refreshAgency };
+  return {
+    agency, loading, isLoggedIn,
+    login, register, verifyEmail, resendCode,
+    logout, updateAgency, refreshAgency,
+  };
 }
