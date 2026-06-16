@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -1130,10 +1130,39 @@ function BillingContent() {
       .then(({ data }) => { setHistory(data.history); setHistoryLoaded(true); }).catch(() => setHistoryLoaded(true));
     refreshAgency();
 
-    if (searchParams.get("tokens") === "success") {
+    const sessionId     = searchParams.get("session_id");
+    const tokensSuccess = searchParams.get("tokens") === "success";
+    const storageSuccess = searchParams.get("storage") === "success";
+    const planSuccess   = searchParams.get("plan") === "success";
+
+    if ((tokensSuccess || storageSuccess || planSuccess) && sessionId) {
+      // Verify the Stripe session — credits the purchase if the webhook hasn't fired yet
+      api.post("/billing/verify-session", { session_id: sessionId })
+        .then(async () => {
+          if (tokensSuccess) {
+            const { data: ts } = await api.get<TokenState>("/agent/tokens");
+            setTokenState(ts);
+            toast.success("AI tokens added to your account! Your balance has been updated.");
+          } else if (storageSuccess) {
+            await refreshAgency();
+            toast.success("Storage added to your account! Your limit has been increased.");
+          } else if (planSuccess) {
+            await refreshAgency();
+            toast.success("Plan upgraded successfully! Welcome to your new plan.");
+          }
+        })
+        .catch(() => {
+          // Webhook may have already processed it — still show confirmation
+          if (tokensSuccess)  toast.success("AI tokens added to your account! Your balance has been updated.");
+          if (storageSuccess) toast.success("Storage added to your account! Your limit has been increased.");
+          if (planSuccess)    toast.success("Plan upgraded successfully! Welcome to your new plan.");
+        });
+    } else if (tokensSuccess) {
       toast.success("AI tokens added to your account! Your balance has been updated.");
-    } else if (searchParams.get("storage") === "success") {
+    } else if (storageSuccess) {
       toast.success("Storage added to your account! Your limit has been increased.");
+    } else if (planSuccess) {
+      toast.success("Plan upgraded successfully! Welcome to your new plan.");
     }
   }, []);
 
@@ -1433,10 +1462,28 @@ function BillingTab() {
 
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+function SettingsPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { agency } = useAuth();
   const { role }   = useRole();
+
+  const getValidTab = (): Tab => {
+    const t = searchParams.get("tab") as Tab;
+    return TABS.some(x => x.id === t) ? t : "general";
+  };
+
+  const [activeTab, setActiveTab] = useState<Tab>(getValidTab);
+
+  useEffect(() => {
+    setActiveTab(getValidTab());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  function handleTabChange(id: Tab) {
+    setActiveTab(id);
+    router.replace(`/settings?tab=${id}`, { scroll: false });
+  }
 
   const accentColor = agency?.accent_color ?? "#6366f1";
   const displayName = agency?.member_name ?? agency?.name ?? "";
@@ -1472,7 +1519,7 @@ export default function SettingsPage() {
             <button
               key={id}
               data-tab={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => handleTabChange(id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === id ? "text-white shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
               }`}
@@ -1496,5 +1543,13 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>}>
+      <SettingsPageInner />
+    </Suspense>
   );
 }

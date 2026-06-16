@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Bot, Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
          Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import api from "@/lib/api";
 import { mapSite, type RawSite } from "@/lib/mappers";
 import { useAuth } from "@/hooks/useAuth";
-import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import type { Site, AgentMessage } from "@/types";
 
 const SUGGESTIONS_GLOBAL = [
@@ -283,13 +283,13 @@ export default function AgentPage() {
                 </div>
               ))}
             </div>
-            <a
+            <Link
               href="/settings?tab=billing"
               className="inline-flex items-center justify-center gap-2 h-11 px-8 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
               style={{ background: "var(--accent)" }}
             >
               <Zap size={15} /> Upgrade to unlock AI Assistant
-            </a>
+            </Link>
             <p className="text-xs text-muted-foreground mt-3">
               AI summaries on your audit reports are always included — free for all plans.
             </p>
