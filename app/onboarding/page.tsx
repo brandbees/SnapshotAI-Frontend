@@ -150,28 +150,31 @@ function StepInstallPlugin({
   onConnected: () => void;
   onSkip: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [copied, setCopied]         = useState(false);
+  const [status, setStatus]         = useState<"waiting" | "checking" | "connected">("waiting");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const checkConnection = useCallback(async () => {
+  const checkConnection = useCallback(async (manual = false) => {
+    if (manual) setStatus("checking");
     try {
-      const { data } = await api.get<{ plugin_connected: boolean }>(`/sites/${site.id}`);
+      const { data } = await api.get<{ plugin_connected: boolean }>(
+        `/sites/${site.id}/connection-status`
+      );
       if (data.plugin_connected) {
-        setConnected(true);
+        setStatus("connected");
         if (pollRef.current) clearInterval(pollRef.current);
-        setTimeout(onConnected, 800);
+        setTimeout(onConnected, 1200);
+      } else if (manual) {
+        setStatus("waiting");
       }
     } catch {
-      // silently ignore poll errors
+      if (manual) setStatus("waiting");
     }
   }, [site.id, onConnected]);
 
   useEffect(() => {
-    pollRef.current = setInterval(checkConnection, 3000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    pollRef.current = setInterval(() => checkConnection(false), 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [checkConnection]);
 
   function copyToken() {
@@ -180,25 +183,43 @@ function StepInstallPlugin({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  if (status === "connected") {
+    return (
+      <div className="flex flex-col items-center text-center gap-5 py-6">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
+          style={{ background: "color-mix(in srgb, #22c55e 15%, transparent)" }}>
+          <Check size={30} className="text-green-500" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground mb-1">Plugin connected!</h2>
+          <p className="text-sm text-muted-foreground">
+            Running your first audit on{" "}
+            <span className="font-medium text-foreground">{site.name}</span>…
+          </p>
+        </div>
+        <Loader2 size={18} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="text-center mb-8">
+      <div className="text-center mb-6">
         <h2 className="text-xl font-bold text-foreground">Install the plugin</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Install the BrandBees SnapshotAI plugin on{" "}
-          <span className="font-medium text-foreground">{site.name}</span> and
-          paste your site token to connect.
+          Install and activate the BrandBees plugin on{" "}
+          <span className="font-medium text-foreground">{site.name}</span>, then paste your token.
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* Step instructions */}
         <div className="bg-surface border border-border rounded-2xl p-5 space-y-3">
           {[
-            "In your WordPress admin, go to Plugins → Add New",
+            "In WordPress admin go to Plugins → Add New",
             "Search for BrandBees SnapshotAI and install it",
-            "Activate the plugin, then go to SnapshotAI → Settings",
-            "Paste your site token below and save",
+            "Activate it, then go to SnapshotAI → Settings",
+            "Paste your site token below and click Save & Connect",
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3 text-sm">
               <span
@@ -234,23 +255,29 @@ function StepInstallPlugin({
           </div>
         </div>
 
-        {/* Connection status */}
-        {connected ? (
-          <div className="flex items-center justify-center gap-2 py-2">
-            <Check size={16} className="text-green-500" />
-            <span className="text-sm font-semibold text-green-600">Plugin connected!</span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-pulse" />
-            <span className="text-xs">Checking automatically — connect the plugin above to continue</span>
-          </div>
-        )}
+        {/* Manual check button — primary action after pasting token */}
+        <button
+          onClick={() => checkConnection(true)}
+          disabled={status === "checking"}
+          className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-bold border-2 transition-colors disabled:opacity-60"
+          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+        >
+          {status === "checking" ? (
+            <><Loader2 size={15} className="animate-spin" /> Checking…</>
+          ) : (
+            <><Check size={15} /> I&apos;ve connected it — verify now</>
+          )}
+        </button>
 
-        {/* Skip — goes directly to dashboard */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-pulse shrink-0" />
+          Also checking automatically every 5 seconds
+        </div>
+
+        {/* Skip */}
         <button
           onClick={onSkip}
-          className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
         >
           <SkipForward size={13} /> Skip for now — I&apos;ll connect later
         </button>

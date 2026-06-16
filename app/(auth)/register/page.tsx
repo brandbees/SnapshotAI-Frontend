@@ -3,10 +3,20 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw } from "lucide-react";
+import { Camera, Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw, Wand2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { cn, isValidEmail } from "@/lib/utils";
+
+// ── Password generator ────────────────────────────────────────────────────────
+
+const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=';
+
+function generateStrongPassword(): string {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map((b) => CHARSET[b % CHARSET.length]).join('');
+}
 
 // ── Password strength ─────────────────────────────────────────────────────────
 
@@ -45,6 +55,7 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
   const [password, setPassword]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showStrength, setShowStrength] = useState(false);
+  const [generated, setGenerated]       = useState(false);
   const [emailError, setEmailError]   = useState("");
   const [error, setError]             = useState("");
   const [loading, setLoading]         = useState(false);
@@ -118,9 +129,26 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
-          Password
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            Password
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              const pwd = generateStrongPassword();
+              setPassword(pwd);
+              setShowPassword(true);
+              setShowStrength(true);
+              setGenerated(true);
+              setTimeout(() => setGenerated(false), 2000);
+            }}
+            className="flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            <Wand2 size={11} />
+            {generated ? "Copied!" : "Generate"}
+          </button>
+        </div>
         <div className="relative">
           <input
             type={showPassword ? "text" : "password"}
