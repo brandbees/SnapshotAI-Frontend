@@ -91,7 +91,8 @@ function TokenBar({ state }: { state: TokenState }) {
 
 export default function AgentPage() {
   const { agency } = useAuth();
-  const canUseAgent = !!agency;
+  const isFreePlan  = agency?.plan === 'free';
+  const canUseAgent = !!agency && !isFreePlan;
 
   const [sites, setSites]               = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
@@ -256,13 +257,48 @@ export default function AgentPage() {
         </div>
       </div>
 
-      {/* ── Plan gate ────────────────────────────────────────────────────────── */}
-      {agency && !canUseAgent && (
-        <UpgradeBanner message="AI Assistant requires the Agency Plus plan. Upgrade to ask questions across all your sites." />
+      {/* ── Free plan upgrade wall ───────────────────────────────────────────── */}
+      {isFreePlan && (
+        <div className="flex-1 flex items-center justify-center bg-[#f8fafc] p-6">
+          <div className="max-w-md w-full text-center">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm"
+              style={{ background: "var(--accent-light)" }}>
+              <Sparkles size={28} style={{ color: "var(--accent)" }} />
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-2">AI Assistant</h2>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              Ask questions about your sites, get audit insights, run audits, send reports,
+              and more — all in plain English. Available on paid plans.
+            </p>
+            <div className="bg-white border border-border rounded-2xl p-5 mb-6 text-left space-y-3">
+              {[
+                "\"What's the most urgent issue on my site?\"",
+                "\"Which plugins need updating?\"",
+                "\"Run an audit and send me a report\"",
+                "\"Why is my security score low?\"",
+              ].map(q => (
+                <div key={q} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                  <Sparkles size={12} style={{ color: "var(--accent)" }} className="shrink-0" />
+                  <span className="italic">{q}</span>
+                </div>
+              ))}
+            </div>
+            <a
+              href="/settings?tab=billing"
+              className="inline-flex items-center justify-center gap-2 h-11 px-8 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--accent)" }}
+            >
+              <Zap size={15} /> Upgrade to unlock AI Assistant
+            </a>
+            <p className="text-xs text-muted-foreground mt-3">
+              AI summaries on your audit reports are always included — free for all plans.
+            </p>
+          </div>
+        </div>
       )}
 
       {/* ── Messages ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto min-h-0 bg-[#f8fafc]">
+      {!isFreePlan && <div className="flex-1 overflow-y-auto min-h-0 bg-[#f8fafc]">
         <div className="max-w-3xl mx-auto px-6 py-8">
 
           {isEmpty ? (
@@ -350,10 +386,10 @@ export default function AgentPage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── Input bar ────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white border-t border-border px-6 py-4">
+      {!isFreePlan && <div className="shrink-0 bg-white border-t border-border px-6 py-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-3 items-end bg-white border border-border rounded-2xl px-4 py-3 transition-shadow">
             <textarea
@@ -387,7 +423,7 @@ export default function AgentPage() {
             Enter to send · Shift+Enter for new line · I can run audits, send reports, and update schedules
           </p>
         </div>
-      </div>
+      </div>}
 
     </div>
   );
