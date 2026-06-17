@@ -14,8 +14,12 @@ import {
   Puzzle,
   Plus,
   TrendingUp,
+  ArrowRight,
+  PlayCircle,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import api from "@/lib/api";
 import {
   ResponsiveContainer,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -352,6 +356,106 @@ function NeedsAttentionCard({ sites }: { sites: Site[] }) {
   );
 }
 
+// ── Next Steps Panel ─────────────────────────────────────────────────────────
+// Shown when a site is connected but has never been audited.
+// Disappears once every connected site has at least one audit.
+
+function NextStepsPanel({ sites }: { sites: Site[] }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState<string | null>(null); // site id being triggered
+
+  const needsAudit = sites.filter((s) => s.plugin_connected && !s.last_audit_at);
+  if (needsAudit.length === 0) return null;
+
+  async function runAudit(siteId: string) {
+    setLoading(siteId);
+    try {
+      await api.post(`/audits/${siteId}/run`);
+      router.push(`/sites/${siteId}`);
+    } catch {
+      setLoading(null);
+    }
+  }
+
+  const single = needsAudit.length === 1;
+
+  return (
+    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-2xl p-5">
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+          <PlayCircle size={20} className="text-indigo-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-indigo-900">
+            {single
+              ? `Run your first audit on ${needsAudit[0].name}`
+              : `${needsAudit.length} connected sites haven't been audited yet`}
+          </p>
+          <p className="text-xs text-indigo-700 mt-0.5 mb-4 leading-relaxed">
+            {single
+              ? "The plugin is connected and ready. Run an audit to get your security score, SEO grade, performance metrics, and malware check."
+              : "Run audits to get security scores, SEO grades, performance metrics, and malware checks for each site."}
+          </p>
+
+          {single ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => runAudit(needsAudit[0].id)}
+                disabled={!!loading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60 hover:opacity-90 transition-opacity"
+                style={{ background: "var(--accent)" }}
+              >
+                {loading === needsAudit[0].id ? (
+                  <><Loader2 size={14} className="animate-spin" /> Starting…</>
+                ) : (
+                  <><PlayCircle size={14} /> Run First Audit</>
+                )}
+              </button>
+              <Link
+                href={`/sites/${needsAudit[0].id}`}
+                className="flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900 transition-colors"
+              >
+                View site <ArrowRight size={13} />
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {needsAudit.map((site) => (
+                <div key={site.id} className="flex items-center justify-between gap-3 bg-white/60 rounded-xl px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{site.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{site.url}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => runAudit(site.id)}
+                      disabled={!!loading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-60 hover:opacity-90 transition-opacity"
+                      style={{ background: "var(--accent)" }}
+                    >
+                      {loading === site.id ? (
+                        <><Loader2 size={12} className="animate-spin" /> Starting…</>
+                      ) : (
+                        <><PlayCircle size={12} /> Run Audit</>
+                      )}
+                    </button>
+                    <Link
+                      href={`/sites/${site.id}`}
+                      className="text-xs font-medium text-indigo-700 hover:text-indigo-900 transition-colors"
+                    >
+                      View
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -491,6 +595,11 @@ export default function DashboardPage() {
       {/* ── Onboarding checklist (agency/team only) */}
       {agency && !agency.is_client_portal && (
         <OnboardingChecklist agency={agency} sites={sites} />
+      )}
+
+      {/* ── Next steps: run first audit (agency/team only) */}
+      {!agency?.is_client_portal && (
+        <NextStepsPanel sites={sites} />
       )}
 
       {/* ── Portfolio Health Score (agency/team only) */}
