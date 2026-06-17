@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Building2, ChevronLeft, ChevronRight, Globe, Users, CreditCard, TrendingUp, LogIn, Plus, X, Eye, EyeOff } from "lucide-react";
+import { Search, Building2, ChevronLeft, ChevronRight, Globe, Users, CreditCard, TrendingUp, LogIn, Plus, X, Eye, EyeOff, User } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie,
@@ -97,6 +97,7 @@ export default function MasterAgenciesPage() {
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCreatePw, setShowCreatePw] = useState(false);
+  const [createStep,   setCreateStep]   = useState<1 | 2>(1);
 
   const load = useCallback(async (p: number, q: string, plan: string, type: string) => {
     setLoading(true);
@@ -161,6 +162,7 @@ export default function MasterAgenciesPage() {
       await masterApi.post("/master/agencies", createForm);
       toast.success(`Agency "${createForm.name}" created.`);
       setShowCreate(false);
+      setCreateStep(1);
       setCreateForm({ name: "", email: "", password: "", plan: "free", account_type: "agency" });
       load(1, search, planFilter, typeFilter);
       setPage(1);
@@ -189,7 +191,7 @@ export default function MasterAgenciesPage() {
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <button
-              onClick={() => { setShowCreate(true); setCreateError(null); }}
+              onClick={() => { setShowCreate(true); setCreateError(null); setCreateStep(1); }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
               style={{ background: AMBER }}
             >
@@ -474,142 +476,168 @@ export default function MasterAgenciesPage() {
           </table>
         </div>
 
-        {/* ── Create Agency modal ─────────────────────────────────────── */}
+        {/* ── Create Account modal (2-step) ──────────────────────────── */}
       {showCreate && (
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
-          onClick={e => { if (e.target === e.currentTarget) setShowCreate(false); }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowCreate(false); setCreateStep(1); } }}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            {/* Modal header strip */}
             <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${AMBER}, #fbbf24)` }} />
+
+            {/* Header */}
             <div className="px-6 py-5 flex items-center justify-between border-b border-border">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(245,158,11,0.12)" }}>
-                  <Building2 size={18} style={{ color: AMBER }} />
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: createStep === 1
+                      ? "rgba(245,158,11,0.12)"
+                      : createForm.account_type === "agency" ? "rgba(14,165,233,0.12)" : "rgba(99,102,241,0.12)"
+                  }}
+                >
+                  {createStep === 1 || createForm.account_type === "agency"
+                    ? <Building2 size={18} style={{ color: createStep === 1 ? AMBER : "#0ea5e9" }} />
+                    : <User size={18} style={{ color: "#6366f1" }} />
+                  }
                 </div>
                 <div>
-                  <p className="font-bold text-foreground">Create Agency</p>
-                  <p className="text-xs text-muted-foreground">New account on the platform</p>
+                  <p className="font-bold text-foreground">
+                    {createStep === 1 ? "Create Account" : createForm.account_type === "agency" ? "Create Agency" : "Create Individual"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {createStep === 1 ? "Choose account type" : "Fill in the account details"}
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => setShowCreate(false)}
+                onClick={() => { setShowCreate(false); setCreateStep(1); }}
                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-gray-100 transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="px-6 py-5 space-y-4">
-              {/* Name */}
-              <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Agency Name</label>
-                <input
-                  value={createForm.name}
-                  onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. BrandBees Agency"
-                  className="w-full mt-1.5 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all"
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Email</label>
-                <input
-                  type="email"
-                  value={createForm.email}
-                  onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="admin@agencyname.com"
-                  className="w-full mt-1.5 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Password</label>
-                <div className="relative mt-1.5">
-                  <input
-                    type={showCreatePw ? "text" : "password"}
-                    value={createForm.password}
-                    onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-                    placeholder="Min 8 characters"
-                    className="w-full pr-10 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCreatePw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showCreatePw ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Plan */}
-              <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Plan</label>
-                <select
-                  value={createForm.plan}
-                  onChange={e => setCreateForm(f => ({ ...f, plan: e.target.value }))}
-                  className="w-full mt-1.5 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 bg-white transition-all"
-                >
-                  {Object.entries(PLAN_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Account Type */}
-              <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Account Type</label>
-                <div className="flex gap-2 mt-1.5">
+            {createStep === 1 ? (
+              /* ── Step 1: Type selection ────────────────────────────── */
+              <div className="px-6 py-6 space-y-4">
+                <p className="text-sm text-center text-muted-foreground">Who is this account for?</p>
+                <div className="grid grid-cols-2 gap-3">
                   {([
-                    { value: "agency",     label: "Agency",     color: "#0ea5e9" },
-                    { value: "individual", label: "Individual", color: "#6366f1" },
-                  ] as const).map(({ value, label, color }) => (
+                    { value: "agency"     as const, label: "Agency",     sub: "Multi-site, client\nreports, team access", icon: Building2, color: "#0ea5e9", bg: "#f0f9ff" },
+                    { value: "individual" as const, label: "Individual", sub: "Single site,\npersonal use",              icon: User,      color: "#6366f1", bg: "#eef2ff" },
+                  ]).map(({ value, label, sub, icon: Icon, color, bg }) => (
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setCreateForm(f => ({ ...f, account_type: value }))}
-                      className="flex-1 py-2 text-sm font-semibold rounded-xl border transition-all"
-                      style={createForm.account_type === value
-                        ? { background: color, color: "#fff", borderColor: color }
-                        : { background: "#fff", color: "#6b7280", borderColor: "#e5e7eb" }
-                      }
+                      onClick={() => { setCreateForm(f => ({ ...f, account_type: value })); setCreateStep(2); }}
+                      className="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 border-border hover:shadow-md transition-all"
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = "")}
                     >
-                      {label}
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: bg }}>
+                        <Icon size={22} style={{ color }} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-foreground">{label}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed whitespace-pre-line">{sub}</p>
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
+            ) : (
+              /* ── Step 2: Form fields ───────────────────────────────── */
+              <div className="px-6 py-5 space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    {createForm.account_type === "agency" ? "Agency Name" : "Full Name"}
+                  </label>
+                  <input
+                    value={createForm.name}
+                    onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder={createForm.account_type === "agency" ? "e.g. BrandBees Agency" : "e.g. John Smith"}
+                    className="w-full mt-1.5 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all"
+                  />
+                </div>
 
-              {/* Error */}
-              {createError && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
-                  {createError}
-                </p>
-              )}
+                {/* Email */}
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Email</label>
+                  <input
+                    type="email"
+                    value={createForm.email}
+                    onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="admin@agencyname.com"
+                    className="w-full mt-1.5 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all"
+                  />
+                </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={createAgency}
-                  disabled={createSaving}
-                  className="flex-1 py-2.5 text-sm font-semibold rounded-xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{ background: AMBER }}
-                >
-                  {createSaving ? "Creating…" : "Create Agency"}
-                </button>
-                <button
-                  onClick={() => setShowCreate(false)}
-                  className="px-4 py-2.5 text-sm rounded-xl border border-border text-muted-foreground hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
+                {/* Password */}
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Password</label>
+                  <div className="relative mt-1.5">
+                    <input
+                      type={showCreatePw ? "text" : "password"}
+                      value={createForm.password}
+                      onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                      placeholder="Min 8 characters"
+                      className="w-full pr-10 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePw(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showCreatePw ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Plan — agency only */}
+                {createForm.account_type === "agency" && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Plan</label>
+                    <select
+                      value={createForm.plan}
+                      onChange={e => setCreateForm(f => ({ ...f, plan: e.target.value }))}
+                      className="w-full mt-1.5 px-3.5 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-200 bg-white transition-all"
+                    >
+                      {Object.entries(PLAN_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Error */}
+                {createError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
+                    {createError}
+                  </p>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => { setCreateStep(1); setCreateError(null); }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 text-sm rounded-xl border border-border text-muted-foreground hover:bg-gray-50 transition-colors"
+                  >
+                    <ChevronLeft size={14} /> Back
+                  </button>
+                  <button
+                    onClick={createAgency}
+                    disabled={createSaving}
+                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{ background: AMBER }}
+                  >
+                    {createSaving ? "Creating…" : createForm.account_type === "agency" ? "Create Agency" : "Create Individual"}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
