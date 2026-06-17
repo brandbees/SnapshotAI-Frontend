@@ -10,6 +10,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "BrandBees SnapshotAI",
   description: "Agency site monitoring and reporting dashboard",
+  icons: {
+    icon: [{ url: "/Brandbees-sas-x512.png", type: "image/png" }],
+    shortcut: "/Brandbees-sas-x512.png",
+    apple: [{ url: "/Brandbees-sas-x512.png", sizes: "512x512" }],
+  },
 };
 
 export default function RootLayout({

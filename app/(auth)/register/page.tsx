@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw, Wand2, Building2, User } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw, Wand2, Building2, User } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
@@ -445,12 +445,8 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-md"
-            style={{ background: "var(--accent)" }}
-          >
-            <Camera size={22} className="text-white" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/Brandbees-sas-x512.png" alt="BrandBees" className="w-14 h-14 object-contain mb-4" />
           <h1 className="text-2xl font-bold text-foreground">{headings[phase].title}</h1>
           <p className="text-sm text-muted-foreground mt-1 text-center">{headings[phase].sub}</p>
         </div>

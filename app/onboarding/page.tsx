@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Check, Copy, Loader2, ArrowRight, SkipForward, Globe, LayoutDashboard, AlertCircle, Download } from "lucide-react";
+import { Check, Copy, Loader2, ArrowRight, SkipForward, Globe, LayoutDashboard, AlertCircle, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/api";
@@ -16,12 +16,8 @@ const STEPS = ["Welcome", "Add site", "Install plugin", "First scan"];
 function StepWelcome({ onNext, isIndividual }: { onNext: () => void; isIndividual: boolean }) {
   return (
     <div className="flex flex-col items-center text-center gap-6 max-w-md mx-auto">
-      <div
-        className="w-16 h-16 rounded-3xl flex items-center justify-center shadow-lg"
-        style={{ background: "var(--accent)" }}
-      >
-        <Camera size={28} className="text-white" />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/Brandbees-sas-x512.png" alt="BrandBees" className="w-16 h-16 object-contain" />
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Welcome to BrandBees SnapshotAI
@@ -509,12 +505,8 @@ export default function OnboardingPage() {
     >
       {/* Header */}
       <header className="h-14 border-b border-border bg-surface/80 backdrop-blur-sm flex items-center px-6 gap-3 shrink-0">
-        <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{ background: "var(--accent)" }}
-        >
-          <Camera size={14} className="text-white" />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/Brandbees-sas-x512.png" alt="BrandBees" className="w-7 h-7 object-contain" />
         <span className="text-sm font-semibold text-foreground">BrandBees SnapshotAI</span>
       </header>
 

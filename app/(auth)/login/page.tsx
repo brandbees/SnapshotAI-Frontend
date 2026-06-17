@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Camera, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
@@ -103,12 +103,8 @@ function LoginContent() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={brandName} className="h-12 w-auto object-contain mb-4" />
           ) : (
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-md"
-              style={{ background: "var(--accent)" }}
-            >
-              <Camera size={22} className="text-white" />
-            </div>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/Brandbees-sas-x512.png" alt="BrandBees" className="w-14 h-14 object-contain mb-4" />
           )}
           <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
           <p className="text-sm text-muted-foreground mt-1">to {brandName}</p>
