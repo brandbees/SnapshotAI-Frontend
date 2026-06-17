@@ -761,9 +761,18 @@ function TeamTab() {
   const [loading, setLoading]     = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteEmailError, setInviteEmailError] = useState("");
   const [inviteName, setInviteName]   = useState("");
   const [inviteRole, setInviteRole]   = useState<Exclude<TeamRole, "owner">>("analyst");
   const [inviting, setInviting]       = useState(false);
+
+  function validateInviteEmail(v: string) {
+    if (v && !isValidEmail(v)) {
+      setInviteEmailError("Please enter a valid email address.");
+    } else {
+      setInviteEmailError("");
+    }
+  }
 
   const canManage = roleLoading ? true : roleCanDo("manage_team");
 
@@ -807,7 +816,7 @@ function TeamTab() {
   const atSeatLimit = data ? data.seats_used >= data.seats_limit : false;
 
   async function handleInvite() {
-    if (!inviteEmail || !isValidEmail(inviteEmail)) { toast.error("Please enter a valid email address."); return; }
+    if (!inviteEmail || !isValidEmail(inviteEmail)) { setInviteEmailError("Please enter a valid email address."); return; }
     setInviting(true);
     try {
       const { data: res } = await api.post<{ member: TeamMember }>("/team/invite", { email: inviteEmail, name: inviteName || undefined, role: inviteRole });
@@ -874,7 +883,15 @@ function TeamTab() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Email address *</label>
-              <Input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colleague@example.com" />
+              <Input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => { setInviteEmail(e.target.value); if (inviteEmailError) validateInviteEmail(e.target.value); }}
+                onBlur={(e) => validateInviteEmail(e.target.value)}
+                placeholder="colleague@example.com"
+                className={inviteEmailError ? "border-red-400 focus:ring-red-400" : ""}
+              />
+              {inviteEmailError && <p className="text-xs text-red-600 mt-1">{inviteEmailError}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Name (optional)</label>
@@ -893,7 +910,7 @@ function TeamTab() {
           </div>
           <div className="flex gap-3 pt-1">
             <Button variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
-            <Button onClick={handleInvite} loading={inviting} disabled={!inviteEmail}>Send invite</Button>
+            <Button onClick={handleInvite} loading={inviting} disabled={!inviteEmail || !!inviteEmailError}>Send invite</Button>
           </div>
         </div>
       )}

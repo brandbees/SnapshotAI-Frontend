@@ -27,8 +27,17 @@ function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function validateEmail(v: string) {
+    if (v && !isValidEmail(v)) {
+      setEmailError("Please enter a valid email address.");
+    } else {
+      setEmailError("");
+    }
+  }
 
   // Start null so SSR and first client render match — populated in useEffect (client-only)
   const [branding, setBranding] = useState<StoredBranding | null>(null);
@@ -59,7 +68,7 @@ function LoginContent() {
     e.preventDefault();
     setError("");
     if (!isValidEmail(email)) {
-      setError("Please enter a valid email address.");
+      setEmailError("Please enter a valid email address.");
       return;
     }
     setLoading(true);
@@ -113,10 +122,12 @@ function LoginContent() {
                 required
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-surface focus:border-transparent transition-all"
+                onChange={(e) => { setEmail(e.target.value); if (emailError) validateEmail(e.target.value); }}
+                onBlur={(e) => validateEmail(e.target.value)}
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:bg-surface transition-all ${emailError ? "border-red-400 focus:ring-red-400" : "border-border focus:ring-ring focus:border-ring"}`}
                 placeholder="you@agency.com"
               />
+              {emailError && <p className="text-xs text-red-600">{emailError}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -152,6 +163,7 @@ function LoginContent() {
             <Button
               type="submit"
               loading={loading}
+              disabled={!!emailError}
               className="w-full h-11 rounded-xl text-sm font-bold mt-1"
             >
               Sign in

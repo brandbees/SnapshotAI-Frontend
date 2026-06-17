@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw, Wand2 } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { cn, isValidEmail } from "@/lib/utils";
+
+const CF_SITE_KEY = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY ?? "";
 
 // ── Password generator ────────────────────────────────────────────────────────
 
@@ -59,6 +62,7 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
   const [emailError, setEmailError]   = useState("");
   const [error, setError]             = useState("");
   const [loading, setLoading]         = useState(false);
+  const [cfToken, setCfToken]         = useState<string | null>(null);
 
   const strength = getStrength(password);
 
@@ -83,7 +87,7 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
     }
     setLoading(true);
     try {
-      const result = await register(agencyName, email, password);
+      const result = await register(agencyName, email, password, undefined, cfToken);
       if (result.pending) onSuccess(result.email);
     } catch (err: unknown) {
       const msg =
@@ -212,10 +216,20 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
         </div>
       )}
 
+      {CF_SITE_KEY && (
+        <Turnstile
+          siteKey={CF_SITE_KEY}
+          onSuccess={setCfToken}
+          onExpire={() => setCfToken(null)}
+          onError={() => setCfToken(null)}
+          options={{ theme: "light", size: "flexible" }}
+        />
+      )}
+
       <Button
         type="submit"
         loading={loading}
-        disabled={!!emailError}
+        disabled={!!emailError || (!!CF_SITE_KEY && !cfToken)}
         className="w-full h-11 rounded-xl text-sm font-bold mt-1"
       >
         Continue
