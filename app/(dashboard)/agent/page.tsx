@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Bot, Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
-         Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink } from "lucide-react";
+         Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { mapSite, type RawSite } from "@/lib/mappers";
@@ -17,10 +17,18 @@ const SUGGESTIONS_GLOBAL = [
 ];
 
 const SUGGESTIONS_SITE = [
-  { q: "What's the most urgent thing to fix?",        icon: "🚨" },
-  { q: "Why is my security score low?",               icon: "🔐" },
-  { q: "Run an audit on this site",                   icon: "▶️" },
-  { q: "Send me a report for this site",              icon: "📄" },
+  { q: "What's the most urgent thing to fix?",              icon: "🚨" },
+  { q: "Is XML-RPC enabled? Is WP_DEBUG on?",               icon: "🔐" },
+  { q: "What are my largest autoloaded options?",           icon: "🗄️" },
+  { q: "Show me the last 100 lines of my error log",        icon: "📋" },
+  { q: "What are my biggest media files?",                  icon: "🖼️" },
+  { q: "Check my file and folder permissions",              icon: "🔒" },
+  { q: "How many cron events do I have scheduled?",         icon: "⏰" },
+  { q: "Show my WooCommerce orders and revenue",            icon: "🛒" },
+  { q: "Do I have orphaned post meta rows?",                icon: "🗑️" },
+  { q: "What plugins have known vulnerabilities?",          icon: "⚠️" },
+  { q: "Do I have too many post revisions?",                icon: "📝" },
+  { q: "Run an audit on this site",                         icon: "▶️" },
 ];
 
 interface TokenState {
@@ -36,13 +44,26 @@ interface ToolCall {
 }
 
 const TOOL_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  run_audit:       { label: "Audit triggered",        icon: Play,        color: "#6366f1" },
-  send_report:     { label: "Report queued",          icon: FileText,    color: "#0ea5e9" },
-  update_schedule: { label: "Schedule updated",       icon: Calendar,    color: "#10b981" },
-  list_sites:      { label: "Sites fetched",          icon: List,        color: "#8b5cf6" },
-  get_scores:      { label: "Scores retrieved",       icon: Zap,         color: "#f59e0b" },
+  run_audit:          { label: "Audit triggered",        icon: Play,        color: "#6366f1" },
+  send_report:        { label: "Report queued",          icon: FileText,    color: "#0ea5e9" },
+  update_schedule:    { label: "Schedule updated",       icon: Calendar,    color: "#10b981" },
+  list_sites:         { label: "Sites fetched",          icon: List,        color: "#8b5cf6" },
+  get_scores:         { label: "Scores retrieved",       icon: Zap,         color: "#f59e0b" },
   get_malware_status: { label: "Malware status checked", icon: ShieldCheck, color: "#ef4444" },
+  get_live_site_data: { label: "Live data fetched",      icon: Database,    color: "#0891b2" },
 };
+
+// Strip artifacts that Llama models sometimes emit as literal text:
+//  - <function=... /> / <function>...</function> syntax
+//  - Raw JSON lines that are tool call arguments (e.g. {"query":"...","site_id":"..."})
+function sanitizeMessage(text: string): string {
+  return text
+    .replace(/<function[^>]*>[\s\S]*?<\/function>/g, '')
+    .replace(/<function[^>]*\/>/g, '')
+    .replace(/\[TOOL_CALL\][^\n]*/g, '')
+    .replace(/^\s*\{"query":"[^"]*","site_id":"[^"]*"\}\s*$/gm, '')
+    .trim();
+}
 
 function ToolCallCard({ call }: { call: ToolCall }) {
   const meta = TOOL_META[call.name] ?? { label: call.name, icon: Zap, color: "#6366f1" };
@@ -104,6 +125,8 @@ export default function AgentPage() {
   const [error, setError]               = useState<string | null>(null);
   const [copied, setCopied]             = useState(false);
   const [tokenState, setTokenState]     = useState<TokenState | null>(null);
+  const [showSiteModal, setShowSiteModal] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
@@ -127,13 +150,11 @@ export default function AgentPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const send = useCallback(async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || loading) return;
-
-    const msgIndex = messages.length + 1; // index of the upcoming assistant message
-    setMessages(prev => [...prev, { role: "user", content: trimmed, created_at: new Date().toISOString() }]);
-    setInput("");
+  const sendWithSite = useCallback(async (text: string, siteId: string, addUserMsg: boolean) => {
+    const msgIndex = messages.length + (addUserMsg ? 1 : 0);
+    if (addUserMsg) {
+      setMessages(prev => [...prev, { role: "user", content: text, created_at: new Date().toISOString() }]);
+    }
     setLoading(true);
     setError(null);
 
@@ -144,11 +165,19 @@ export default function AgentPage() {
         tokens_used?: number;
         tokens_limit?: number;
         tokens_extra?: number;
+        needs_site_selection?: boolean;
       }>("/agent/chat", {
-        message: trimmed,
-        site_id: selectedSiteId || undefined,
+        message: text,
+        site_id: siteId || undefined,
         history: messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
       });
+
+      if (data.needs_site_selection) {
+        setPendingMessage(text);
+        setShowSiteModal(true);
+        setLoading(false);
+        return;
+      }
 
       setMessages(prev => [...prev, { role: "assistant", content: data.reply, created_at: new Date().toISOString() }]);
 
@@ -172,7 +201,24 @@ export default function AgentPage() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [loading, messages, selectedSiteId]);
+  }, [messages]);
+
+  const send = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || loading) return;
+    setInput("");
+    await sendWithSite(trimmed, selectedSiteId, true);
+  }, [loading, selectedSiteId, sendWithSite]);
+
+  const handleSiteModalSelect = useCallback(async (siteId: string) => {
+    setShowSiteModal(false);
+    setSelectedSiteId(siteId);
+    const msg = pendingMessage;
+    setPendingMessage("");
+    if (msg) {
+      await sendWithSite(msg, siteId, false);
+    }
+  }, [pendingMessage, sendWithSite]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
@@ -352,7 +398,7 @@ export default function AgentPage() {
                       }`}
                       style={msg.role === "user" ? { background: "var(--accent)" } : undefined}
                     >
-                      {msg.content}
+                      {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
                     </div>
                     {/* Tool call cards — shown below the assistant message */}
                     {msg.role === "assistant" && toolCallsMap[i] && toolCallsMap[i].map((tc, j) => (
@@ -396,6 +442,52 @@ export default function AgentPage() {
           )}
         </div>
       </div>}
+
+      {/* ── Choose Site modal ────────────────────────────────────────────────── */}
+      {showSiteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setShowSiteModal(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)" }}>
+                  <Database size={13} style={{ color: "var(--accent)" }} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground leading-none">Choose a site</h2>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Which site are you asking about?</p>
+                </div>
+              </div>
+              <button onClick={() => setShowSiteModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="p-3 max-h-72 overflow-y-auto space-y-1">
+              {sites.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No sites connected yet.</p>
+              )}
+              {sites.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => handleSiteModalSelect(s.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0 text-[10px] font-bold text-muted-foreground">
+                    {(s.name || s.url).charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{s.name || s.url}</p>
+                    {s.name && <p className="text-[11px] text-muted-foreground truncate">{s.url}</p>}
+                  </div>
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.plugin_connected ? "bg-green-500" : "bg-gray-300"}`} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Input bar ────────────────────────────────────────────────────────── */}
       {!isFreePlan && <div className="shrink-0 bg-white border-t border-border px-6 py-4">
