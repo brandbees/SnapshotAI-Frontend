@@ -21,7 +21,6 @@ interface OnboardingChecklistProps {
 
 function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
   const hasPlugin   = sites.some((s) => s.plugin_connected);
-  const hasClient   = false; // derived below via API — starts optimistic
   const hasBranding = !!(agency.logo_url || agency.brand_name);
   const hasSchedule = sites.some((s) => s.scan_schedule !== "manual");
 
@@ -37,8 +36,8 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
       id: "install_plugin",
       label: "Connect the WordPress plugin",
       done: hasPlugin,
-      href: "/sites",
-      hrefLabel: "View plugin instructions",
+      href: "/connect",
+      hrefLabel: "Connect plugin",
     },
     {
       id: "white_label",

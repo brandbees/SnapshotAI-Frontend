@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Check, Copy, Loader2, ArrowRight, SkipForward, Globe, LayoutDashboard, AlertCircle } from "lucide-react";
+import { Camera, Check, Copy, Loader2, ArrowRight, SkipForward, Globe, LayoutDashboard, AlertCircle, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/constants";
 
 const STEPS = ["Welcome", "Add site", "Install plugin", "First scan"];
 
@@ -213,12 +214,23 @@ function StepInstallPlugin({
       </div>
 
       <div className="space-y-3">
+        {/* Plugin download */}
+        <a
+          href={`${API_BASE_URL}/plugin/download`}
+          download="brandbees-snapshot.zip"
+          className="flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border-2 text-sm font-semibold hover:opacity-90 transition-opacity"
+          style={{ borderColor: "var(--accent)", color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}
+        >
+          <span>Download BrandBees Plugin (.zip)</span>
+          <Download size={16} />
+        </a>
+
         {/* Step instructions */}
         <div className="bg-surface border border-border rounded-2xl p-5 space-y-3">
           {[
-            "In WordPress admin go to Plugins → Add New",
-            "Search for BrandBees SnapshotAI and install it",
-            "Activate it, then go to SnapshotAI → Settings",
+            "In WordPress admin go to Plugins → Add New → Upload Plugin",
+            "Upload the downloaded zip file and click Install Now",
+            "Activate the plugin, then go to Settings → BrandBees Snapshot",
             "Paste your site token below and click Save & Connect",
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3 text-sm">
@@ -482,25 +494,29 @@ export default function OnboardingPage() {
       </div>
 
       {/* Step labels */}
-      <div className="flex justify-center gap-0 pt-6 px-6">
+      <div className="flex justify-center gap-0 pt-6 px-4">
         {STEPS.map((label, i) => (
           <div key={label} className="flex items-center">
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-1.5">
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   i < step
-                    ? "bg-green-500 text-white"
+                    ? "bg-green-500 text-white shadow-sm"
                     : i === step
-                    ? "text-white"
+                    ? "text-white shadow-md scale-110"
                     : "bg-muted text-muted-foreground border border-border"
                 }`}
                 style={i === step ? { background: "var(--accent)" } : {}}
               >
-                {i < step ? <Check size={10} /> : i + 1}
+                {i < step ? <Check size={12} /> : i + 1}
               </div>
               <span
-                className={`text-[10px] font-medium hidden sm:block ${
-                  i === step ? "text-foreground" : "text-muted-foreground"
+                className={`text-xs leading-tight text-center max-w-[64px] ${
+                  i === step
+                    ? "font-semibold text-foreground"
+                    : i < step
+                    ? "font-medium text-green-600"
+                    : "font-medium text-muted-foreground"
                 }`}
               >
                 {label}
@@ -508,7 +524,7 @@ export default function OnboardingPage() {
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`w-12 sm:w-20 h-px mx-1 mb-5 transition-colors ${
+                className={`w-10 sm:w-16 h-px mx-2 mb-6 transition-colors ${
                   i < step ? "bg-green-400" : "bg-border"
                 }`}
               />
