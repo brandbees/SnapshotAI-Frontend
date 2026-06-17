@@ -26,6 +26,7 @@ interface Agency {
   stripe_customer_id: string | null; stripe_subscription_id: string | null;
   brand_name: string | null; trial_ends_at: string | null; created_at: string;
   is_suspended: boolean;
+  account_type: "agency" | "individual";
   // Usage
   ai_tokens_used:     number;
   ai_tokens_extra:    number;
@@ -128,6 +129,10 @@ export default function AgencyDetailPage() {
   const [newPlan,  setNewPlan]  = useState("");
   const [trialDays, setTrialDays] = useState("30");
 
+  // Account type edit
+  const [typeEdit,   setTypeEdit]   = useState(false);
+  const [newAccType, setNewAccType] = useState<"agency" | "individual">("agency");
+
   // Delete
   const [showDelete,  setShowDelete]  = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
@@ -182,6 +187,7 @@ export default function AgencyDetailPage() {
       setAudits(data.audits);
       setTrend(data.audit_trend);
       setNewPlan(data.agency.plan);
+      setNewAccType(data.agency.account_type ?? "agency");
     } catch { /* interceptor */ }
     finally { setLoading(false); }
   }, [id]);
@@ -198,6 +204,17 @@ export default function AgencyDetailPage() {
       await load(); setPlanEdit(false);
       toast.success(`Plan updated to ${planLabel(newPlan)}.`);
     } catch { toast.error("Failed to update plan."); }
+    finally { setSaving(false); }
+  }
+
+  async function changeAccountType() {
+    if (!agency || newAccType === agency.account_type) { setTypeEdit(false); return; }
+    setSaving(true);
+    try {
+      await masterApi.patch(`/master/agencies/${id}`, { account_type: newAccType });
+      await load(); setTypeEdit(false);
+      toast.success(`Account type changed to ${newAccType}.`);
+    } catch { toast.error("Failed to update account type."); }
     finally { setSaving(false); }
   }
 
@@ -457,6 +474,9 @@ export default function AgencyDetailPage() {
                     style={{ background: `${planColor(agency.plan)}15`, color: planColor(agency.plan) }}>
                     {planLabel(agency.plan)}
                   </span>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 capitalize">
+                    {agency.account_type ?? "agency"}
+                  </span>
                   {isPaid && (
                     <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Paid
@@ -550,6 +570,39 @@ export default function AgencyDetailPage() {
                       {planLabel(agency.plan)}
                     </span>
                     <button onClick={() => setPlanEdit(true)}
+                      className="px-2.5 py-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors border-l border-border">
+                      <Pencil size={11} />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Account Type pill */}
+              <div className="inline-flex items-center gap-0 rounded-xl border border-border bg-gray-50 overflow-hidden">
+                <span className="text-[11px] font-semibold text-muted-foreground px-3 py-2 border-r border-border bg-white">Type</span>
+                {typeEdit ? (
+                  <>
+                    <select value={newAccType} onChange={e => setNewAccType(e.target.value as "agency" | "individual")}
+                      className="text-xs font-semibold px-2.5 py-2 bg-gray-50 border-none outline-none cursor-pointer text-blue-600">
+                      <option value="agency">Agency</option>
+                      <option value="individual">Individual</option>
+                    </select>
+                    <button onClick={changeAccountType} disabled={saving}
+                      className="text-[11px] font-bold px-3 py-2 text-white border-l border-amber-400 disabled:opacity-60"
+                      style={{ background: AMBER }}>
+                      {saving ? "…" : "Save"}
+                    </button>
+                    <button onClick={() => setTypeEdit(false)}
+                      className="px-2.5 py-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors">
+                      <X size={12} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs font-bold px-3 py-2 text-blue-600 capitalize">
+                      {agency.account_type ?? "agency"}
+                    </span>
+                    <button onClick={() => setTypeEdit(true)}
                       className="px-2.5 py-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors border-l border-border">
                       <Pencil size={11} />
                     </button>

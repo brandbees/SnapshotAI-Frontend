@@ -26,6 +26,7 @@ export interface Agency {
   ai_tokens_reset_at?: string | null;
   storage_used_bytes?: number;
   storage_extra_bytes?: number;
+  account_type?: "agency" | "individual";
 }
 
 export interface WooGateway {

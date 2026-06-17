@@ -13,7 +13,7 @@ const STEPS = ["Welcome", "Add site", "Install plugin", "First scan"];
 
 // ── Step 1 — Welcome ──────────────────────────────────────────────────────────
 
-function StepWelcome({ onNext }: { onNext: () => void }) {
+function StepWelcome({ onNext, isIndividual }: { onNext: () => void; isIndividual: boolean }) {
   return (
     <div className="flex flex-col items-center text-center gap-6 max-w-md mx-auto">
       <div
@@ -26,13 +26,28 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Welcome to BrandBees SnapshotAI
         </h1>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Monitor your clients&apos; WordPress sites, catch threats early, and
-          deliver beautiful audit reports — all from one dashboard.
-        </p>
-        <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
-          Let&apos;s get your first site set up. It only takes a few minutes.
-        </p>
+        {isIndividual ? (
+          <>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Keep your WordPress site healthy, secure, and fast — without
+              needing to be a developer. We&apos;ll monitor your site around the
+              clock and alert you before small issues become big problems.
+            </p>
+            <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
+              Let&apos;s connect your site now. It only takes a few minutes.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Monitor your clients&apos; WordPress sites, catch threats early, and
+              deliver beautiful audit reports — all from one dashboard.
+            </p>
+            <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
+              Let&apos;s get your first site set up. It only takes a few minutes.
+            </p>
+          </>
+        )}
       </div>
       <Button
         onClick={onNext}
@@ -53,7 +68,7 @@ interface NewSite {
   url: string;
 }
 
-function StepAddSite({ onNext }: { onNext: (site: NewSite) => void }) {
+function StepAddSite({ onNext, isIndividual }: { onNext: (site: NewSite) => void; isIndividual: boolean }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
@@ -88,16 +103,20 @@ function StepAddSite({ onNext }: { onNext: (site: NewSite) => void }) {
         >
           <Globe size={20} style={{ color: "var(--accent)" }} />
         </div>
-        <h2 className="text-xl font-bold text-foreground">Add your first site</h2>
+        <h2 className="text-xl font-bold text-foreground">
+          {isIndividual ? "Add your site" : "Add your first client site"}
+        </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Enter the WordPress site you want to monitor.
+          {isIndividual
+            ? "Enter your WordPress site URL so we can start monitoring it."
+            : "Enter the WordPress site you want to monitor for your client."}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
-            Site name
+            {isIndividual ? "Site name" : "Client site name"}
           </label>
           <input
             type="text"
@@ -105,7 +124,7 @@ function StepAddSite({ onNext }: { onNext: (site: NewSite) => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className={inputCls}
-            placeholder="Acme Corp Website"
+            placeholder={isIndividual ? "My Business Website" : "Acme Corp Website"}
           />
         </div>
         <div className="space-y-1.5">
@@ -118,7 +137,7 @@ function StepAddSite({ onNext }: { onNext: (site: NewSite) => void }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className={inputCls}
-            placeholder="https://acme.com"
+            placeholder={isIndividual ? "https://mybusiness.com" : "https://acme.com"}
           />
         </div>
 
@@ -133,7 +152,7 @@ function StepAddSite({ onNext }: { onNext: (site: NewSite) => void }) {
           loading={loading}
           className="w-full h-11 rounded-xl font-bold text-sm mt-1"
         >
-          Add site
+          {isIndividual ? "Add my site" : "Add site"}
         </Button>
       </form>
     </div>
@@ -146,10 +165,12 @@ function StepInstallPlugin({
   site,
   onConnected,
   onSkip,
+  isIndividual,
 }: {
   site: NewSite;
   onConnected: () => void;
   onSkip: () => void;
+  isIndividual: boolean;
 }) {
   const [copied, setCopied]         = useState(false);
   const [status, setStatus]         = useState<"waiting" | "checking" | "connected">("waiting");
@@ -208,8 +229,10 @@ function StepInstallPlugin({
       <div className="text-center mb-6">
         <h2 className="text-xl font-bold text-foreground">Install the plugin</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Install and activate the BrandBees plugin on{" "}
-          <span className="font-medium text-foreground">{site.name}</span>, then paste your token.
+          {isIndividual
+            ? <>Install the BrandBees plugin on your site <span className="font-medium text-foreground">{site.name}</span> — no coding required.</>
+            : <>Install and activate the BrandBees plugin on <span className="font-medium text-foreground">{site.name}</span>, then paste your token.</>
+          }
         </p>
       </div>
 
@@ -227,12 +250,18 @@ function StepInstallPlugin({
 
         {/* Step instructions */}
         <div className="bg-surface border border-border rounded-2xl p-5 space-y-3">
-          {[
+          {(isIndividual ? [
+            "Log in to your WordPress dashboard (yoursite.com/wp-admin)",
+            "Go to Plugins → Add New → Upload Plugin",
+            "Upload the downloaded zip file and click Install Now",
+            "Activate the plugin, then go to Settings → BrandBees Snapshot",
+            "Paste your site token and click Save & Connect — that's it!",
+          ] : [
             "In WordPress admin go to Plugins → Add New → Upload Plugin",
             "Upload the downloaded zip file and click Install Now",
             "Activate the plugin, then go to Settings → BrandBees Snapshot",
             "Paste your site token below and click Save & Connect",
-          ].map((step, i) => (
+          ]).map((step, i) => (
             <div key={i} className="flex items-start gap-3 text-sm">
               <span
                 className="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5 text-white"
@@ -291,7 +320,10 @@ function StepInstallPlugin({
           onClick={onSkip}
           className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
         >
-          <SkipForward size={13} /> Skip for now — I&apos;ll connect later
+          <SkipForward size={13} />
+          {isIndividual
+            ? "Skip for now — I'll do this later"
+            : "Skip for now — I'll connect later"}
         </button>
       </div>
     </div>
@@ -447,9 +479,10 @@ function StepFirstScan({
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { updateAgency } = useAuth();
+  const { agency, updateAgency } = useAuth();
   const [step, setStep] = useState(0);
   const [site, setSite] = useState<NewSite | null>(null);
+  const isIndividual = agency?.account_type === "individual";
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -536,9 +569,10 @@ export default function OnboardingPage() {
       {/* Content */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-lg bg-surface border border-border rounded-2xl p-8 shadow-[0_4px_32px_0_rgb(0_0_0/0.08)]">
-          {step === 0 && <StepWelcome onNext={() => setStep(1)} />}
+          {step === 0 && <StepWelcome onNext={() => setStep(1)} isIndividual={isIndividual} />}
           {step === 1 && (
             <StepAddSite
+              isIndividual={isIndividual}
               onNext={(newSite) => {
                 setSite(newSite);
                 setStep(2);
@@ -548,6 +582,7 @@ export default function OnboardingPage() {
           {step === 2 && site && (
             <StepInstallPlugin
               site={site}
+              isIndividual={isIndividual}
               onConnected={() => setStep(3)}
               onSkip={markComplete}
             />

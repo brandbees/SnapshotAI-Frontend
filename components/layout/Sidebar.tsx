@@ -37,9 +37,9 @@ const ALL_NAV = [
   { href: "/security",      label: "Security",      icon: Shield,          clientVisible: true  },
   { href: "/malware",       label: "Malware",       icon: Bug,             clientVisible: true  },
   { href: "/uptime",        label: "Uptime",        icon: Activity,        clientVisible: true  },
-  { href: "/reports",       label: "Reports",       icon: FileText,        clientVisible: false },
-  { href: "/clients",       label: "Clients",       icon: Users,           clientVisible: false },
-  { href: "/agent",         label: "AI Agent",      icon: Bot,             clientVisible: false },
+  { href: "/reports",       label: "Reports",       icon: FileText,        clientVisible: false, agencyOnly: false },
+  { href: "/clients",       label: "Clients",       icon: Users,           clientVisible: false, agencyOnly: true  },
+  { href: "/agent",         label: "AI Agent",      icon: Bot,             clientVisible: false, agencyOnly: false },
 ];
 
 const bottomItems = [
@@ -64,7 +64,11 @@ export function Sidebar() {
       .catch(() => {});
   }, [isClientPortal]);
 
-  const navItems = ALL_NAV.filter(item => !isClientPortal || item.clientVisible);
+  const isIndividual = agency?.account_type === "individual";
+  const navItems = ALL_NAV.filter(item =>
+    (!isClientPortal || item.clientVisible) &&
+    (!isIndividual || !item.agencyOnly)
+  );
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");

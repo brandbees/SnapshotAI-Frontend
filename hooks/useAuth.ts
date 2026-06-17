@@ -28,7 +28,8 @@ export function useAuth() {
     email: string,
     password: string,
     coupon?: string,
-    cfTurnstileToken?: string | null
+    cfTurnstileToken?: string | null,
+    accountType?: "agency" | "individual"
   ): Promise<{ pending: boolean; email: string }> {
     const { data } = await api.post<{ pending: boolean; email: string }>("/auth/register", {
       agency_name: agencyName,
@@ -36,6 +37,7 @@ export function useAuth() {
       password,
       coupon_code: coupon,
       cf_turnstile_token: cfTurnstileToken,
+      account_type: accountType ?? "agency",
     });
     return data;
   }

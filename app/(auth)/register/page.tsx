@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw, Wand2 } from "lucide-react";
+import { Camera, Eye, EyeOff, CheckCircle2, Circle, ArrowLeft, RefreshCw, Wand2, Building2, User } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { cn, isValidEmail } from "@/lib/utils";
+
+type AccountType = "agency" | "individual";
 
 const CF_SITE_KEY = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY ?? "";
 
@@ -45,13 +47,56 @@ function getStrength(password: string) {
 const inputCls =
   "w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:bg-surface focus:border-ring transition-all";
 
+// ── Phase 0 — Account type selection ─────────────────────────────────────────
+
+function TypeSelectionStep({ onSelect }: { onSelect: (type: AccountType) => void }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground text-center">Choose the option that best describes you</p>
+      <button
+        type="button"
+        onClick={() => onSelect("agency")}
+        className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-border hover:border-accent hover:bg-accent/5 transition-all text-left group"
+      >
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-accent/10 group-hover:bg-accent/20 transition-colors mt-0.5">
+          <Building2 size={18} style={{ color: "var(--accent)" }} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">Agency / Freelancer</p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+            You manage websites for multiple clients and need reporting, team access, and client portals.
+          </p>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSelect("individual")}
+        className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-border hover:border-accent hover:bg-accent/5 transition-all text-left group"
+      >
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-accent/10 group-hover:bg-accent/20 transition-colors mt-0.5">
+          <User size={18} style={{ color: "var(--accent)" }} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">Individual / Business Owner</p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+            You own or manage your own website and want simple monitoring, audits, and fix recommendations.
+          </p>
+        </div>
+      </button>
+    </div>
+  );
+}
+
 // ── Phase 1 — Registration form ───────────────────────────────────────────────
 
 interface Phase1Props {
   onSuccess: (email: string) => void;
+  accountType: AccountType;
+  onBack: () => void;
 }
 
-function RegistrationForm({ onSuccess }: Phase1Props) {
+function RegistrationForm({ onSuccess, accountType, onBack }: Phase1Props) {
   const { register } = useAuth();
   const [agencyName, setAgencyName]   = useState("");
   const [email, setEmail]             = useState("");
@@ -87,7 +132,7 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
     }
     setLoading(true);
     try {
-      const result = await register(agencyName, email, password, undefined, cfToken);
+      const result = await register(agencyName, email, password, undefined, cfToken, accountType);
       if (result.pending) onSuccess(result.email);
     } catch (err: unknown) {
       const msg =
@@ -101,9 +146,19 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center gap-2 pb-1">
+        <button type="button" onClick={onBack} className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors">
+          <ArrowLeft size={14} />
+        </button>
+        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${accountType === "agency" ? "bg-accent/10 text-accent" : "bg-emerald-50 text-emerald-700"}`}>
+          {accountType === "agency" ? <Building2 size={11} /> : <User size={11} />}
+          {accountType === "agency" ? "Agency / Freelancer" : "Individual / Business Owner"}
+        </span>
+      </div>
+
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-foreground uppercase tracking-wide">
-          Agency / business name
+          {accountType === "agency" ? "Agency / business name" : "Your name or business name"}
         </label>
         <input
           type="text"
@@ -111,7 +166,7 @@ function RegistrationForm({ onSuccess }: Phase1Props) {
           value={agencyName}
           onChange={(e) => setAgencyName(e.target.value)}
           className={inputCls}
-          placeholder="Acme Digital Agency"
+          placeholder={accountType === "agency" ? "Acme Digital Agency" : "My Business"}
         />
       </div>
 
@@ -366,14 +421,21 @@ function VerifyEmailForm({ email, onBack }: Phase2Props) {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [phase, setPhase]         = useState<"form" | "verify">("form");
-  const [pendingEmail, setPending] = useState("");
+  const [phase, setPhase]               = useState<"type" | "form" | "verify">("type");
+  const [accountType, setAccountType]   = useState<AccountType>("agency");
+  const [pendingEmail, setPending]      = useState("");
 
   useEffect(() => {
     import("@/lib/auth").then(({ isLoggedIn }) => {
       if (isLoggedIn()) router.replace("/dashboard");
     });
   }, [router]);
+
+  const headings = {
+    type:   { title: "Create account",     sub: "Tell us a bit about how you'll use the platform" },
+    form:   { title: "Create account",     sub: accountType === "agency" ? "Start monitoring your clients' WordPress sites" : "Start monitoring your WordPress site" },
+    verify: { title: "Check your email",   sub: "Enter the code we emailed you" },
+  };
 
   return (
     <div
@@ -389,33 +451,38 @@ export default function RegisterPage() {
           >
             <Camera size={22} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {phase === "form" ? "Create account" : "Check your email"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {phase === "form"
-              ? "Start monitoring your WordPress sites"
-              : "Enter the code we emailed you"}
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">{headings[phase].title}</h1>
+          <p className="text-sm text-muted-foreground mt-1 text-center">{headings[phase].sub}</p>
         </div>
 
         {/* Card */}
         <div className="bg-surface border border-border rounded-2xl p-7 shadow-[0_4px_24px_0_rgb(0_0_0/0.08)]">
-          {phase === "form" ? (
+          {phase === "type" && (
+            <TypeSelectionStep
+              onSelect={(type) => {
+                setAccountType(type);
+                setPhase("form");
+              }}
+            />
+          )}
+          {phase === "form" && (
             <RegistrationForm
+              accountType={accountType}
+              onBack={() => setPhase("type")}
               onSuccess={(email) => {
                 setPending(email);
                 setPhase("verify");
               }}
             />
-          ) : (
+          )}
+          {phase === "verify" && (
             <VerifyEmailForm
               email={pendingEmail}
               onBack={() => setPhase("form")}
             />
           )}
 
-          {phase === "form" && (
+          {phase !== "verify" && (
             <p className="text-sm text-center text-muted-foreground mt-6">
               Already have an account?{" "}
               <Link href="/login" className="font-semibold text-accent hover:underline">

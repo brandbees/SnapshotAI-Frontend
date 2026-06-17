@@ -23,8 +23,9 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
   const hasPlugin   = sites.some((s) => s.plugin_connected);
   const hasBranding = !!(agency.logo_url || agency.brand_name);
   const hasSchedule = sites.some((s) => s.scan_schedule !== "manual");
+  const isIndividual = agency.account_type === "individual";
 
-  return [
+  const items: ChecklistItem[] = [
     {
       id: "add_site",
       label: "Add your first site",
@@ -46,13 +47,19 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
       href: "/settings/white-label",
       hrefLabel: "Open branding settings",
     },
-    {
+  ];
+
+  if (!isIndividual) {
+    items.push({
       id: "add_client",
       label: "Add a client",
       done: false, // resolved async below
       href: "/clients",
       hrefLabel: "Go to Clients",
-    },
+    });
+  }
+
+  items.push(
     {
       id: "schedule_report",
       label: "Schedule a report",
@@ -62,12 +69,14 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
     },
     {
       id: "invite_team",
-      label: "Invite a team member",
+      label: isIndividual ? "Invite someone to help" : "Invite a team member",
       done: false, // resolved async below
       href: "/settings/team",
       hrefLabel: "Manage team",
-    },
-  ];
+    }
+  );
+
+  return items;
 }
 
 export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps) {
@@ -84,19 +93,29 @@ export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps)
 
   // Resolve async items (clients, team members)
   useEffect(() => {
+    const isIndividual = agency.account_type === "individual";
+
     async function fetchAsyncState() {
       try {
-        const [clientsRes, teamRes] = await Promise.all([
-          api.get<{ clients: unknown[] } | unknown[]>("/clients"),
+        const requests: Promise<{ data: unknown }>[] = [
           api.get<{ members: unknown[] } | unknown[]>("/team"),
-        ]);
+        ];
+        if (!isIndividual) {
+          requests.unshift(api.get<{ clients: unknown[] } | unknown[]>("/clients"));
+        }
 
-        const clients = Array.isArray(clientsRes.data)
-          ? clientsRes.data
-          : (clientsRes.data as { clients: unknown[] }).clients ?? [];
+        const results = await Promise.all(requests);
+        const teamRes = isIndividual ? results[0] : results[1];
+        const clientsRes = isIndividual ? null : results[0];
+
         const members = Array.isArray(teamRes.data)
           ? teamRes.data
           : (teamRes.data as { members: unknown[] }).members ?? [];
+        const clients = clientsRes
+          ? Array.isArray(clientsRes.data)
+            ? clientsRes.data
+            : (clientsRes.data as { clients: unknown[] }).clients ?? []
+          : [];
 
         setItems((prev) =>
           prev.map((item) => {
@@ -110,7 +129,7 @@ export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps)
       }
     }
     fetchAsyncState();
-  }, []);
+  }, [agency.account_type]);
 
   // Rebuild sync items when sites/agency changes
   useEffect(() => {
