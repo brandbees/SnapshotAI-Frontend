@@ -4,12 +4,15 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, Eye, EyeOff } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { getBranding } from "@/lib/auth";
 import { isValidEmail } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/constants";
 import type { StoredBranding } from "@/lib/auth";
+
+const CF_SITE_KEY = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY ?? "";
 
 export default function LoginPage() {
   return (
@@ -30,6 +33,7 @@ function LoginContent() {
   const [emailError, setEmailError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cfToken, setCfToken] = useState<string | null>(null);
 
   function validateEmail(v: string) {
     if (v && !isValidEmail(v)) {
@@ -73,7 +77,7 @@ function LoginContent() {
     }
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, cfToken);
       router.replace("/dashboard");
     } catch (err: unknown) {
       const msg =
@@ -160,10 +164,20 @@ function LoginContent() {
               </div>
             )}
 
+            {CF_SITE_KEY && (
+              <Turnstile
+                siteKey={CF_SITE_KEY}
+                onSuccess={setCfToken}
+                onExpire={() => setCfToken(null)}
+                onError={() => setCfToken(null)}
+                options={{ theme: "light", size: "flexible" }}
+              />
+            )}
+
             <Button
               type="submit"
               loading={loading}
-              disabled={!!emailError}
+              disabled={!!emailError || (!!CF_SITE_KEY && !cfToken)}
               className="w-full h-11 rounded-xl text-sm font-bold mt-1"
             >
               Sign in

@@ -14,10 +14,10 @@ export function useMasterAuth() {
 
   const isAuthenticated = isMasterLoggedIn();
 
-  async function login(email: string, password: string): Promise<void> {
+  async function login(email: string, password: string, cfTurnstileToken?: string | null): Promise<void> {
     const { data } = await masterApi.post<{ token: string }>(
       "/master/auth/login",
-      { email, password }
+      { email, password, cf_turnstile_token: cfTurnstileToken }
     );
     setMasterToken(data.token);
   }

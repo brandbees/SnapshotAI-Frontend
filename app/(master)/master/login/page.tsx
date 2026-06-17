@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Eye, EyeOff, Lock } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { useMasterAuth } from "@/hooks/useMasterAuth";
 import { isMasterLoggedIn } from "@/lib/masterAuth";
+
+const CF_SITE_KEY = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY ?? "";
 
 export default function MasterLoginPage() {
   const router = useRouter();
@@ -15,6 +18,7 @@ export default function MasterLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError]               = useState("");
   const [loading, setLoading]           = useState(false);
+  const [cfToken, setCfToken]           = useState<string | null>(null);
 
   useEffect(() => {
     if (isMasterLoggedIn()) {
@@ -27,7 +31,7 @@ export default function MasterLoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, cfToken);
       router.replace("/master/dashboard");
     } catch (err: unknown) {
       const msg =
@@ -111,9 +115,19 @@ export default function MasterLoginPage() {
               </div>
             )}
 
+            {CF_SITE_KEY && (
+              <Turnstile
+                siteKey={CF_SITE_KEY}
+                onSuccess={setCfToken}
+                onExpire={() => setCfToken(null)}
+                onError={() => setCfToken(null)}
+                options={{ theme: "light", size: "flexible" }}
+              />
+            )}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!!CF_SITE_KEY && !cfToken)}
               className="w-full h-11 rounded-xl text-sm font-bold transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 mt-1"
               style={{ background: "#f59e0b", color: "#000" }}
             >

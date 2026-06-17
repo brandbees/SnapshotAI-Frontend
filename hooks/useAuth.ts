@@ -15,8 +15,8 @@ export function useAuth() {
     setLoading(false);
   }, []);
 
-  async function login(email: string, password: string): Promise<void> {
-    const { data } = await api.post<AuthResponse>("/auth/login", { email, password });
+  async function login(email: string, password: string, cfTurnstileToken?: string | null): Promise<void> {
+    const { data } = await api.post<AuthResponse>("/auth/login", { email, password, cf_turnstile_token: cfTurnstileToken });
     setToken(data.token);
     setAgency(data.agency);
     setAgencyState(data.agency);

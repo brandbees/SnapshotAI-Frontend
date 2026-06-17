@@ -3,9 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Shield } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { API_BASE_URL } from "@/lib/constants";
 import { setToken, setAgency, getToken } from "@/lib/auth";
 import type { Agency } from "@/types";
+
+const CF_SITE_KEY = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY ?? "";
 
 export default function ClientPortalLoginPage() {
   const router = useRouter();
@@ -15,6 +18,7 @@ export default function ClientPortalLoginPage() {
   const [showPwd, setShowPwd]     = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]         = useState<string | null>(null);
+  const [cfToken, setCfToken]     = useState<string | null>(null);
 
   useEffect(() => {
     if (getToken()) router.replace("/dashboard");
@@ -27,7 +31,7 @@ export default function ClientPortalLoginPage() {
       const res = await fetch(`${API_BASE_URL}/client-portal/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, cf_turnstile_token: cfToken }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Invalid email or password."); return; }
@@ -105,9 +109,19 @@ export default function ClientPortalLoginPage() {
             </p>
           )}
 
+          {CF_SITE_KEY && (
+            <Turnstile
+              siteKey={CF_SITE_KEY}
+              onSuccess={setCfToken}
+              onExpire={() => setCfToken(null)}
+              onError={() => setCfToken(null)}
+              options={{ theme: "light", size: "flexible" }}
+            />
+          )}
+
           <button
             type="submit"
-            disabled={submitting || !email || !password}
+            disabled={submitting || !email || !password || (!!CF_SITE_KEY && !cfToken)}
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-accent disabled:opacity-50 hover:opacity-90 transition-opacity">
             {submitting ? "Signing in…" : "Sign In"}
           </button>
