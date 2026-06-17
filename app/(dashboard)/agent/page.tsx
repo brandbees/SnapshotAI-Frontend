@@ -267,8 +267,8 @@ export default function AgentPage() {
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">AI Assistant</h2>
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              Ask questions about your sites, get audit insights, run audits, send reports,
-              and more — all in plain English. Available on paid plans.
+              AI Assistant is available on upgraded plans. Ask questions about your sites, get
+              audit insights, run audits, send reports, and more — all in plain English.
             </p>
             <div className="bg-white border border-border rounded-2xl p-5 mb-6 text-left space-y-3">
               {[
@@ -284,7 +284,7 @@ export default function AgentPage() {
               ))}
             </div>
             <Link
-              href="/settings?tab=billing"
+              href="/settings?tab=billing&from=%2Fagent"
               className="inline-flex items-center justify-center gap-2 h-11 px-8 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
               style={{ background: "var(--accent)" }}
             >

@@ -1110,6 +1110,7 @@ const TX_META: Record<string, { label: string; color: string; icon: React.Elemen
 function BillingContent() {
   const { agency, refreshAgency } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [sites, setSites]           = useState<Site[]>([]);
   const [seatsUsed, setSeatsUsed]   = useState(1);
@@ -1156,6 +1157,18 @@ function BillingContent() {
     const storageSuccess = searchParams.get("storage") === "success";
     const planSuccess    = searchParams.get("plan") === "success";
 
+    // Persist the originating route so we can redirect back after payment
+    const fromParam = searchParams.get("from");
+    if (fromParam) sessionStorage.setItem("bbss_checkout_from", fromParam);
+
+    function redirectAfterPurchase() {
+      const from = sessionStorage.getItem("bbss_checkout_from");
+      if (from) {
+        sessionStorage.removeItem("bbss_checkout_from");
+        setTimeout(() => router.push(from), 800);
+      }
+    }
+
     if ((tokensSuccess || storageSuccess || planSuccess) && sessionId) {
       // Verify the Stripe session — credits the purchase if the webhook hasn't fired yet
       api.post("/billing/verify-session", { session_id: sessionId })
@@ -1171,6 +1184,7 @@ function BillingContent() {
           if (tokensSuccess)  toast.success("AI tokens added to your account! Your balance has been updated.");
           if (storageSuccess) toast.success("Storage added to your account! Your limit has been increased.");
           if (planSuccess)    toast.success("Plan upgraded successfully! Welcome to your new plan.");
+          redirectAfterPurchase();
         })
         .catch(async () => {
           // Webhook may have already processed it — still refresh history and show confirmation
@@ -1178,6 +1192,7 @@ function BillingContent() {
           if (tokensSuccess)  toast.success("AI tokens added to your account! Your balance has been updated.");
           if (storageSuccess) toast.success("Storage added to your account! Your limit has been increased.");
           if (planSuccess)    toast.success("Plan upgraded successfully! Welcome to your new plan.");
+          redirectAfterPurchase();
         });
     } else if (tokensSuccess) {
       toast.success("AI tokens added to your account! Your balance has been updated.");

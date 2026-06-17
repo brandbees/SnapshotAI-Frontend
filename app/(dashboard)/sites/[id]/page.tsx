@@ -10,7 +10,7 @@ import {
   Activity, Wrench, TrendingUp, Clock, Zap, Server, Database, LayoutGrid,
   Bell, DollarSign, BarChart2, CalendarClock, HeartPulse, Search, AlertTriangle, Bot,
   Loader2, ToggleLeft, ToggleRight, Ban, ImageIcon, X, CalendarDays,
-  HardDrive, RotateCcw, Download,
+  HardDrive, RotateCcw, Download, ListTodo,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -38,6 +38,7 @@ function siteAvatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % A
 
 type Tab =
   | "overview"
+  | "issues"
   | "security"
   | "performance"
   | "seo"
@@ -51,6 +52,7 @@ type Tab =
 
 const BASE_TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "overview",    label: "Overview",    icon: <LayoutGrid size={13} /> },
+  { key: "issues",      label: "Issues",      icon: <ListTodo size={13} /> },
   { key: "seo",         label: "SEO",         icon: <TrendingUp size={13} /> },
   { key: "security",    label: "Security",    icon: <Shield size={13} /> },
   { key: "performance", label: "Performance", icon: <Zap size={13} /> },
@@ -527,9 +529,219 @@ function OverviewTab({
   );
 }
 
+// ── Issues Tab ────────────────────────────────────────────────────────────────
+
+interface FixItem {
+  priority: "critical" | "high" | "medium" | "low";
+  title: string;
+  description: string;
+  effort: "low" | "medium" | "high";
+  component: "security" | "malware" | "performance" | "seo";
+  resolved: boolean;
+}
+
+const PRIORITY_ORDER_LIST = ["critical", "high", "medium", "low"] as const;
+
+const PRIORITY_META: Record<string, { label: string; color: string; bg: string }> = {
+  critical: { label: "Critical", color: "text-red-700",    bg: "bg-red-50 border-red-200"       },
+  high:     { label: "High",     color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
+  medium:   { label: "Medium",   color: "text-amber-700",  bg: "bg-amber-50 border-amber-200"   },
+  low:      { label: "Low",      color: "text-blue-700",   bg: "bg-blue-50 border-blue-200"     },
+};
+
+const EFFORT_META: Record<string, { label: string; cls: string }> = {
+  low:    { label: "Quick fix", cls: "bg-green-50 text-green-700"  },
+  medium: { label: "Moderate",  cls: "bg-amber-50 text-amber-700"  },
+  high:   { label: "Complex",   cls: "bg-red-50 text-red-700"      },
+};
+
+const COMPONENT_CLS: Record<string, string> = {
+  security:    "bg-cyan-50 text-cyan-700",
+  malware:     "bg-purple-50 text-purple-700",
+  performance: "bg-indigo-50 text-indigo-700",
+  seo:         "bg-pink-50 text-pink-700",
+};
+
+function IssuesTab({ site, brandColor }: { site: Site; brandColor: string }) {
+  const [fixes, setFixes]         = useState<FixItem[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [confirmFix, setConfirmFix] = useState<FixItem | null>(null);
+  const [resolved, setResolved]   = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    api.get<{ fixes: FixItem[] }>(`/sites/${site.id}/fix-queue`)
+      .then(({ data }) => setFixes(data.fixes ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [site.id]);
+
+  async function resolveFix(fix: FixItem) {
+    setResolving(fix.title);
+    try {
+      await api.post(`/sites/${site.id}/fix-queue/resolve`, { title: fix.title });
+      setResolved((prev) => new Set([...prev, fix.title]));
+      toast.success("Fix marked as resolved");
+    } catch {
+      toast.error("Failed to mark fix as resolved");
+    } finally {
+      setResolving(null);
+      setConfirmFix(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: `${brandColor}30`, borderTopColor: brandColor }} />
+      </div>
+    );
+  }
+
+  const activeFixes = fixes.filter((f) => !f.resolved && !resolved.has(f.title));
+  const resolvedFixes = fixes.filter((f) => f.resolved || resolved.has(f.title));
+
+  if (activeFixes.length === 0 && resolvedFixes.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-border shadow-sm flex items-center justify-center py-20">
+        <div className="text-center">
+          <CheckCircle2 size={28} className="text-green-500 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-foreground">No issues found</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">Run an audit to check for issues</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Confirmation modal */}
+      {confirmFix && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Mark as resolved?</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Confirm you have applied this fix before marking it resolved.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs font-semibold text-foreground">{confirmFix.title}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmFix(null)}
+                className="flex-1 text-sm px-4 py-2 rounded-lg border border-border text-foreground hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => resolveFix(confirmFix)}
+                disabled={resolving === confirmFix.title}
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm px-4 py-2 rounded-lg text-white font-medium disabled:opacity-60"
+                style={{ background: brandColor }}
+              >
+                {resolving === confirmFix.title
+                  ? <><Loader2 size={12} className="animate-spin" />Saving…</>
+                  : "Mark resolved"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {PRIORITY_ORDER_LIST.map((p) => {
+          const count = activeFixes.filter((f) => f.priority === p).length;
+          if (!count) return null;
+          const meta = PRIORITY_META[p];
+          return (
+            <span key={p} className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${meta.bg} ${meta.color}`}>
+              {meta.label} · {count}
+            </span>
+          );
+        })}
+        {activeFixes.length === 0 && (
+          <span className="text-xs text-green-700 font-semibold flex items-center gap-1.5">
+            <CheckCircle2 size={13} className="text-green-500" /> All issues resolved
+          </span>
+        )}
+      </div>
+
+      {/* Groups */}
+      {PRIORITY_ORDER_LIST.map((priority) => {
+        const group = activeFixes.filter((f) => f.priority === priority);
+        if (!group.length) return null;
+        const meta = PRIORITY_META[priority];
+        return (
+          <div key={priority}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${meta.bg} ${meta.color}`}>
+                {meta.label} — {group.length} {group.length === 1 ? "issue" : "issues"}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {group.map((fix) => {
+                const effort = EFFORT_META[fix.effort] ?? EFFORT_META.medium;
+                const compCls = COMPONENT_CLS[fix.component] ?? "bg-gray-100 text-gray-600";
+                return (
+                  <div key={fix.title} className="bg-white rounded-2xl border border-border shadow-sm p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground mb-1.5">{fix.title}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">{fix.description}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${effort.cls}`}>{effort.label}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${compCls}`}>{fix.component}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setConfirmFix(fix)}
+                        disabled={!!resolving}
+                        className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={12} />
+                        Resolve
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Resolved section */}
+      {resolvedFixes.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Resolved ({resolvedFixes.length})</p>
+          <div className="space-y-2">
+            {resolvedFixes.map((fix) => (
+              <div key={fix.title} className="bg-white rounded-2xl border border-border shadow-sm p-4 opacity-50">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                  <p className="text-sm text-foreground flex-1">{fix.title}</p>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Resolved</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Security Tab ──────────────────────────────────────────────────────────────
 
-function SecurityTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; brandColor: string }) {
+function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site: Site; audits: Audit[]; brandColor: string; runAudit?: () => void; canRunAudit?: boolean }) {
   const score = site.latest_scores?.security;
   const sslDays = sslDaysRemaining(site.ssl_expiry_date);
   const sslColor = sslDays === null ? "#9ca3af" : sslDays <= 7 ? "#dc2626" : sslDays <= 30 ? "#d97706" : "#16a34a";
@@ -590,7 +802,17 @@ function SecurityTab({ site, audits, brandColor }: { site: Site; audits: Audit[]
           ) : (
             <div className="text-center">
               <Shield size={32} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No audit yet</p>
+              <p className="text-sm font-semibold text-foreground">No audit yet</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-3">Run an audit to see your security score</p>
+              {canRunAudit && runAudit && (
+                <button
+                  onClick={runAudit}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+                  style={{ background: brandColor }}
+                >
+                  Run first audit
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -829,7 +1051,7 @@ function SecurityTab({ site, audits, brandColor }: { site: Site; audits: Audit[]
 
 // ── Performance Tab ───────────────────────────────────────────────────────────
 
-function PerformanceTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; brandColor: string }) {
+function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { site: Site; audits: Audit[]; brandColor: string; runAudit?: () => void; canRunAudit?: boolean }) {
   const score = site.latest_scores?.performance;
   const latestAudit = audits.find((a) => a.status === "completed");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -911,7 +1133,17 @@ function PerformanceTab({ site, audits, brandColor }: { site: Site; audits: Audi
           ) : (
             <div className="text-center">
               <Activity size={28} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No audit yet</p>
+              <p className="text-sm font-semibold text-foreground">No audit yet</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-3">Run an audit to measure performance</p>
+              {canRunAudit && runAudit && (
+                <button
+                  onClick={runAudit}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+                  style={{ background: brandColor }}
+                >
+                  Run first audit
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2147,7 +2379,18 @@ function MalwareTab({
           ) : (
             <div className="text-center">
               <Shield size={32} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No audit yet</p>
+              <p className="text-sm font-semibold text-foreground">No scan yet</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-3">Run a scan to check for malware</p>
+              {canRunScan && (
+                <button
+                  onClick={onRunScan}
+                  disabled={scanning}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
+                  style={{ background: "#8b5cf6" }}
+                >
+                  {scanning ? "Scanning…" : "Run scan"}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -4878,9 +5121,10 @@ function SiteDetailContent() {
             benchmarks={benchmarks}
           />
         )}
+        {activeTab === "issues"      && <IssuesTab site={site} brandColor={brandColor} />}
         {activeTab === "seo"         && <SeoTab site={site} audits={site.audits} brandColor={brandColor} />}
-        {activeTab === "security"    && <SecurityTab site={site} audits={site.audits} brandColor={brandColor} />}
-        {activeTab === "performance" && <PerformanceTab site={site} audits={site.audits} brandColor={brandColor} />}
+        {activeTab === "security"    && <SecurityTab site={site} audits={site.audits} brandColor={brandColor} runAudit={runAudit} canRunAudit={canRunAudit} />}
+        {activeTab === "performance" && <PerformanceTab site={site} audits={site.audits} brandColor={brandColor} runAudit={runAudit} canRunAudit={canRunAudit} />}
         {activeTab === "malware"     && (
           <MalwareTab
             site={site}
