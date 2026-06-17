@@ -2353,6 +2353,8 @@ function MalwareTab({
   const allThreats = scans.flatMap((s) => s.threats ?? []);
   const threatTypes = [...new Set(allThreats.map((t) => t.threat_type || t.type || "Unknown"))];
   const allSources = [...new Set(scans.flatMap((s) => s.sources_used ?? []))];
+  const confirmedThreatCount = allThreats.filter((t) => t.confidence === "confirmed").length;
+  const possibleThreatCount  = allThreats.filter((t) => t.confidence !== "confirmed").length;
 
   return (
     <div className="space-y-5">
@@ -2546,31 +2548,42 @@ function MalwareTab({
           {/* Overall status */}
           <div className={`flex items-center gap-3 p-3 rounded-xl mb-4 ${
             totalThreats === 0 && totalScans > 0 ? "bg-green-50" :
-            totalThreats > 0 ? "bg-red-50" : "bg-gray-50"
+            confirmedThreatCount > 0 ? "bg-red-50" :
+            totalThreats > 0 ? "bg-amber-50" : "bg-gray-50"
           }`}>
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
               totalThreats === 0 && totalScans > 0 ? "bg-green-100" :
-              totalThreats > 0 ? "bg-red-100" : "bg-gray-100"
+              confirmedThreatCount > 0 ? "bg-red-100" :
+              totalThreats > 0 ? "bg-amber-100" : "bg-gray-100"
             }`}>
               {totalThreats === 0 && totalScans > 0
                 ? <CheckCircle2 size={16} className="text-green-600" />
-                : totalThreats > 0
+                : confirmedThreatCount > 0
                 ? <XCircle size={16} className="text-red-600" />
+                : totalThreats > 0
+                ? <AlertTriangle size={16} className="text-amber-600" />
                 : <Shield size={16} className="text-gray-400" />}
             </div>
             <div>
               <p className={`text-xs font-semibold ${
                 totalThreats === 0 && totalScans > 0 ? "text-green-700" :
-                totalThreats > 0 ? "text-red-700" : "text-gray-600"
+                confirmedThreatCount > 0 ? "text-red-700" :
+                totalThreats > 0 ? "text-amber-700" : "text-gray-600"
               }`}>
                 {totalThreats === 0 && totalScans > 0
                   ? "Site is clean"
+                  : confirmedThreatCount > 0
+                  ? `${confirmedThreatCount} confirmed threat${confirmedThreatCount !== 1 ? "s" : ""}`
                   : totalThreats > 0
-                  ? `${totalThreats} threat${totalThreats !== 1 ? "s" : ""} detected`
+                  ? `${possibleThreatCount} finding${possibleThreatCount !== 1 ? "s" : ""} need review`
                   : "No scans yet"}
               </p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {totalScans > 0 ? `Across ${totalScans} scan${totalScans !== 1 ? "s" : ""}` : "Run a scan to check"}
+                {confirmedThreatCount > 0 && possibleThreatCount > 0
+                  ? `+ ${possibleThreatCount} unconfirmed finding${possibleThreatCount !== 1 ? "s" : ""}`
+                  : totalScans > 0
+                  ? `Across ${totalScans} scan${totalScans !== 1 ? "s" : ""}`
+                  : "Run a scan to check"}
               </p>
             </div>
           </div>
@@ -2655,13 +2668,16 @@ function MalwareTab({
               </thead>
               <tbody>
                 {scans.map((scan) => {
-                  const threatCount = scan.threats?.length ?? 0;
-                  const isExpanded = expandedScan === scan.id;
+                  const threatCount    = scan.threats?.length ?? 0;
+                  const scanConfirmed  = (scan.threats ?? []).filter((t) => t.confidence === "confirmed").length;
+                  const scanPossible   = threatCount - scanConfirmed;
+                  const isExpanded     = expandedScan === scan.id;
+                  const hasFindings    = threatCount > 0;
                   return (
                     <Fragment key={scan.id}>
                       <tr
                         className="border-b border-border hover:bg-gray-50/60 transition-colors cursor-pointer"
-                        onClick={() => !scan.is_clean && setExpandedScan(isExpanded ? null : scan.id)}
+                        onClick={() => hasFindings && setExpandedScan(isExpanded ? null : scan.id)}
                       >
                         <td className="px-5 py-3">
                           <p className="text-sm text-foreground font-medium">
@@ -2672,20 +2688,30 @@ function MalwareTab({
                           </p>
                         </td>
                         <td className="px-5 py-3">
-                          {scan.is_clean ? (
+                          {scan.is_clean && threatCount === 0 ? (
                             <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">
                               <CheckCircle2 size={10} /> Clean
                             </span>
-                          ) : (
+                          ) : scanConfirmed > 0 ? (
                             <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
-                              <XCircle size={10} /> Threats Found
+                              <XCircle size={10} /> Confirmed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                              <AlertTriangle size={10} /> Needs Review
                             </span>
                           )}
                         </td>
                         <td className="px-5 py-3">
-                          <span className={`text-sm font-bold tabular-nums ${threatCount > 0 ? "text-red-600" : "text-green-600"}`}>
-                            {threatCount}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {scanConfirmed > 0 && (
+                              <span className="text-xs font-bold text-red-600">{scanConfirmed} confirmed</span>
+                            )}
+                            {scanPossible > 0 && (
+                              <span className="text-xs font-semibold text-amber-600">{scanPossible} possible</span>
+                            )}
+                            {threatCount === 0 && <span className="text-xs text-green-600 font-bold">0</span>}
+                          </div>
                         </td>
                         <td className="px-5 py-3">
                           <span className="text-xs text-muted-foreground">
@@ -2693,7 +2719,7 @@ function MalwareTab({
                           </span>
                         </td>
                         <td className="px-5 py-3">
-                          {!scan.is_clean && (
+                          {hasFindings && (
                             <button className="flex items-center gap-1 text-xs font-medium hover:underline" style={{ color: brandColor }}>
                               {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                               {isExpanded ? "Hide" : "View"}
@@ -2701,44 +2727,70 @@ function MalwareTab({
                           )}
                         </td>
                       </tr>
-                      {isExpanded && !scan.is_clean && (
+                      {isExpanded && hasFindings && (
                         <tr>
-                          <td colSpan={5} className="px-5 py-4 bg-red-50/40 border-b border-border">
+                          <td colSpan={5} className="px-5 py-4 border-b border-border bg-gray-50/40">
                             {scan.threats && scan.threats.length > 0 ? (
-                              <div className="rounded-xl overflow-hidden border border-red-100">
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="bg-red-50 border-b border-red-100">
-                                      <th className="px-4 py-2 text-left font-semibold text-red-700">URL / Path</th>
-                                      <th className="px-4 py-2 text-left font-semibold text-red-700">Threat Type</th>
-                                      <th className="px-4 py-2 text-left font-semibold text-red-700">Source Feed</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {scan.threats.map((threat, i) => (
-                                      <tr key={i} className="border-b border-red-100 last:border-0 bg-white">
-                                        <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground max-w-[240px] truncate" title={threat.url || threat.file_path || threat.location || threat.description || ""}>
-                                          {threat.url || threat.file_path || threat.location || threat.description || "—"}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-foreground font-medium">
-                                          {threat.threat_type || threat.type || "Unknown"}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-muted-foreground">
-                                          {threat.source || threat.severity || "—"}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                                {scan.sources_used && scan.sources_used.length > 0 && (
-                                  <div className="px-4 py-2 border-t border-red-100 bg-red-50">
-                                    <span className="text-[10px] font-semibold text-red-700 uppercase tracking-wider">Sources: </span>
-                                    <span className="text-[10px] text-red-600">{scan.sources_used.join(", ")}</span>
+                              <div className="space-y-3">
+                                {/* Context banner for unconfirmed findings */}
+                                {scanConfirmed === 0 && (
+                                  <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                                    <span>These are <strong>unconfirmed findings</strong> that require investigation before treating as real threats. Common causes include third-party CDN URLs or plugin assets flagged in intelligence feeds.</span>
                                   </div>
+                                )}
+                                {scan.threats.map((threat, i) => {
+                                  const conf = threat.confidence ?? "needs_review";
+                                  const confStyle = conf === "confirmed"
+                                    ? { badge: "bg-red-100 text-red-700",    border: "border-red-100",    bg: "bg-white" }
+                                    : conf === "possible"
+                                    ? { badge: "bg-amber-100 text-amber-700", border: "border-amber-100", bg: "bg-white" }
+                                    : { badge: "bg-gray-100 text-gray-600",   border: "border-gray-200",  bg: "bg-white" };
+                                  const confLabel = conf === "confirmed" ? "Confirmed" : conf === "possible" ? "Possible" : "Needs Review";
+                                  const exp = threat.explanation;
+                                  return (
+                                    <div key={i} className={`rounded-xl border ${confStyle.border} ${confStyle.bg} overflow-hidden`}>
+                                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-inherit bg-gray-50/60">
+                                        <span className="text-xs font-semibold text-foreground">{threat.threat_type || threat.type || "Unknown"}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${confStyle.badge}`}>{confLabel}</span>
+                                      </div>
+                                      {exp ? (
+                                        <div className="px-4 py-3 space-y-2 text-xs">
+                                          <div className="flex gap-2">
+                                            <span className="text-muted-foreground w-20 shrink-0">What</span>
+                                            <span className="text-foreground">{exp.what}</span>
+                                          </div>
+                                          {exp.where && (
+                                            <div className="flex gap-2">
+                                              <span className="text-muted-foreground w-20 shrink-0">Where</span>
+                                              <span className="font-mono text-[10px] text-muted-foreground truncate">{exp.where}</span>
+                                            </div>
+                                          )}
+                                          <div className="flex gap-2">
+                                            <span className="text-muted-foreground w-20 shrink-0">Why risky</span>
+                                            <span className="text-foreground">{exp.why_risky}</span>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <span className="text-muted-foreground w-20 shrink-0">Action</span>
+                                            <span className={`font-medium ${conf === "confirmed" ? "text-red-700" : "text-amber-700"}`}>{exp.recommended_action}</span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="px-4 py-2.5 text-xs text-muted-foreground">
+                                          {threat.url || threat.file_path || threat.location || threat.description || "No additional details available."}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {scan.sources_used && scan.sources_used.length > 0 && (
+                                  <p className="text-[10px] text-muted-foreground px-1">
+                                    Intelligence sources: {scan.sources_used.join(", ")}
+                                  </p>
                                 )}
                               </div>
                             ) : (
-                              <p className="text-xs text-red-700 px-2">No specific threat details — URL matched threat intelligence feed</p>
+                              <p className="text-xs text-muted-foreground px-2">No specific threat details available for this scan.</p>
                             )}
                           </td>
                         </tr>

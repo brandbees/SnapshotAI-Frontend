@@ -238,6 +238,16 @@ export interface ScanResult {
   created_at: string;
 }
 
+export type ThreatConfidence = 'confirmed' | 'possible' | 'needs_review';
+
+export interface ThreatExplanation {
+  what: string;
+  where: string | null;
+  why_risky: string;
+  recommended_action: string;
+  user_action_required: boolean;
+}
+
 export interface ScanThreat {
   severity?: string;
   type?: string;
@@ -250,6 +260,10 @@ export interface ScanThreat {
   // db_threat fields
   location?: string;
   excerpt?: string;
+  // enriched fields (added by scannerService)
+  _source?: 'threat_intel' | 'file_threats' | 'db_threats';
+  confidence?: ThreatConfidence;
+  explanation?: ThreatExplanation;
 }
 
 // ── Plugin data ───────────────────────────────────────────────────────────────
