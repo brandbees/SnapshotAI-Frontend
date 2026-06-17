@@ -468,6 +468,7 @@ export default function DashboardPage() {
   const limit = agency ? PLAN_LIMITS[agency.plan] : 1;
   const atLimit = sites.length >= limit;
   const canAddSite = roleCanDo("add_site");
+  const isIndividual = agency?.account_type === "individual";
 
   const connectedCount = sites.filter((s) => s.plugin_connected).length;
   const threatCount = sites.filter((s) => s.malware_status === "threat").length;
@@ -564,11 +565,15 @@ export default function DashboardPage() {
       <EmptyState
         icon={<Globe size={22} />}
         title="No sites yet"
-        description="Add your first client site to start monitoring performance, SEO, security, and malware."
+        description={
+          isIndividual
+            ? "Add your WordPress site to start monitoring performance, SEO, security, and malware."
+            : "Add your first client site to start monitoring performance, SEO, security, and malware."
+        }
         action={
           canAddSite ? (
             <Button onClick={() => setShowAdd(true)}>
-              <Plus size={15} /> Add your first site
+              <Plus size={15} /> {isIndividual ? "Add my site" : "Add your first site"}
             </Button>
           ) : undefined
         }
@@ -578,7 +583,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {atLimit && canAddSite && (
+      {atLimit && canAddSite && !isIndividual && (
         <UpgradeBanner
           message={`You've reached your ${limit}-site limit on the ${agency?.plan} plan.`}
         />
@@ -588,7 +593,9 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Overview of all monitored sites and key metrics
+          {isIndividual
+            ? "Your site health overview and key metrics"
+            : "Overview of all monitored sites and key metrics"}
         </p>
       </div>
 

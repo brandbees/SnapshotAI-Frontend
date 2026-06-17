@@ -1127,9 +1127,10 @@ function BillingContent() {
   const [history, setHistory]         = useState<BillingEvent[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
-  const currentPlan = (agency?.plan ?? "free") as PlanKey;
-  const sitesLimit  = PLAN_LIMITS[currentPlan] ?? 1;
-  const seatsLimit  = PLAN_SEATS[currentPlan] ?? 1;
+  const currentPlan  = (agency?.plan ?? "free") as PlanKey;
+  const sitesLimit   = PLAN_LIMITS[currentPlan] ?? 1;
+  const seatsLimit   = PLAN_SEATS[currentPlan] ?? 1;
+  const isIndividual = agency?.account_type === "individual";
 
   // Dynamic storage limit — live from API, fallback to constant
   const dynStorageLimit = planLimits[currentPlan]?.storage ?? 524_288_000;
@@ -1255,7 +1256,7 @@ function BillingContent() {
         <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-4 sm:col-span-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Usage</p>
           <UsageBar used={sites.length} total={sitesLimit} label="Sites" />
-          <UsageBar used={seatsUsed} total={seatsLimit} label="Team seats" />
+          {!isIndividual && <UsageBar used={seatsUsed} total={seatsLimit} label="Team seats" />}
         </div>
       </div>
 
@@ -1309,16 +1310,37 @@ function BillingContent() {
       {/* Quick feature stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { icon: Globe, title: `${sitesLimit >= 9999 ? "Unlimited" : sitesLimit} sites`, sub: "Monitored and audited" },
-          { icon: Users, title: `${seatsLimit >= 9999 ? "Unlimited" : seatsLimit} seats`, sub: "Team members included" },
-          { icon: Zap,   title: "Scheduled audits", sub: currentPlan === "free" ? "Upgrade to enable" : "Weekly & monthly" },
-        ].map(({ icon: Icon, title, sub }) => (
+          { icon: Globe, title: `${sitesLimit >= 9999 ? "Unlimited" : sitesLimit} site${sitesLimit === 1 ? "" : "s"}`, sub: "Monitored and audited", show: true },
+          { icon: Users, title: `${seatsLimit >= 9999 ? "Unlimited" : seatsLimit} seats`, sub: "Team members included", show: !isIndividual },
+          { icon: Zap,   title: "Scheduled audits", sub: currentPlan === "free" ? "Upgrade to enable" : "Weekly & monthly", show: true },
+        ].filter(s => s.show).map(({ icon: Icon, title, sub }) => (
           <div key={title} className="rounded-xl border border-border bg-muted/20 p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0"><Icon size={16} className="text-muted-foreground" /></div>
             <div><p className="text-sm font-semibold text-foreground">{title}</p><p className="text-xs text-muted-foreground">{sub}</p></div>
           </div>
         ))}
       </div>
+
+      {/* Agency upgrade callout — individual only */}
+      {isIndividual && (
+        <div className="rounded-xl border border-border bg-muted/20 p-5 flex items-start gap-4">
+          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Users size={16} className="text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">Need to manage clients or add team members?</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Switch your account to Agency to unlock multi-site management, white-label branding, client portals, and team collaboration.
+            </p>
+          </div>
+          <a
+            href="mailto:support@brandbees.io?subject=Switch to Agency account"
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border bg-white text-foreground hover:bg-muted/60 transition-colors"
+          >
+            Contact us
+          </a>
+        </div>
+      )}
 
       {/* AI Token Top-up */}
       {currentPlan !== "free" && (
@@ -1498,9 +1520,16 @@ function SettingsPageInner() {
   const { agency } = useAuth();
   const { role }   = useRole();
 
+  const isIndividual = agency?.account_type === "individual";
+  const visibleTabs  = TABS.filter(({ id }) => {
+    if (isIndividual && id === "branding") return false;
+    if (isIndividual && id === "team")     return false;
+    return true;
+  });
+
   const getValidTab = (): Tab => {
     const t = searchParams.get("tab") as Tab;
-    return TABS.some(x => x.id === t) ? t : "general";
+    return visibleTabs.some(x => x.id === t) ? t : "general";
   };
 
   const [activeTab, setActiveTab] = useState<Tab>(getValidTab);
@@ -1545,7 +1574,7 @@ function SettingsPageInner() {
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
         {/* Tab bar */}
         <div className="flex items-center gap-1 p-1.5 border-b border-border overflow-x-auto">
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {visibleTabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               data-tab={id}

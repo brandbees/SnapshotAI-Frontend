@@ -103,6 +103,7 @@ export function TopBar() {
   const router = useRouter();
 
   const isClientPortal = agency?.is_client_portal ?? false;
+  const isIndividual   = agency?.account_type === "individual";
 
   const [showAddSite,  setShowAddSite]  = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -262,7 +263,7 @@ export function TopBar() {
 
         {/* Right */}
         <div className="flex items-center gap-2">
-          {!isClientPortal && roleCanDo("add_site") && (
+          {!isClientPortal && !isIndividual && roleCanDo("add_site") && (
             <button onClick={() => setShowAddSite(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-white transition-colors"
               style={{ background: "var(--accent)" }}>

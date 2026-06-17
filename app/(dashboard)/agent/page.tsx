@@ -91,8 +91,9 @@ function TokenBar({ state }: { state: TokenState }) {
 
 export default function AgentPage() {
   const { agency } = useAuth();
-  const isFreePlan  = agency?.plan === 'free';
-  const canUseAgent = !!agency && !isFreePlan;
+  const isFreePlan   = agency?.plan === 'free';
+  const isIndividual = agency?.account_type === "individual";
+  const canUseAgent  = !!agency && !isFreePlan;
 
   const [sites, setSites]               = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
@@ -267,16 +268,22 @@ export default function AgentPage() {
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">AI Assistant</h2>
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              AI Assistant is available on upgraded plans. Ask questions about your sites, get
-              audit insights, run audits, send reports, and more — all in plain English.
+              {isIndividual
+                ? "AI Assistant is available on upgraded plans. Get plain-English explanations of your audit results, find out exactly what to fix, and take action — no technical knowledge needed."
+                : "AI Assistant is available on upgraded plans. Ask questions about your sites, get audit insights, run audits, send reports, and more — all in plain English."}
             </p>
             <div className="bg-white border border-border rounded-2xl p-5 mb-6 text-left space-y-3">
-              {[
+              {(isIndividual ? [
+                "\"What's wrong with my site right now?\"",
+                "\"Is my WordPress version up to date?\"",
+                "\"Why is my security score low and how do I fix it?\"",
+                "\"Run a full audit and explain the results\"",
+              ] : [
                 "\"What's the most urgent issue on my site?\"",
                 "\"Which plugins need updating?\"",
                 "\"Run an audit and send me a report\"",
                 "\"Why is my security score low?\"",
-              ].map(q => (
+              ]).map(q => (
                 <div key={q} className="flex items-center gap-2.5 text-sm text-muted-foreground">
                   <Sparkles size={12} style={{ color: "var(--accent)" }} className="shrink-0" />
                   <span className="italic">{q}</span>
@@ -291,7 +298,9 @@ export default function AgentPage() {
               <Zap size={15} /> Upgrade to unlock AI Assistant
             </Link>
             <p className="text-xs text-muted-foreground mt-3">
-              AI summaries on your audit reports are always included — free for all plans.
+              {isIndividual
+                ? "Basic AI summaries on your audit reports are always free."
+                : "AI summaries on your audit reports are always included — free for all plans."}
             </p>
           </div>
         </div>

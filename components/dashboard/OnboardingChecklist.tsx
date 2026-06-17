@@ -28,7 +28,7 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
   const items: ChecklistItem[] = [
     {
       id: "add_site",
-      label: "Add your first site",
+      label: isIndividual ? "Add your site" : "Add your first site",
       done: sites.length > 0,
       href: "/sites",
       hrefLabel: "Go to Sites",
@@ -40,41 +40,44 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
       href: "/connect",
       hrefLabel: "Connect plugin",
     },
-    {
-      id: "white_label",
-      label: "Set up white-label branding",
-      done: hasBranding,
-      href: "/settings/white-label",
-      hrefLabel: "Open branding settings",
-    },
   ];
 
   if (!isIndividual) {
-    items.push({
-      id: "add_client",
-      label: "Add a client",
-      done: false, // resolved async below
-      href: "/clients",
-      hrefLabel: "Go to Clients",
-    });
+    items.push(
+      {
+        id: "white_label",
+        label: "Set up white-label branding",
+        done: hasBranding,
+        href: "/settings/white-label",
+        hrefLabel: "Open branding settings",
+      },
+      {
+        id: "add_client",
+        label: "Add a client",
+        done: false,
+        href: "/clients",
+        hrefLabel: "Go to Clients",
+      }
+    );
   }
 
-  items.push(
-    {
-      id: "schedule_report",
-      label: "Schedule a report",
-      done: hasSchedule,
-      href: sites[0] ? `/sites/${sites[0].id}` : "/sites",
-      hrefLabel: "Open site settings",
-    },
-    {
+  items.push({
+    id: "schedule_report",
+    label: "Schedule a report",
+    done: hasSchedule,
+    href: sites[0] ? `/sites/${sites[0].id}` : "/sites",
+    hrefLabel: isIndividual ? "Open site settings" : "Open site settings",
+  });
+
+  if (!isIndividual) {
+    items.push({
       id: "invite_team",
-      label: isIndividual ? "Invite someone to help" : "Invite a team member",
-      done: false, // resolved async below
+      label: "Invite a team member",
+      done: false,
       href: "/settings/team",
       hrefLabel: "Manage team",
-    }
-  );
+    });
+  }
 
   return items;
 }
@@ -91,31 +94,23 @@ export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps)
     return age < 30 * 24 * 3600 * 1000;
   })();
 
-  // Resolve async items (clients, team members)
+  // Resolve async items (clients, team members) — agency only
   useEffect(() => {
     const isIndividual = agency.account_type === "individual";
+    if (isIndividual) return;
 
     async function fetchAsyncState() {
       try {
-        const requests: Promise<{ data: unknown }>[] = [
+        const [clientsRes, teamRes] = await Promise.all([
+          api.get<{ clients: unknown[] } | unknown[]>("/clients"),
           api.get<{ members: unknown[] } | unknown[]>("/team"),
-        ];
-        if (!isIndividual) {
-          requests.unshift(api.get<{ clients: unknown[] } | unknown[]>("/clients"));
-        }
-
-        const results = await Promise.all(requests);
-        const teamRes = isIndividual ? results[0] : results[1];
-        const clientsRes = isIndividual ? null : results[0];
-
+        ]);
+        const clients = Array.isArray(clientsRes.data)
+          ? clientsRes.data
+          : (clientsRes.data as { clients: unknown[] }).clients ?? [];
         const members = Array.isArray(teamRes.data)
           ? teamRes.data
           : (teamRes.data as { members: unknown[] }).members ?? [];
-        const clients = clientsRes
-          ? Array.isArray(clientsRes.data)
-            ? clientsRes.data
-            : (clientsRes.data as { clients: unknown[] }).clients ?? []
-          : [];
 
         setItems((prev) =>
           prev.map((item) => {
