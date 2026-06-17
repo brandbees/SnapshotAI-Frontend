@@ -9,7 +9,7 @@ import {
   CreditCard, Calendar, Trash2,
   Plus, X, Pencil, Check, Wifi, WifiOff,
   BarChart3, ShieldCheck, Activity, Eye, EyeOff,
-  Brain, HardDrive, Zap, RotateCcw, Gift,
+  Brain, HardDrive, Zap, RotateCcw, Gift, Mail, Receipt,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -50,8 +50,15 @@ interface Audit {
   created_at: string; site_url: string; site_name: string | null;
 }
 interface TrendPoint { date: string; avg_score: number | null; count: number }
+interface BillingEvent {
+  id: string; type: "subscription" | "token_topup" | "storage_addon";
+  plan: string | null; tokens: number | null; bytes: number | null;
+  amount_cents: number; currency: string;
+  stripe_session_id: string | null; stripe_event_id: string | null;
+  status: string; created_at: string;
+}
 
-type Tab = "overview" | "sites" | "clients" | "team" | "audits";
+type Tab = "overview" | "sites" | "clients" | "team" | "audits" | "billing";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,6 +153,18 @@ export default function AgencyDetailPage() {
   const [infoSaving, setInfoSaving] = useState(false);
   const [showInfoPw, setShowInfoPw] = useState(false);
 
+  // Site limit edit
+  const [siteLimitEdit,  setSiteLimitEdit]  = useState(false);
+  const [newSiteLimit,   setNewSiteLimit]   = useState<number>(1);
+
+  // Send reset email
+  const [sendingReset, setSendingReset] = useState(false);
+
+  // Billing tab
+  const [billingEvents,  setBillingEvents]  = useState<BillingEvent[]>([]);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingLoaded,  setBillingLoaded]  = useState(false);
+
   // Grant tokens / storage / reset
   const [grantTokenInput,   setGrantTokenInput]   = useState("");
   const [grantStorageInput, setGrantStorageInput] = useState("");
@@ -188,11 +207,17 @@ export default function AgencyDetailPage() {
       setTrend(data.audit_trend);
       setNewPlan(data.agency.plan);
       setNewAccType(data.agency.account_type ?? "agency");
+      setNewSiteLimit(data.agency.sites_limit);
     } catch { /* interceptor */ }
     finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (tab === "billing" && !billingLoaded) loadBilling();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -391,6 +416,38 @@ export default function AgencyDetailPage() {
     finally { setSaving(false); }
   }
 
+  async function changeSiteLimit() {
+    if (!agency || newSiteLimit === agency.sites_limit) { setSiteLimitEdit(false); return; }
+    if (newSiteLimit < 0) return;
+    setSaving(true);
+    try {
+      await masterApi.patch(`/master/agencies/${id}`, { sites_limit: newSiteLimit });
+      await load(); setSiteLimitEdit(false);
+      toast.success(`Site limit updated to ${newSiteLimit === 9999 ? "unlimited" : newSiteLimit}.`);
+    } catch { toast.error("Failed to update site limit."); }
+    finally { setSaving(false); }
+  }
+
+  async function sendReset() {
+    setSendingReset(true);
+    try {
+      const { data } = await masterApi.post<{ success: boolean; email: string }>(`/master/agencies/${id}/send-reset`);
+      toast.success(`Password reset email sent to ${data.email}.`);
+    } catch { toast.error("Failed to send reset email."); }
+    finally { setSendingReset(false); }
+  }
+
+  async function loadBilling() {
+    if (billingLoaded) return;
+    setBillingLoading(true);
+    try {
+      const { data } = await masterApi.get<{ events: BillingEvent[] }>(`/master/agencies/${id}/billing`);
+      setBillingEvents(data.events);
+      setBillingLoaded(true);
+    } catch { toast.error("Failed to load billing history."); }
+    finally { setBillingLoading(false); }
+  }
+
   async function deleteTeamMember(memberId: string) {
     if (!await confirm({ title: "Remove team member?", description: "This member will lose access to this agency immediately.", danger: true, confirmLabel: "Remove" })) return;
     setSaving(true);
@@ -438,6 +495,7 @@ export default function AgencyDetailPage() {
     { key: "clients",  label: "Clients",       icon: Users,    count: clients.length },
     { key: "team",     label: "Team",          icon: Users,    count: team.length },
     { key: "audits",   label: "Audit History", icon: FileText, count: audits.length },
+    { key: "billing",  label: "Billing",       icon: Receipt },
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -609,6 +667,48 @@ export default function AgencyDetailPage() {
                   </>
                 )}
               </div>
+
+              {/* Custom Site Limit pill */}
+              <div className="inline-flex items-center gap-0 rounded-xl border border-border bg-gray-50 overflow-hidden">
+                <span className="text-[11px] font-semibold text-muted-foreground px-3 py-2 border-r border-border bg-white">
+                  <Globe size={11} className="inline mr-1 opacity-60" />Limit
+                </span>
+                {siteLimitEdit ? (
+                  <>
+                    <input
+                      type="number" min={0} max={9999} value={newSiteLimit === 9999 ? 9999 : newSiteLimit}
+                      onChange={e => setNewSiteLimit(parseInt(e.target.value, 10) || 0)}
+                      className="w-14 text-xs font-semibold text-center px-1 py-2 bg-gray-50 border-none outline-none"
+                    />
+                    <button onClick={changeSiteLimit} disabled={saving}
+                      className="text-[11px] font-bold px-3 py-2 text-white border-l border-amber-400 disabled:opacity-60"
+                      style={{ background: AMBER }}>
+                      {saving ? "…" : "Save"}
+                    </button>
+                    <button onClick={() => setSiteLimitEdit(false)}
+                      className="px-2.5 py-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors">
+                      <X size={12} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs font-bold px-3 py-2 text-foreground">
+                      {agency.sites_limit === 9999 ? "∞" : agency.sites_limit}
+                    </span>
+                    <button onClick={() => setSiteLimitEdit(true)}
+                      className="px-2.5 py-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors border-l border-border">
+                      <Pencil size={11} />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Send Password Reset Email */}
+              <button onClick={sendReset} disabled={sendingReset || saving}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-indigo-200 text-indigo-600 bg-white hover:bg-indigo-50 transition-colors disabled:opacity-50">
+                <Mail size={12} />
+                {sendingReset ? "Sending…" : "Send Reset Email"}
+              </button>
 
               {/* Extend Trial */}
               {!isPaid && (
@@ -1240,6 +1340,92 @@ export default function AgencyDetailPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* ── BILLING ───────────────────────────────────────────── */}
+            {tab === "billing" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">Purchase &amp; Billing History</p>
+                  <p className="text-xs text-muted-foreground">Last 50 events</p>
+                </div>
+                {billingLoading ? (
+                  <div className="space-y-2">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : billingEvents.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Receipt size={28} className="text-gray-300 mb-3" />
+                    <p className="text-sm font-semibold text-foreground">No billing events</p>
+                    <p className="text-xs text-muted-foreground mt-1">No purchases or subscription changes recorded yet.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-gray-50">
+                          {["Date", "Type", "Product / Plan", "Tokens / Storage", "Amount", "Status", "Stripe ID"].map(h => (
+                            <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {billingEvents.map(ev => {
+                          const typeLabels: Record<string, { label: string; color: string; bg: string }> = {
+                            subscription:  { label: "Plan",    color: "#6366f1", bg: "rgba(99,102,241,0.08)" },
+                            token_topup:   { label: "Tokens",  color: "#8b5cf6", bg: "rgba(139,92,246,0.08)" },
+                            storage_addon: { label: "Storage", color: "#3b82f6", bg: "rgba(59,130,246,0.08)" },
+                          };
+                          const t = typeLabels[ev.type] ?? { label: ev.type, color: "#64748b", bg: "#f8fafc" };
+                          const amount = ev.amount_cents > 0
+                            ? new Intl.NumberFormat("en-US", { style: "currency", currency: ev.currency?.toUpperCase() ?? "USD" }).format(ev.amount_cents / 100)
+                            : "Free";
+                          const stripeId = ev.stripe_session_id || ev.stripe_event_id;
+                          return (
+                            <tr key={ev.id} className="border-b border-border last:border-0 hover:bg-gray-50/50 transition-colors">
+                              <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(ev.created_at)}</td>
+                              <td className="px-4 py-3.5">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                                  style={{ background: t.bg, color: t.color }}>
+                                  {t.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5 text-xs font-semibold text-foreground capitalize">
+                                {ev.plan
+                                  ? (ev.plan === "freemium" ? "Starter" : ev.plan === "premium" ? "Growth" : ev.plan === "agency_plus" ? "Agency+" : ev.plan.replace(/_/g, " "))
+                                  : "—"}
+                              </td>
+                              <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                                {ev.tokens ? fmtTokens(ev.tokens) : ev.bytes ? formatBytes(ev.bytes) : "—"}
+                              </td>
+                              <td className="px-4 py-3.5 text-xs font-bold text-foreground">{amount}</td>
+                              <td className="px-4 py-3.5">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize
+                                  ${ev.status === "paid" || ev.status === "active"
+                                    ? "text-green-700 bg-green-50"
+                                    : ev.status === "pending"
+                                    ? "text-amber-700 bg-amber-50"
+                                    : "text-gray-600 bg-gray-100"}`}>
+                                  {ev.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5">
+                                {stripeId ? (
+                                  <span className="text-[10px] font-mono text-muted-foreground" title={stripeId}>
+                                    {stripeId.slice(0, 18)}…
+                                  </span>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

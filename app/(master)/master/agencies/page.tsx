@@ -14,6 +14,7 @@ import masterApi from "@/lib/masterApi";
 
 interface Agency {
   id: string; name: string; email: string; plan: string;
+  account_type: "agency" | "individual";
   sites_limit: number; stripe_subscription_id: string | null;
   trial_ends_at: string | null; created_at: string;
   sites_count: number; team_count: number;
@@ -64,16 +65,23 @@ const PLAN_FILTERS = [
   { key: "suspended", label: "Suspended" },
 ];
 
+const TYPE_FILTERS = [
+  { key: "all",        label: "All Users"   },
+  { key: "agency",     label: "Agency"      },
+  { key: "individual", label: "Individual"  },
+];
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function MasterAgenciesPage() {
   const router = useRouter();
-  const [agencies,   setAgencies]   = useState<Agency[]>([]);
-  const [total,      setTotal]      = useState(0);
-  const [page,       setPage]       = useState(1);
-  const [search,     setSearch]     = useState("");
-  const [planFilter, setPlan]       = useState("all");
-  const [loading,    setLoading]    = useState(true);
+  const [agencies,    setAgencies]   = useState<Agency[]>([]);
+  const [total,       setTotal]      = useState(0);
+  const [page,        setPage]       = useState(1);
+  const [search,      setSearch]     = useState("");
+  const [planFilter,  setPlan]       = useState("all");
+  const [typeFilter,  setTypeFilter] = useState("all");
+  const [loading,     setLoading]    = useState(true);
 
   // Stats / charts
   const [stats,      setStats]      = useState<PlatformStats | null>(null);
@@ -90,10 +98,10 @@ export default function MasterAgenciesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCreatePw, setShowCreatePw] = useState(false);
 
-  const load = useCallback(async (p: number, q: string, plan: string) => {
+  const load = useCallback(async (p: number, q: string, plan: string, type: string) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), limit: String(LIMIT), search: q, plan });
+      const params = new URLSearchParams({ page: String(p), limit: String(LIMIT), search: q, plan, type });
       const { data } = await masterApi.get<{ agencies: Agency[]; total: number }>(
         `/master/agencies?${params}`
       );
@@ -117,10 +125,11 @@ export default function MasterAgenciesPage() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => { load(page, search, planFilter); }, [page, search, planFilter, load]);
+  useEffect(() => { load(page, search, planFilter, typeFilter); }, [page, search, planFilter, typeFilter, load]);
 
   function handleSearch(val: string) { setSearch(val); setPage(1); }
   function handlePlan(val: string)   { setPlan(val);   setPage(1); }
+  function handleType(val: string)   { setTypeFilter(val); setPage(1); }
 
   const totalPages = Math.ceil(total / LIMIT);
   const freeCount  = (stats?.total_agencies ?? 0) - (stats?.active_paid_agencies ?? 0) - (stats?.trial_agencies ?? 0);
@@ -153,7 +162,7 @@ export default function MasterAgenciesPage() {
       toast.success(`Agency "${createForm.name}" created.`);
       setShowCreate(false);
       setCreateForm({ name: "", email: "", password: "", plan: "free" });
-      load(1, search, planFilter);
+      load(1, search, planFilter, typeFilter);
       setPage(1);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to create agency.";
@@ -302,32 +311,54 @@ export default function MasterAgenciesPage() {
       </div>
 
       {/* ── Search + filters ─────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search name or email…"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 text-sm rounded-xl border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all"
-          />
+      <div className="space-y-2.5">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search name or email…"
+              value={search}
+              onChange={e => handleSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 text-sm rounded-xl border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all"
+            />
+          </div>
+
+          <div className="flex gap-1.5 flex-wrap">
+            {PLAN_FILTERS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => handlePlan(key)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border"
+                style={planFilter === key
+                  ? { background: key === "suspended" ? "#ef4444" : AMBER, color: "#fff", borderColor: key === "suspended" ? "#ef4444" : AMBER }
+                  : { background: "#fff", color: "#6b7280", borderColor: "#e5e7eb" }
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
-          {PLAN_FILTERS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => handlePlan(key)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border"
-              style={planFilter === key
-                ? { background: key === "suspended" ? "#ef4444" : AMBER, color: "#fff", borderColor: key === "suspended" ? "#ef4444" : AMBER }
-                : { background: "#fff", color: "#6b7280", borderColor: "#e5e7eb" }
-              }
-            >
-              {label}
-            </button>
-          ))}
+        {/* User type filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0">Type</span>
+          <div className="flex gap-1.5">
+            {TYPE_FILTERS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => handleType(key)}
+                className="px-3 py-1 rounded-lg text-xs font-semibold transition-colors border"
+                style={typeFilter === key
+                  ? { background: key === "individual" ? "#6366f1" : key === "agency" ? "#0ea5e9" : "#64748b", color: "#fff", borderColor: "transparent" }
+                  : { background: "#fff", color: "#6b7280", borderColor: "#e5e7eb" }
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -337,7 +368,7 @@ export default function MasterAgenciesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-gray-50/60">
-                {["Agency", "Plan", "Status", "Sites", "Team", "Joined", ""].map(h => (
+                {["Agency", "Plan", "Type", "Status", "Sites", "Team", "Joined", ""].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                     {h}
                   </th>
@@ -357,7 +388,7 @@ export default function MasterAgenciesPage() {
                 ))
               ) : agencies.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-5 py-12 text-center text-sm text-muted-foreground">
                     No agencies found
                   </td>
                 </tr>
@@ -390,6 +421,17 @@ export default function MasterAgenciesPage() {
                         style={{ background: `${planColor(ag.plan)}15`, color: planColor(ag.plan) }}
                       >
                         {planLabel(ag.plan)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-full capitalize"
+                        style={ag.account_type === "individual"
+                          ? { background: "rgba(99,102,241,0.1)", color: "#6366f1" }
+                          : { background: "rgba(14,165,233,0.1)", color: "#0ea5e9" }
+                        }
+                      >
+                        {ag.account_type ?? "agency"}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
