@@ -93,7 +93,7 @@ export default function MasterAgenciesPage() {
 
   // Create agency modal
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: "", email: "", password: "", plan: "free" });
+  const [createForm, setCreateForm] = useState({ name: "", email: "", password: "", plan: "free", account_type: "agency" as "agency" | "individual" });
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCreatePw, setShowCreatePw] = useState(false);
@@ -161,7 +161,7 @@ export default function MasterAgenciesPage() {
       await masterApi.post("/master/agencies", createForm);
       toast.success(`Agency "${createForm.name}" created.`);
       setShowCreate(false);
-      setCreateForm({ name: "", email: "", password: "", plan: "free" });
+      setCreateForm({ name: "", email: "", password: "", plan: "free", account_type: "agency" });
       load(1, search, planFilter, typeFilter);
       setPage(1);
     } catch (e: unknown) {
@@ -559,6 +559,30 @@ export default function MasterAgenciesPage() {
                     <option key={key} value={key}>{label}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Account Type */}
+              <div>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Account Type</label>
+                <div className="flex gap-2 mt-1.5">
+                  {([
+                    { value: "agency",     label: "Agency",     color: "#0ea5e9" },
+                    { value: "individual", label: "Individual", color: "#6366f1" },
+                  ] as const).map(({ value, label, color }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setCreateForm(f => ({ ...f, account_type: value }))}
+                      className="flex-1 py-2 text-sm font-semibold rounded-xl border transition-all"
+                      style={createForm.account_type === value
+                        ? { background: color, color: "#fff", borderColor: color }
+                        : { background: "#fff", color: "#6b7280", borderColor: "#e5e7eb" }
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Error */}

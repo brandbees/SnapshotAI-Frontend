@@ -23,7 +23,7 @@
   /* Feedback */
   --destructive: #dc2626;
   --destructive-light: #fef2f2;
-  --ring: #0ea5e9;
+  --ring: #6366f1;
   --radius: 0.75rem;
 
   /* Shadows */
@@ -85,8 +85,17 @@ body {
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Thin, brand-aligned focus ring for all form inputs */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.12) !important;
 }
 
 /* Scrollbar */

@@ -166,13 +166,19 @@ export function Sidebar() {
                     key={href}
                     href={href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                      "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                       active
                         ? "bg-accent-light text-accent"
-                        : "text-muted-foreground hover:text-foreground hover:bg-gray-50"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent-light"
                     )}
                   >
-                    <Icon size={16} className={active ? "text-accent" : ""} />
+                    <Icon
+                      size={16}
+                      className={cn(
+                        "shrink-0 transition-colors",
+                        active ? "text-accent" : "group-hover:text-accent"
+                      )}
+                    />
                     {label}
                   </Link>
                 );

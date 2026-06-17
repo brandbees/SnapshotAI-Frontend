@@ -35,10 +35,10 @@ export default function RootLayout({
         {children}
         <ConfirmDialog />
         <Toaster
-          position="top-right"
+          position="top-center"
           richColors
           expand={false}
-          duration={3500}
+          duration={4500}
           toastOptions={{
             style: {
               fontFamily: "inherit",

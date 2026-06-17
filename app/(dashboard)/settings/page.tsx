@@ -1118,6 +1118,7 @@ function BillingContent() {
   const [redeemLoading, setRedeemLoading]   = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [addonLoading, setAddonLoading]       = useState<string | null>(null);
+  const [checkoutError,  setCheckoutError]    = useState<string | null>(null);
   const [tokenState, setTokenState] = useState<TokenState | null>(null);
 
   // Live data from backend
@@ -1205,20 +1206,32 @@ function BillingContent() {
   }, []);
 
   async function handleAddonCheckout(type: "tokens" | "storage", pkg: string) {
-    setAddonLoading(pkg);
+    setAddonLoading(pkg); setCheckoutError(null);
     try {
       const endpoint = type === "tokens" ? "/billing/tokens/checkout" : "/billing/storage/checkout";
       const { data } = await api.post<{ url: string }>(endpoint, { package: pkg });
       window.location.href = data.url;
-    } catch { toast.error("Failed to start checkout. Please try again."); setAddonLoading(null); }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? "Failed to start checkout. Please try again.";
+      setCheckoutError(msg);
+      toast.error(msg);
+      setAddonLoading(null);
+    }
   }
 
   async function handleUpgrade(plan: string) {
-    setCheckoutLoading(plan);
+    setCheckoutLoading(plan); setCheckoutError(null);
     try {
       const { data } = await api.post<{ url: string }>("/billing/checkout", { plan });
       window.location.href = data.url;
-    } catch { toast.error("Failed to start checkout. Please try again."); setCheckoutLoading(null); }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? "Failed to start checkout. Please try again.";
+      setCheckoutError(msg);
+      toast.error(msg);
+      setCheckoutLoading(null);
+    }
   }
 
   async function handleCouponRedeem() {
@@ -1259,6 +1272,21 @@ function BillingContent() {
           {!isIndividual && <UsageBar used={seatsUsed} total={seatsLimit} label="Team seats" />}
         </div>
       </div>
+
+      {/* Checkout error banner */}
+      {checkoutError && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span className="flex-1">{checkoutError}</span>
+          <button onClick={() => setCheckoutError(null)} className="text-red-400 hover:text-red-600 transition-colors shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Plan cards */}
       <div>
