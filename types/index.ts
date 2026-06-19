@@ -227,7 +227,7 @@ export interface Recommendation {
   effort: "low" | "medium" | "high";
 }
 
-// ── Scan results ──────────────────────────────────────────────────────────────
+// ── Legacy scan results (old scanner) ────────────────────────────────────────
 
 export interface ScanResult {
   id: string;
@@ -257,13 +257,61 @@ export interface ScanThreat {
   description?: string;
   url?: string;
   source?: string;
-  // db_threat fields
   location?: string;
   excerpt?: string;
-  // enriched fields (added by scannerService)
   _source?: 'threat_intel' | 'file_threats' | 'db_threats';
   confidence?: ThreatConfidence;
   explanation?: ThreatExplanation;
+}
+
+// ── 4-Tier Malware Scanner results ───────────────────────────────────────────
+
+export type MalwareSeverity = 'critical' | 'high' | 'medium' | 'low' | 'warning' | 'info';
+export type MalwareThreatLayer = 'file' | 'database';
+export type MalwareScanStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface MalwareFinding {
+  id: string;
+  scan_id: string;
+  site_id: string;
+  threat_layer: MalwareThreatLayer;
+  threat_tier: 1 | 2 | 3 | 4;
+  threat_type: string;
+  severity: MalwareSeverity;
+  confidence: number;
+  confidence_basis: string;
+  source_api: string;
+  score_contribution: number;
+  file_path: string | null;
+  db_location: string | null;
+  cve_id: string | null;
+  cve_url: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface MalwareScanResult {
+  id: string;
+  site_id: string;
+  agency_id: string;
+  status: MalwareScanStatus;
+  triggered_by: string | null;
+  overall_threat_score: number;
+  threats_found: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  warning_count: number;
+  info_count: number;
+  total_files_scanned: number | null;
+  total_db_checks: number | null;
+  total_urls_checked: number | null;
+  r2_report_key: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  threats: MalwareFinding[];
 }
 
 // ── Plugin data ───────────────────────────────────────────────────────────────

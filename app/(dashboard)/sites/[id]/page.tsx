@@ -27,6 +27,7 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { LoadingPage } from "@/components/shared/LoadingSpinner";
 import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { Button } from "@/components/ui/Button";
+import { MalwareScanPanel } from "@/components/sites/MalwareScanPanel";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
 import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth, PluginVulnerability, WooFatalError, WooGateway } from "@/types";
@@ -2310,8 +2311,6 @@ function SearchConsoleSection({ site, brandColor }: { site: Site; brandColor: st
 
 function MalwareTab({
   site,
-  audits,
-  scans,
   onRunScan,
   scanning,
   canRunScan,
@@ -2319,491 +2318,23 @@ function MalwareTab({
   brandColor,
 }: {
   site: Site;
-  audits: Audit[];
-  scans: ScanResult[];
   onRunScan: () => void;
   scanning: boolean;
   canRunScan: boolean;
   scanError?: string | null;
   brandColor: string;
 }) {
-  const score = site.latest_scores?.malware;
-  const [expandedScan, setExpandedScan] = useState<string | null>(null);
-
-  const latestScan = scans[0] ?? null;
-  const totalScans = scans.length;
-  const cleanScans = scans.filter((s) => s.is_clean).length;
-  const threatScans = scans.filter((s) => !s.is_clean).length;
-  const totalThreats = scans.reduce((sum, s) => sum + (s.threats?.length ?? 0), 0);
-
-  // Malware score trend from audit history
-  const completed = audits.filter((a) => a.status === "completed" && a.scores);
-  const trendPts = completed.slice(-10).map((a) => ({
-    date: new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    score: a.scores!.malware,
-  }));
-  const displayTrend = trendPts.length === 1
-    ? [{ date: "—", score: trendPts[0].score }, trendPts[0]]
-    : trendPts;
-  const scoreDelta = trendPts.length >= 2
-    ? trendPts[trendPts.length - 1].score - trendPts[0].score
-    : null;
-
-  // Unique threat types and sources across all scans
-  const allThreats = scans.flatMap((s) => s.threats ?? []);
-  const threatTypes = [...new Set(allThreats.map((t) => t.threat_type || t.type || "Unknown"))];
-  const allSources = [...new Set(scans.flatMap((s) => s.sources_used ?? []))];
-  const confirmedThreatCount = allThreats.filter((t) => t.confidence === "confirmed").length;
-  const possibleThreatCount  = allThreats.filter((t) => t.confidence !== "confirmed").length;
-
+  const scanParam = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('scan');
   return (
-    <div className="space-y-5">
-
-      {/* ── Row 1: 4 info cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-        {/* Malware Score */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-2 min-h-[190px]">
-          {score !== undefined ? (
-            <>
-              <ScoreGauge
-                score={score}
-                label="Malware"
-                sublabel={score >= 80 ? "Clean" : score >= 50 ? "Suspicious" : "Compromised"}
-                sublabelVariant={score >= 80 ? "good" : score >= 50 ? "warn" : "bad"}
-                size="md"
-                isMalware
-              />
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                {totalThreats > 0 ? `${totalThreats} threat${totalThreats !== 1 ? "s" : ""} detected` : "No threats detected"}
-              </p>
-            </>
-          ) : (
-            <div className="text-center">
-              <Shield size={32} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm font-semibold text-foreground">No scan yet</p>
-              <p className="text-xs text-muted-foreground mt-1 mb-3">Run a scan to check for malware</p>
-              {canRunScan && (
-                <button
-                  onClick={onRunScan}
-                  disabled={scanning}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
-                  style={{ background: "#8b5cf6" }}
-                >
-                  {scanning ? "Scanning…" : "Run scan"}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Last Scan */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-              <Shield size={15} className="text-purple-500" />
-            </div>
-            <p className="text-sm font-semibold text-foreground">Last Scan</p>
-          </div>
-          {latestScan ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Date</span>
-                <span className="text-xs font-semibold text-foreground">
-                  {new Date(latestScan.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Time</span>
-                <span className="text-xs font-semibold text-foreground">
-                  {new Date(latestScan.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Result</span>
-                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  latestScan.is_clean ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                }`}>
-                  {latestScan.is_clean ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                  {latestScan.is_clean ? "Clean" : "Threats Found"}
-                </span>
-              </div>
-              {!latestScan.is_clean && (latestScan.threats?.length ?? 0) > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Threats</span>
-                  <span className="text-xs font-bold text-red-600">{latestScan.threats!.length} detected</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <p className="text-xs text-muted-foreground text-center">No scans run yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Scan Summary */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-              <Activity size={15} className="text-indigo-500" />
-            </div>
-            <p className="text-sm font-semibold text-foreground">Scan Summary</p>
-          </div>
-          <div className="space-y-2.5">
-            {([
-              { label: "Total Scans",    value: totalScans,    color: "text-foreground" },
-              { label: "Clean",          value: cleanScans,    color: "text-green-600" },
-              { label: "With Threats",   value: threatScans,   color: threatScans > 0 ? "text-red-600" : "text-foreground" },
-              { label: "Total Threats",  value: totalThreats,  color: totalThreats > 0 ? "text-red-600" : "text-foreground" },
-            ] as { label: string; value: number; color: string }[]).map(({ label, value, color }) => (
-              <div key={label} className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <span className={`text-sm font-bold tabular-nums ${color}`}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Run Scan CTA */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col justify-center gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
-              <RefreshCw size={15} className="text-violet-500" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Run Scan</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Manual scan</p>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Check against our threat intelligence database for malware, suspicious URLs, and blacklisted domains.
-          </p>
-          {canRunScan ? (
-            <button
-              onClick={onRunScan}
-              disabled={scanning}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
-              style={{ background: brandColor }}
-            >
-              <RefreshCw size={13} className={scanning ? "animate-spin" : ""} />
-              {scanning ? "Scanning…" : "Run Malware Scan"}
-            </button>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center">Insufficient permissions</p>
-          )}
-          {scanError && (
-            <p className="text-xs text-center text-red-600 -mt-2">{scanError}</p>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 2: Trend chart + Threat Intelligence ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-        {/* Malware score trend */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-sm p-5">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-semibold text-foreground">Malware Score Trend</h3>
-            {scoreDelta !== null && (
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                scoreDelta >= 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
-              }`}>
-                {scoreDelta >= 0 ? "+" : ""}{scoreDelta} pts
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mb-4">Historical malware score over time</p>
-          {displayTrend.length === 0 ? (
-            <div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
-              Run audits to build trend data
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={displayTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="malGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={brandColor} stopOpacity={0.2} />
-                    <stop offset="95%" stopColor={brandColor} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-                  formatter={(v) => [`${v}`, "Malware Score"]}
-                />
-                <Area type="monotone" dataKey="score" stroke={brandColor} strokeWidth={2}
-                  fill="url(#malGrad)" dot={{ r: 3, fill: brandColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Threat Intelligence */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Threat Intelligence</h3>
-
-          {/* Overall status */}
-          <div className={`flex items-center gap-3 p-3 rounded-xl mb-4 ${
-            totalThreats === 0 && totalScans > 0 ? "bg-green-50" :
-            confirmedThreatCount > 0 ? "bg-red-50" :
-            totalThreats > 0 ? "bg-amber-50" : "bg-gray-50"
-          }`}>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-              totalThreats === 0 && totalScans > 0 ? "bg-green-100" :
-              confirmedThreatCount > 0 ? "bg-red-100" :
-              totalThreats > 0 ? "bg-amber-100" : "bg-gray-100"
-            }`}>
-              {totalThreats === 0 && totalScans > 0
-                ? <CheckCircle2 size={16} className="text-green-600" />
-                : confirmedThreatCount > 0
-                ? <XCircle size={16} className="text-red-600" />
-                : totalThreats > 0
-                ? <AlertTriangle size={16} className="text-amber-600" />
-                : <Shield size={16} className="text-gray-400" />}
-            </div>
-            <div>
-              <p className={`text-xs font-semibold ${
-                totalThreats === 0 && totalScans > 0 ? "text-green-700" :
-                confirmedThreatCount > 0 ? "text-red-700" :
-                totalThreats > 0 ? "text-amber-700" : "text-gray-600"
-              }`}>
-                {totalThreats === 0 && totalScans > 0
-                  ? "Site is clean"
-                  : confirmedThreatCount > 0
-                  ? `${confirmedThreatCount} confirmed threat${confirmedThreatCount !== 1 ? "s" : ""}`
-                  : totalThreats > 0
-                  ? `${possibleThreatCount} finding${possibleThreatCount !== 1 ? "s" : ""} need review`
-                  : "No scans yet"}
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {confirmedThreatCount > 0 && possibleThreatCount > 0
-                  ? `+ ${possibleThreatCount} unconfirmed finding${possibleThreatCount !== 1 ? "s" : ""}`
-                  : totalScans > 0
-                  ? `Across ${totalScans} scan${totalScans !== 1 ? "s" : ""}`
-                  : "Run a scan to check"}
-              </p>
-            </div>
-          </div>
-
-          {/* Threat types */}
-          {threatTypes.length > 0 && (
-            <div className="mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Threat Types Found</p>
-              <div className="flex flex-wrap gap-1.5">
-                {threatTypes.map((t) => (
-                  <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">{t}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Intelligence sources */}
-          {allSources.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Intelligence Sources</p>
-              <div className="space-y-1.5">
-                {allSources.map((s) => (
-                  <div key={s} className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
-                    <span className="text-xs text-muted-foreground">{s}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {totalScans === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">Run your first scan to see intelligence data</p>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 3: Full scan history table ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Scan History</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{totalScans} scan{totalScans !== 1 ? "s" : ""} recorded</p>
-          </div>
-          {threatScans > 0 && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-              {threatScans} with threats
-            </span>
-          )}
-        </div>
-
-        {scans.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center">
-              <Shield size={22} className="text-purple-400" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-semibold text-foreground">No scans yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Run your first malware scan to detect threats</p>
-            </div>
-            {canRunScan && (
-              <button
-                onClick={onRunScan}
-                disabled={scanning}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60 flex items-center gap-2"
-                style={{ background: brandColor }}
-              >
-                <RefreshCw size={13} className={scanning ? "animate-spin" : ""} />
-                {scanning ? "Scanning…" : "Run First Scan"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-gray-50/50">
-                  {["Date & Time", "Result", "Threats", "Sources", "Details"].map((h) => (
-                    <th key={h} className="text-left text-xs font-semibold text-muted-foreground px-5 py-3">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {scans.map((scan) => {
-                  const threatCount    = scan.threats?.length ?? 0;
-                  const scanConfirmed  = (scan.threats ?? []).filter((t) => t.confidence === "confirmed").length;
-                  const scanPossible   = threatCount - scanConfirmed;
-                  const isExpanded     = expandedScan === scan.id;
-                  const hasFindings    = threatCount > 0;
-                  return (
-                    <Fragment key={scan.id}>
-                      <tr
-                        className="border-b border-border hover:bg-gray-50/60 transition-colors cursor-pointer"
-                        onClick={() => hasFindings && setExpandedScan(isExpanded ? null : scan.id)}
-                      >
-                        <td className="px-5 py-3">
-                          <p className="text-sm text-foreground font-medium">
-                            {new Date(scan.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(scan.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </td>
-                        <td className="px-5 py-3">
-                          {scan.is_clean && threatCount === 0 ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">
-                              <CheckCircle2 size={10} /> Clean
-                            </span>
-                          ) : scanConfirmed > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
-                              <XCircle size={10} /> Confirmed
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                              <AlertTriangle size={10} /> Needs Review
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-1.5">
-                            {scanConfirmed > 0 && (
-                              <span className="text-xs font-bold text-red-600">{scanConfirmed} confirmed</span>
-                            )}
-                            {scanPossible > 0 && (
-                              <span className="text-xs font-semibold text-amber-600">{scanPossible} possible</span>
-                            )}
-                            {threatCount === 0 && <span className="text-xs text-green-600 font-bold">0</span>}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {(scan.sources_used?.length ?? 0)} source{(scan.sources_used?.length ?? 0) !== 1 ? "s" : ""}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3">
-                          {hasFindings && (
-                            <button className="flex items-center gap-1 text-xs font-medium hover:underline" style={{ color: brandColor }}>
-                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                              {isExpanded ? "Hide" : "View"}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                      {isExpanded && hasFindings && (
-                        <tr>
-                          <td colSpan={5} className="px-5 py-4 border-b border-border bg-gray-50/40">
-                            {scan.threats && scan.threats.length > 0 ? (
-                              <div className="space-y-3">
-                                {/* Context banner for unconfirmed findings */}
-                                {scanConfirmed === 0 && (
-                                  <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-                                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                                    <span>These are <strong>unconfirmed findings</strong> that require investigation before treating as real threats. Common causes include third-party CDN URLs or plugin assets flagged in intelligence feeds.</span>
-                                  </div>
-                                )}
-                                {scan.threats.map((threat, i) => {
-                                  const conf = threat.confidence ?? "needs_review";
-                                  const confStyle = conf === "confirmed"
-                                    ? { badge: "bg-red-100 text-red-700",    border: "border-red-100",    bg: "bg-white" }
-                                    : conf === "possible"
-                                    ? { badge: "bg-amber-100 text-amber-700", border: "border-amber-100", bg: "bg-white" }
-                                    : { badge: "bg-gray-100 text-gray-600",   border: "border-gray-200",  bg: "bg-white" };
-                                  const confLabel = conf === "confirmed" ? "Confirmed" : conf === "possible" ? "Possible" : "Needs Review";
-                                  const exp = threat.explanation;
-                                  return (
-                                    <div key={i} className={`rounded-xl border ${confStyle.border} ${confStyle.bg} overflow-hidden`}>
-                                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-inherit bg-gray-50/60">
-                                        <span className="text-xs font-semibold text-foreground">{threat.threat_type || threat.type || "Unknown"}</span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${confStyle.badge}`}>{confLabel}</span>
-                                      </div>
-                                      {exp ? (
-                                        <div className="px-4 py-3 space-y-2 text-xs">
-                                          <div className="flex gap-2">
-                                            <span className="text-muted-foreground w-20 shrink-0">What</span>
-                                            <span className="text-foreground">{exp.what}</span>
-                                          </div>
-                                          {exp.where && (
-                                            <div className="flex gap-2">
-                                              <span className="text-muted-foreground w-20 shrink-0">Where</span>
-                                              <span className="font-mono text-[10px] text-muted-foreground truncate">{exp.where}</span>
-                                            </div>
-                                          )}
-                                          <div className="flex gap-2">
-                                            <span className="text-muted-foreground w-20 shrink-0">Why risky</span>
-                                            <span className="text-foreground">{exp.why_risky}</span>
-                                          </div>
-                                          <div className="flex gap-2">
-                                            <span className="text-muted-foreground w-20 shrink-0">Action</span>
-                                            <span className={`font-medium ${conf === "confirmed" ? "text-red-700" : "text-amber-700"}`}>{exp.recommended_action}</span>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="px-4 py-2.5 text-xs text-muted-foreground">
-                                          {threat.url || threat.file_path || threat.location || threat.description || "No additional details available."}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                {scan.sources_used && scan.sources_used.length > 0 && (
-                                  <p className="text-[10px] text-muted-foreground px-1">
-                                    Intelligence sources: {scan.sources_used.join(", ")}
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground px-2">No specific threat details available for this scan.</p>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+    <MalwareScanPanel
+      siteId={site.id}
+      onRunScan={onRunScan}
+      scanning={scanning}
+      canRunScan={canRunScan}
+      scanError={scanError}
+      brandColor={brandColor}
+      initialOpenScanId={scanParam}
+    />
   );
 }
 
@@ -4917,18 +4448,17 @@ function SiteDetailContent() {
     setScanLoading(true);
     setScanError(null);
     try {
-      await api.post(`/scanner/scan/${id}`);
+      const { data: triggerData } = await api.post<{ scan_id: string }>(`/scan/sites/${id}/trigger`);
+      const newScanId = triggerData.scan_id;
       scanPollRef.current = setInterval(async () => {
         try {
-          const { data } = await api.get<{ status: string }>(`/scanner/${id}/status`);
+          const { data } = await api.get<{ status: string }>(`/scan/sites/${id}/status?scan_id=${newScanId}`);
           if (data.status === "completed" || data.status === "failed") {
             clearInterval(scanPollRef.current!);
             scanPollRef.current = null;
             setScanLoading(false);
             if (data.status === "failed") {
               setScanError("Scan failed. Please try again.");
-            } else {
-              refetch();
             }
           }
         } catch {
@@ -4937,7 +4467,7 @@ function SiteDetailContent() {
           setScanLoading(false);
           setScanError("Failed to check scan status.");
         }
-      }, 3000);
+      }, 4000);
     } catch (err: unknown) {
       setScanLoading(false);
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -5180,8 +4710,6 @@ function SiteDetailContent() {
         {activeTab === "malware"     && (
           <MalwareTab
             site={site}
-            audits={site.audits}
-            scans={site.scans}
             onRunScan={runScan}
             scanning={scanLoading}
             canRunScan={canRunAudit}
