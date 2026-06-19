@@ -4459,11 +4459,47 @@ function SiteDetailContent() {
     setScanLoading(true);
     setScanError(null);
     try {
-      const { data: triggerData } = await api.post<{ scan_id: string }>(`/scan/sites/${id}/trigger`);
+      const { data: triggerData } = await api.post<{ scan_id: string; mode?: string }>(`/scan/sites/${id}/trigger`);
       const newScanId = triggerData.scan_id;
+      const isPollingMode = triggerData.mode === "polling";
+
+      // Hard stop after 8 minutes — prevents infinite loop when scan is queued
+      // but the WP plugin hasn't run yet (e.g. pending cron or polling mode)
+      const deadlineMs = Date.now() + 8 * 60 * 1000;
+      let pendingTicks = 0;
+
       scanPollRef.current = setInterval(async () => {
+        // Bail out past the deadline
+        if (Date.now() > deadlineMs) {
+          clearInterval(scanPollRef.current!);
+          scanPollRef.current = null;
+          setScanLoading(false);
+          setScanError(
+            isPollingMode
+              ? "Scan scheduled — the site's security scanner will run it automatically within 2 minutes. Refresh the page to see results."
+              : "Scan is taking longer than expected. It will complete in the background — check back shortly."
+          );
+          return;
+        }
+
         try {
           const { data } = await api.get<{ status: string }>(`/scan/sites/${id}/status?scan_id=${newScanId}`);
+
+          // pending/claimed = still waiting for WP to pick it up; don't count as failure
+          if (data.status === "pending" || data.status === "claimed") {
+            pendingTicks++;
+            // After 30 ticks (~2 min) in pending, show a softer "waiting" message
+            if (pendingTicks === 30 && isPollingMode) {
+              setScanError("Waiting for site scanner to respond… (this can take up to 2 minutes)");
+            }
+            return;
+          }
+
+          // Clear any interim message once the scan actually starts
+          if (data.status === "queued" || data.status === "running") {
+            setScanError(null);
+          }
+
           if (data.status === "completed" || data.status === "failed") {
             clearInterval(scanPollRef.current!);
             scanPollRef.current = null;
