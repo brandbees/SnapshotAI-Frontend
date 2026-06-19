@@ -189,13 +189,16 @@ export default function AgentPage() {
         setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0 });
       }
     } catch (err: unknown) {
-      const resp = (err as { response?: { data?: { error?: string; tokens_used?: number; tokens_limit?: number } } })?.response;
-      const msg  = resp?.data?.error;
+      const resp = (err as { response?: { status?: number; data?: { error?: string; message?: string; tokens_used?: number; tokens_limit?: number } } })?.response;
+      const errCode = resp?.data?.error;
+      const errMsg  = resp?.data?.message;
       if (resp?.data?.tokens_used != null) {
         setTokenState({ tokens_used: resp.data.tokens_used, tokens_limit: resp.data.tokens_limit ?? 0, tokens_extra: 0 });
         setError("Token limit reached. Purchase more tokens to continue.");
+      } else if (errCode === 'rate_limit' || resp?.status === 429) {
+        setError(errMsg ?? "AI service is temporarily rate-limited. Please try again in a few minutes.");
       } else {
-        setError(msg ?? "Something went wrong. Please try again.");
+        setError(errMsg ?? errCode ?? "Something went wrong. Please try again.");
       }
     } finally {
       setLoading(false);
