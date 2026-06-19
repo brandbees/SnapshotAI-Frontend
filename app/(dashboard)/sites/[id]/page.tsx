@@ -249,6 +249,7 @@ function OverviewTab({
   const overallScore = scores
     ? Math.round((scores.performance + scores.seo + scores.security + scores.malware) / 4)
     : null;
+  const isAuditInProgress = audits.some(a => a.status === "pending" || a.status === "running");
 
   const pillarConfig: {
     key: "performance" | "seo" | "security" | "malware";
@@ -359,13 +360,23 @@ function OverviewTab({
       ) : (
         <div className="bg-white rounded-2xl border border-border shadow-sm flex items-center justify-center py-12">
           <div className="text-center">
-            <Wifi size={24} className="text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm font-semibold text-foreground">No audit data yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Run your first audit to see scores</p>
-            {canRunAudit && (
-              <Button className="mt-4" size="sm" onClick={runAudit} loading={auditLoading}>
-                Run first audit
-              </Button>
+            {isAuditInProgress ? (
+              <>
+                <Loader2 size={24} className="text-accent mx-auto mb-2 animate-spin" />
+                <p className="text-sm font-semibold text-foreground">Audit in progress…</p>
+                <p className="text-xs text-muted-foreground mt-1">Scores will appear here when it completes</p>
+              </>
+            ) : (
+              <>
+                <Wifi size={24} className="text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm font-semibold text-foreground">No audit data yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Run your first audit to see scores</p>
+                {canRunAudit && (
+                  <Button className="mt-4" size="sm" onClick={runAudit} loading={auditLoading}>
+                    Run first audit
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
