@@ -490,9 +490,9 @@ export default function AgentPage() {
       )}
 
       {/* ── Input bar ────────────────────────────────────────────────────────── */}
-      {!isFreePlan && <div className="shrink-0 bg-white border-t border-border px-6 py-4">
+      {!isFreePlan && <div className="shrink-0 bg-[#f8fafc] border-t border-border px-6 pb-5 pt-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex gap-3 items-end bg-white border border-border rounded-2xl px-4 py-3 transition-shadow">
+          <div className="flex gap-3 items-end bg-white border border-border rounded-2xl px-4 py-3 shadow-sm focus-within:border-[color:var(--accent)]/40 focus-within:shadow-md transition-all">
             <textarea
               ref={inputRef}
               value={input}
