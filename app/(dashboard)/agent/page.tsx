@@ -492,7 +492,7 @@ export default function AgentPage() {
       {/* ── Input bar ────────────────────────────────────────────────────────── */}
       {!isFreePlan && <div className="shrink-0 bg-[#f8fafc] border-t border-border px-6 pb-5 pt-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex gap-3 items-end bg-white border border-border rounded-2xl px-4 py-3 shadow-sm focus-within:border-[color:var(--accent)]/40 focus-within:shadow-md transition-all">
+          <div className="flex gap-3 items-end bg-white rounded-2xl px-4 py-3 shadow-sm focus-within:shadow-md transition-shadow">
             <textarea
               ref={inputRef}
               value={input}
@@ -507,7 +507,7 @@ export default function AgentPage() {
               }
               rows={1}
               disabled={!canUseAgent}
-              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground py-0.5 max-h-32 border-0 ring-0 disabled:cursor-not-allowed"
+              className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground py-0.5 max-h-32 border-0 ring-0 disabled:cursor-not-allowed"
               style={{ outline: "none", boxShadow: "none", overflowY: "auto" }}
             />
             <button
