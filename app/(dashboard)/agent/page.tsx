@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Bot, Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
-         Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X } from "lucide-react";
+         Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X,
+         AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { mapSite, type RawSite } from "@/lib/mappers";
@@ -44,14 +45,169 @@ interface ToolCall {
 }
 
 const TOOL_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  run_audit:          { label: "Audit triggered",        icon: Play,        color: "#6366f1" },
-  send_report:        { label: "Report queued",          icon: FileText,    color: "#0ea5e9" },
-  update_schedule:    { label: "Schedule updated",       icon: Calendar,    color: "#10b981" },
-  list_sites:         { label: "Sites fetched",          icon: List,        color: "#8b5cf6" },
-  get_scores:         { label: "Scores retrieved",       icon: Zap,         color: "#f59e0b" },
-  get_malware_status: { label: "Malware status checked", icon: ShieldCheck, color: "#ef4444" },
-  get_live_site_data: { label: "Live data fetched",      icon: Database,    color: "#0891b2" },
+  run_audit:               { label: "Audit triggered",        icon: Play,        color: "#6366f1" },
+  send_report:             { label: "Report queued",          icon: FileText,    color: "#0ea5e9" },
+  update_schedule:         { label: "Schedule updated",       icon: Calendar,    color: "#10b981" },
+  list_sites:              { label: "Sites fetched",          icon: List,        color: "#8b5cf6" },
+  get_scores:              { label: "Scores retrieved",       icon: Zap,         color: "#f59e0b" },
+  get_malware_status:      { label: "Malware status checked", icon: ShieldCheck, color: "#ef4444" },
+  get_live_site_data:      { label: "Live data fetched",      icon: Database,    color: "#0891b2" },
+  preview_write_operation: { label: "Write preview ready",    icon: Wrench,      color: "#7c3aed" },
 };
+
+interface WritePreview {
+  write_preview:  boolean;
+  operation:      string;
+  site_id:        string;
+  site_name:      string;
+  risk_level:     "low" | "medium" | "high";
+  risk_label:     string;
+  risk_color:     string;
+  description:    string;
+  counts:         Record<string, unknown>;
+  target_options: string[] | null;
+  can_undo:       boolean;
+}
+
+const OP_LABELS: Record<string, string> = {
+  delete_expired_transients: "Delete Expired Transients",
+  fix_file_permissions:      "Fix File Permissions",
+  delete_post_revisions:     "Delete Post Revisions",
+  optimize_db_tables:        "Optimize DB Tables",
+  delete_orphaned_options:   "Delete Orphaned Options",
+  clear_all_transients:      "Clear All Transients",
+};
+
+function WriteConfirmCard({ call, siteId }: { call: ToolCall; siteId: string }) {
+  const preview = call.result as unknown as WritePreview;
+  const [phase, setPhase]         = useState<"idle" | "running" | "done" | "undo_running" | "undone" | "error">("idle");
+  const [resultMsg, setResultMsg] = useState<string>("");
+  const [snapshotId, setSnapshotId] = useState<string>("");
+  const [canUndo, setCanUndo]     = useState<boolean>(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
+  const riskIcon = preview.risk_level === "low"
+    ? <CheckCircle2 size={13} className="text-green-600 shrink-0" />
+    : preview.risk_level === "medium"
+    ? <AlertTriangle size={13} className="text-yellow-500 shrink-0" />
+    : <AlertTriangle size={13} className="text-red-500 shrink-0" />;
+
+  const confirm = async () => {
+    setPhase("running");
+    try {
+      const { data } = await api.post<{ success: boolean; snapshot_id: string; can_undo: boolean; message: string }>("/agent/write", {
+        site_id:        siteId,
+        operation:      preview.operation,
+        target_options: preview.target_options ?? undefined,
+      });
+      setSnapshotId(data.snapshot_id);
+      setCanUndo(data.can_undo);
+      setResultMsg(data.message ?? "Operation completed.");
+      setPhase("done");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setResultMsg(msg ?? "Operation failed. Please try again.");
+      setPhase("error");
+    }
+  };
+
+  const undo = async () => {
+    setPhase("undo_running");
+    try {
+      const { data } = await api.post<{ message: string }>("/agent/write/undo", { snapshot_id: snapshotId });
+      setResultMsg(data.message ?? "Undo completed.");
+      setPhase("undone");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setResultMsg(msg ?? "Undo failed.");
+      setPhase("error");
+    }
+  };
+
+  const borderColor = preview.risk_level === "low" ? "#16a34a" : preview.risk_level === "medium" ? "#d97706" : "#dc2626";
+  const bgColor     = preview.risk_level === "low" ? "#f0fdf4" : preview.risk_level === "medium" ? "#fffbeb" : "#fef2f2";
+
+  return (
+    <div className="mt-2 rounded-xl border overflow-hidden text-xs" style={{ borderColor, background: bgColor }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 border-b" style={{ borderColor }}>
+        <div className="flex items-center gap-2">
+          <Wrench size={12} style={{ color: preview.risk_color }} />
+          <span className="font-semibold" style={{ color: preview.risk_color }}>
+            {OP_LABELS[preview.operation] ?? preview.operation}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {riskIcon}
+          <span className="font-medium" style={{ color: preview.risk_color }}>{preview.risk_label}</span>
+          {phase === "idle" && (
+            <button onClick={() => setDismissed(true)} className="ml-1 p-0.5 rounded hover:bg-black/10 text-muted-foreground">
+              <X size={10} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="px-3.5 py-2.5 space-y-2.5">
+        <p className="text-foreground leading-snug">{preview.description}</p>
+
+        {/* Result / undo */}
+        {phase === "done" && (
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <div className="flex items-center gap-1.5 text-green-700">
+              <Check size={11} />
+              <span>{resultMsg}</span>
+            </div>
+            {canUndo && (
+              <button onClick={undo}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors">
+                <Undo2 size={10} /> Undo
+              </button>
+            )}
+          </div>
+        )}
+
+        {(phase === "undo_running" || phase === "undone") && (
+          <div className="flex items-center gap-1.5 text-foreground">
+            {phase === "undo_running"
+              ? <><Loader2 size={11} className="animate-spin" /> Undoing…</>
+              : <><Check size={11} className="text-green-600" /> {resultMsg}</>
+            }
+          </div>
+        )}
+
+        {phase === "error" && (
+          <p className="text-destructive">{resultMsg}</p>
+        )}
+
+        {/* Confirm / cancel buttons */}
+        {phase === "idle" && (
+          <div className="flex items-center gap-2 pt-0.5">
+            <button onClick={confirm}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-medium transition-opacity hover:opacity-90"
+              style={{ background: preview.risk_color }}>
+              <Trash2 size={11} /> Confirm
+            </button>
+            <button onClick={() => setDismissed(true)}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {phase === "running" && (
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Loader2 size={11} className="animate-spin" style={{ color: preview.risk_color }} />
+            <span>Running…</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Strip artifacts that Llama models sometimes emit as literal text:
 //  - <function=... /> / <function>...</function> syntax
@@ -406,7 +562,9 @@ export default function AgentPage() {
                     </div>
                     {/* Tool call cards — shown below the assistant message */}
                     {msg.role === "assistant" && toolCallsMap[i] && toolCallsMap[i].map((tc, j) => (
-                      <ToolCallCard key={j} call={tc} />
+                      tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview
+                        ? <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} />
+                        : <ToolCallCard key={j} call={tc} />
                     ))}
                   </div>
                 </div>
