@@ -89,9 +89,10 @@ function ToolCallCard({ call }: { call: ToolCall }) {
 }
 
 function TokenBar({ state }: { state: TokenState }) {
-  const pct  = state.tokens_limit > 0 ? Math.min(100, (state.tokens_used / state.tokens_limit) * 100) : 0;
-  const warn = pct >= 80;
-  const fmt  = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+  const pct      = state.tokens_limit > 0 ? Math.min(100, (state.tokens_used / state.tokens_limit) * 100) : 0;
+  const warn     = pct >= 80;
+  const fmt      = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+  const baseLimit = state.tokens_limit - state.tokens_extra;
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border bg-muted/20 text-[11px] shrink-0">
@@ -101,7 +102,7 @@ function TokenBar({ state }: { state: TokenState }) {
           style={{ width: `${pct}%`, background: warn ? "#ef4444" : "var(--accent)" }} />
       </div>
       <span className="text-muted-foreground tabular-nums whitespace-nowrap">
-        {fmt(state.tokens_used)} / {fmt(state.tokens_limit)}
+        {fmt(state.tokens_used)} / {fmt(baseLimit)}
       </span>
       {state.tokens_extra > 0 && (
         <span className="text-green-600 font-medium">+{fmt(state.tokens_extra)} extra</span>
