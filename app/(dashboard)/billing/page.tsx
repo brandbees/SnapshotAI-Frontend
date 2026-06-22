@@ -276,11 +276,17 @@ function BillingPage() {
 
       {/* AI Token usage */}
       {(() => {
-        const tokenExtra = agency?.ai_tokens_extra ?? 0;
-        const tokenUsed  = agency?.ai_tokens_used  ?? 0;
-        const tokenTotal = dynTokenLimit + tokenExtra;
-        const tokenPct   = tokenTotal > 0 ? Math.min(100, (tokenUsed / tokenTotal) * 100) : 0;
-        const tokenWarn  = tokenPct >= 80;
+        const tokenExtra      = agency?.ai_tokens_extra      ?? 0;
+        const tokenExtraUsed  = agency?.ai_tokens_extra_used ?? 0;
+        const tokenUsed       = agency?.ai_tokens_used       ?? 0;
+        const tokenTotal      = dynTokenLimit + tokenExtra;
+        // Compute actual remaining: base headroom this month + extra headroom (lifetime)
+        const baseHeadroom    = Math.max(0, dynTokenLimit - tokenUsed);
+        const extraHeadroom   = Math.max(0, tokenExtra - tokenExtraUsed);
+        const actualRemaining = baseHeadroom + extraHeadroom;
+        const effectiveUsed   = Math.max(0, tokenTotal - actualRemaining);
+        const tokenPct        = tokenTotal > 0 ? Math.min(100, (effectiveUsed / tokenTotal) * 100) : 0;
+        const tokenWarn       = tokenPct >= 80;
         const resetAt    = agency?.ai_tokens_reset_at
           ? new Date(agency.ai_tokens_reset_at).toLocaleDateString("en-GB", { month: "short", day: "numeric" })
           : null;
@@ -299,8 +305,8 @@ function BillingPage() {
               <div>
                 <div className="flex justify-between mb-1.5">
                   <span className="text-xs text-muted-foreground">
-                    {fmtTokens(tokenUsed)} used of {fmtTokens(tokenTotal)} tokens
-                    {tokenExtra > 0 && <span className="ml-1 text-indigo-500">(+{fmtTokens(tokenExtra)} extra)</span>}
+                    {fmtTokens(effectiveUsed)} used of {fmtTokens(tokenTotal)} tokens
+                    {tokenExtra > 0 && <span className={`ml-1 ${extraHeadroom <= 0 ? "text-red-500" : "text-indigo-500"}`}>(+{fmtTokens(tokenExtra)} extra)</span>}
                   </span>
                   <span className={`text-xs font-semibold ${tokenWarn ? "text-red-600" : "text-foreground"}`}>
                     {tokenPct.toFixed(0)}%
@@ -319,7 +325,7 @@ function BillingPage() {
 
               {tokenPackageList.length > 0 ? (
                 <div className={`grid gap-3 ${tokenPackageList.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-                  {tokenPackageList.map(({ key, tokens, price_cents, label }) => (
+                  {tokenPackageList.map(({ key, tokens, price_cents }) => (
                     <button key={key} onClick={() => handleAddonCheckout("tokens", key)}
                       disabled={addonLoading === key}
                       className="flex flex-col items-center gap-1 rounded-xl border border-border p-3 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 transition-colors disabled:opacity-50">
@@ -378,7 +384,7 @@ function BillingPage() {
 
               {storagePackageList.length > 0 ? (
                 <div className={`grid gap-3 ${storagePackageList.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-                  {storagePackageList.map(({ key, bytes, price_cents, label }) => (
+                  {storagePackageList.map(({ key, bytes, price_cents }) => (
                     <button key={key} onClick={() => handleAddonCheckout("storage", key)}
                       disabled={addonLoading === key}
                       className="flex flex-col items-center gap-1 rounded-xl border border-border p-3 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 transition-colors disabled:opacity-50">

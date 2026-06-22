@@ -23,6 +23,7 @@ export interface Agency {
   is_client_portal?: boolean;
   ai_tokens_used?: number;
   ai_tokens_extra?: number;
+  ai_tokens_extra_used?: number;
   ai_tokens_reset_at?: string | null;
   storage_used_bytes?: number;
   storage_extra_bytes?: number;
