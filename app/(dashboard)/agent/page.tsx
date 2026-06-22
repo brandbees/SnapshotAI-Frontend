@@ -33,10 +33,11 @@ const SUGGESTIONS_SITE = [
 ];
 
 interface TokenState {
-  tokens_used:   number;
-  tokens_limit:  number;
-  tokens_extra:  number;
-  monthly_limit?: number;
+  tokens_used:      number;
+  tokens_limit:     number;   // base + total purchased (e.g. 270k)
+  tokens_extra:     number;   // total extra purchased (e.g. 250k)
+  extra_remaining?: number;   // extra still available (e.g. 43k)
+  monthly_limit?:   number;   // plan base limit (e.g. 20k)
 }
 
 interface ToolCall {
@@ -246,12 +247,10 @@ function ToolCallCard({ call }: { call: ToolCall }) {
 }
 
 function TokenBar({ state }: { state: TokenState }) {
+  const fmt      = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+  // Bar shows used vs total capacity (base + all purchased extra)
   const pct      = state.tokens_limit > 0 ? Math.min(100, (state.tokens_used / state.tokens_limit) * 100) : 0;
   const warn     = pct >= 80;
-  const fmt      = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-  // monthly_limit is the plan's base token cap. Fall back to the old derivation
-  // only for stale responses that predate the tokens_limit formula fix.
-  const baseLimit = state.monthly_limit ?? (state.tokens_limit - state.tokens_extra);
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border bg-muted/20 text-[11px] shrink-0">
@@ -261,7 +260,7 @@ function TokenBar({ state }: { state: TokenState }) {
           style={{ width: `${pct}%`, background: warn ? "#ef4444" : "var(--accent)" }} />
       </div>
       <span className="text-muted-foreground tabular-nums whitespace-nowrap">
-        {fmt(state.tokens_used)} / {fmt(baseLimit)}
+        {fmt(state.tokens_used)} / {fmt(state.tokens_limit)}
       </span>
       {state.tokens_extra > 0 && (
         <span className="text-green-600 font-medium">+{fmt(state.tokens_extra)} extra</span>
@@ -325,6 +324,7 @@ export default function AgentPage() {
         tokens_used?: number;
         tokens_limit?: number;
         tokens_extra?: number;
+        extra_remaining?: number;
         monthly_limit?: number;
         needs_site_selection?: boolean;
       }>("/agent/chat", {
@@ -347,14 +347,14 @@ export default function AgentPage() {
       }
 
       if (data.tokens_used != null) {
-        setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0, monthly_limit: data.monthly_limit });
+        setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0, extra_remaining: data.extra_remaining, monthly_limit: data.monthly_limit });
       }
     } catch (err: unknown) {
-      const resp = (err as { response?: { status?: number; data?: { error?: string; message?: string; tokens_used?: number; tokens_limit?: number; tokens_extra?: number; monthly_limit?: number } } })?.response;
+      const resp = (err as { response?: { status?: number; data?: { error?: string; message?: string; tokens_used?: number; tokens_limit?: number; tokens_extra?: number; extra_remaining?: number; monthly_limit?: number } } })?.response;
       const errCode = resp?.data?.error;
       const errMsg  = resp?.data?.message;
       if (resp?.data?.tokens_used != null) {
-        setTokenState({ tokens_used: resp.data.tokens_used, tokens_limit: resp.data.tokens_limit ?? 0, tokens_extra: resp.data.tokens_extra ?? 0, monthly_limit: resp.data.monthly_limit });
+        setTokenState({ tokens_used: resp.data.tokens_used, tokens_limit: resp.data.tokens_limit ?? 0, tokens_extra: resp.data.tokens_extra ?? 0, extra_remaining: resp.data.extra_remaining, monthly_limit: resp.data.monthly_limit });
         setError("Token limit reached. Purchase more tokens to continue.");
       } else if (errCode === 'rate_limit' || resp?.status === 429) {
         setError(errMsg ?? "AI service is temporarily rate-limited. Please try again in a few minutes.");
