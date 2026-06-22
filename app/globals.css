@@ -68,6 +68,14 @@
   --color-score-bad: var(--score-bad);
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --radius: var(--radius);
+
+  /* ── Font-size scale — bumped for readability, xl+ kept at Tailwind defaults ──
+     xs: 12→13px  sm: 14→15px  base: 16→17px  lg: 18→19px
+     xl: 20px (default)  2xl: 24px (default)                                      */
+  --text-xs:   0.8125rem;   /* 13px */
+  --text-sm:   0.9375rem;   /* 15px */
+  --text-base: 1.0625rem;   /* 17px */
+  --text-lg:   1.1875rem;   /* 19px */
 }
 
 * {
@@ -82,6 +90,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Bump hardcoded pixel sizes used for micro-labels — not affected by the theme scale above */
+.text-\[10px\]    { font-size: 11px !important; }
+.text-\[10\.5px\] { font-size: 12px !important; }
+.text-\[11px\]    { font-size: 12px !important; }
 
 /* Focus ring */
 :focus-visible {

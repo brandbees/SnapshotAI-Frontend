@@ -127,78 +127,182 @@ function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366
   );
 }
 
-// ── Portfolio Health Score ────────────────────────────────────────────────────
+// ── Portfolio Health ──────────────────────────────────────────────────────────
 
-function PortfolioHealthScore({ portfolio }: { portfolio: PortfolioStats }) {
+function AlertRow({ icon, label, sub, severity }: {
+  icon: React.ReactNode; label: string; sub: string; severity: "critical" | "warning";
+}) {
+  const crit = severity === "critical";
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-xl border ${crit ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${crit ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-500"}`}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-semibold ${crit ? "text-red-700" : "text-amber-700"}`}>{label}</p>
+        <p className={`text-[10px] ${crit ? "text-red-400" : "text-amber-400"}`}>{sub}</p>
+      </div>
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${crit ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+        {crit ? "Critical" : "Warning"}
+      </span>
+    </div>
+  );
+}
+
+function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
   const { avg_score, total_sites, healthy, warning, critical, malware_detected, sites_down, ssl_expiring } = portfolio;
 
-  const scoreColor = avg_score == null ? "#6b7280" : avg_score >= 80 ? "#16a34a" : avg_score >= 50 ? "#d97706" : "#dc2626";
-  const scoreLabel = avg_score == null ? "No data" : avg_score >= 80 ? "Healthy" : avg_score >= 50 ? "Needs Attention" : "Critical";
+  const score     = avg_score ?? 0;
+  const scoreLabel = avg_score == null ? "No data" : score >= 80 ? "Healthy" : score >= 50 ? "Needs Attention" : "Critical";
+  const pct        = (n: number) => total_sites > 0 ? Math.round((n / total_sites) * 100) : 0;
+  const hasAlerts  = malware_detected > 0 || sites_down > 0 || ssl_expiring > 0;
 
-  const pct = (n: number) => total_sites > 0 ? Math.round((n / total_sites) * 100) : 0;
+  // SVG arc gauge — 240° arc opening at the bottom (150° → 30° clockwise)
+  const W = 160, H = 110, cx = W / 2, cy = 70, R = 52;
+  function pt(deg: number) {
+    const rad = (deg * Math.PI) / 180;
+    return `${(cx + R * Math.cos(rad)).toFixed(2)} ${(cy + R * Math.sin(rad)).toFixed(2)}`;
+  }
+  const bgArc  = `M ${pt(150)} A ${R} ${R} 0 1 1 ${pt(30)}`;
+  const filledDeg = 150 + (score / 100) * 240;
+  const fgArc  = score > 0
+    ? `M ${pt(150)} A ${R} ${R} 0 ${(score / 100) * 240 > 180 ? 1 : 0} 1 ${pt(filledDeg)}`
+    : null;
+
+  const statusRows = [
+    { label: "Healthy",  count: healthy,  color: "#16a34a", numBg: "#f0fdf4", trackBg: "#dcfce7" },
+    { label: "Warning",  count: warning,  color: "#d97706", numBg: "#fffbeb", trackBg: "#fef9c3" },
+    { label: "Critical", count: critical, color: "#dc2626", numBg: "#fef2f2", trackBg: "#fee2e2" },
+  ];
+
+  const alertCount = (malware_detected > 0 ? 1 : 0) + (sites_down > 0 ? 1 : 0) + (ssl_expiring > 0 ? 1 : 0);
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Portfolio Health</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Aggregate across all {total_sites} site{total_sites !== 1 ? "s" : ""}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-3xl font-bold tabular-nums" style={{ color: scoreColor }}>
-            {avg_score ?? "—"}
-          </span>
-          <div className="text-right">
-            <p className="text-xs font-semibold" style={{ color: scoreColor }}>{scoreLabel}</p>
-            <p className="text-[10px] text-muted-foreground">avg score</p>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      {/* ── Card 1: Score gauge ── */}
+      <div className="rounded-2xl overflow-hidden relative"
+        style={{ background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" }}>
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)" }} />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)" }} />
+
+        <div className="relative p-5 flex flex-col">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Portfolio Health
+            </p>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
+              {total_sites} {total_sites === 1 ? "site" : "sites"}
+            </span>
+          </div>
+
+          <div className="flex justify-center mt-1">
+            <svg width={W} height={H} style={{ overflow: "visible" }}>
+              <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={11} strokeLinecap="round" />
+              {fgArc && (
+                <path d={fgArc} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={11} strokeLinecap="round"
+                  style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.4))" }} />
+              )}
+              <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle"
+                fill="white" fontSize={30} fontWeight={700} fontFamily="system-ui,sans-serif">
+                {avg_score ?? "—"}
+              </text>
+              <text x={cx} y={cy + 17} textAnchor="middle" dominantBaseline="middle"
+                fill="rgba(255,255,255,0.4)" fontSize={10} fontFamily="system-ui,sans-serif">
+                out of 100
+              </text>
+            </svg>
+          </div>
+
+          <div className="flex justify-center -mt-1">
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full"
+              style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.9)" }}>
+              {scoreLabel}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Status breakdown bar */}
-      <div className="flex rounded-full overflow-hidden h-2 mb-3 gap-0.5">
-        {healthy  > 0 && <div className="bg-green-500 transition-all" style={{ width: `${pct(healthy)}%` }} title={`${healthy} healthy`} />}
-        {warning  > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${pct(warning)}%` }} title={`${warning} warning`} />}
-        {critical > 0 && <div className="bg-red-500 transition-all"   style={{ width: `${pct(critical)}%` }} title={`${critical} critical`} />}
-        {total_sites === 0 && <div className="bg-gray-200 w-full" />}
+      {/* ── Card 2: Site status breakdown ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-4">Site Status</p>
+        <div className="space-y-3.5">
+          {statusRows.map(({ label, count, color, numBg, trackBg }) => (
+            <div key={label} className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base font-bold tabular-nums"
+                style={{ background: numBg, color }}>
+                {count}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs font-medium text-foreground">{label}</span>
+                  <span className="text-[10px] font-bold tabular-nums" style={{ color }}>{pct(count)}%</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: trackBg }}>
+                  <div className="h-full rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${pct(count)}%`, background: color }} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 pt-3.5 border-t border-border flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Monitored sites</span>
+          <span className="text-sm font-bold text-foreground tabular-nums">{total_sites}</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="text-center">
-          <p className="text-lg font-bold text-green-600">{healthy}</p>
-          <p className="text-[10px] text-muted-foreground">Healthy</p>
+      {/* ── Card 3: Active alerts ── */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Active Alerts</p>
+          {hasAlerts && (
+            <span className="text-[10px] font-bold bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+              {alertCount} active
+            </span>
+          )}
         </div>
-        <div className="text-center border-x border-border">
-          <p className="text-lg font-bold text-amber-500">{warning}</p>
-          <p className="text-[10px] text-muted-foreground">Warning</p>
-        </div>
-        <div className="text-center">
-          <p className="text-lg font-bold text-red-600">{critical}</p>
-          <p className="text-[10px] text-muted-foreground">Critical</p>
-        </div>
-      </div>
 
-      {/* Alert flags */}
-      <div className="flex flex-wrap gap-2">
-        {malware_detected > 0 && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700">
-            {malware_detected} malware threat{malware_detected !== 1 ? "s" : ""}
-          </span>
-        )}
-        {sites_down > 0 && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700">
-            {sites_down} site{sites_down !== 1 ? "s" : ""} down
-          </span>
-        )}
-        {ssl_expiring > 0 && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-            {ssl_expiring} SSL expiring soon
-          </span>
-        )}
-        {malware_detected === 0 && sites_down === 0 && ssl_expiring === 0 && total_sites > 0 && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
-            No active alerts
-          </span>
+        {!hasAlerts ? (
+          <div className="flex flex-col items-center justify-center py-5 gap-3 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center">
+              <Shield size={22} className="text-green-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">All Clear</p>
+              <p className="text-xs text-muted-foreground mt-0.5">No active threats detected</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {malware_detected > 0 && (
+              <AlertRow
+                icon={<Shield size={13} />}
+                label={`${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`}
+                sub="Immediate action required"
+                severity="critical"
+              />
+            )}
+            {sites_down > 0 && (
+              <AlertRow
+                icon={<WifiOff size={13} />}
+                label={`${sites_down} site${sites_down !== 1 ? "s" : ""} offline`}
+                sub="Check uptime monitor"
+                severity="critical"
+              />
+            )}
+            {ssl_expiring > 0 && (
+              <AlertRow
+                icon={<Lock size={13} />}
+                label={`${ssl_expiring} SSL expiring soon`}
+                sub="Renew before expiry"
+                severity="warning"
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -609,8 +713,8 @@ export default function DashboardPage() {
         <NextStepsPanel sites={sites} />
       )}
 
-      {/* ── Portfolio Health Score (agency/team only) */}
-      {portfolio && !agency?.is_client_portal && <PortfolioHealthScore portfolio={portfolio} />}
+      {/* ── Portfolio Health (agency/team only) */}
+      {portfolio && !agency?.is_client_portal && <PortfolioHealthSection portfolio={portfolio} />}
 
       {/* ── 6 Stat Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
