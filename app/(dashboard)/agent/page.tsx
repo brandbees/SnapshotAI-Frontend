@@ -33,9 +33,10 @@ const SUGGESTIONS_SITE = [
 ];
 
 interface TokenState {
-  tokens_used:  number;
-  tokens_limit: number;
-  tokens_extra: number;
+  tokens_used:   number;
+  tokens_limit:  number;
+  tokens_extra:  number;
+  monthly_limit?: number;
 }
 
 interface ToolCall {
@@ -248,7 +249,9 @@ function TokenBar({ state }: { state: TokenState }) {
   const pct      = state.tokens_limit > 0 ? Math.min(100, (state.tokens_used / state.tokens_limit) * 100) : 0;
   const warn     = pct >= 80;
   const fmt      = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-  const baseLimit = state.tokens_limit - state.tokens_extra;
+  // monthly_limit is the plan's base token cap. Fall back to the old derivation
+  // only for stale responses that predate the tokens_limit formula fix.
+  const baseLimit = state.monthly_limit ?? (state.tokens_limit - state.tokens_extra);
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border bg-muted/20 text-[11px] shrink-0">
@@ -322,6 +325,7 @@ export default function AgentPage() {
         tokens_used?: number;
         tokens_limit?: number;
         tokens_extra?: number;
+        monthly_limit?: number;
         needs_site_selection?: boolean;
       }>("/agent/chat", {
         message: text,
@@ -343,14 +347,14 @@ export default function AgentPage() {
       }
 
       if (data.tokens_used != null) {
-        setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0 });
+        setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0, monthly_limit: data.monthly_limit });
       }
     } catch (err: unknown) {
-      const resp = (err as { response?: { status?: number; data?: { error?: string; message?: string; tokens_used?: number; tokens_limit?: number } } })?.response;
+      const resp = (err as { response?: { status?: number; data?: { error?: string; message?: string; tokens_used?: number; tokens_limit?: number; tokens_extra?: number; monthly_limit?: number } } })?.response;
       const errCode = resp?.data?.error;
       const errMsg  = resp?.data?.message;
       if (resp?.data?.tokens_used != null) {
-        setTokenState({ tokens_used: resp.data.tokens_used, tokens_limit: resp.data.tokens_limit ?? 0, tokens_extra: 0 });
+        setTokenState({ tokens_used: resp.data.tokens_used, tokens_limit: resp.data.tokens_limit ?? 0, tokens_extra: resp.data.tokens_extra ?? 0, monthly_limit: resp.data.monthly_limit });
         setError("Token limit reached. Purchase more tokens to continue.");
       } else if (errCode === 'rate_limit' || resp?.status === 429) {
         setError(errMsg ?? "AI service is temporarily rate-limited. Please try again in a few minutes.");
