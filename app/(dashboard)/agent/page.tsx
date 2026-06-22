@@ -69,6 +69,11 @@ interface WritePreview {
   counts:         Record<string, unknown>;
   target_options: string[] | null;
   can_undo:       boolean;
+  // Extra params for new operations
+  plugin_path?:   string | null;
+  user_id?:       number | null;
+  constant?:      string | null;
+  value?:         unknown;
 }
 
 const OP_LABELS: Record<string, string> = {
@@ -102,7 +107,11 @@ function WriteConfirmCard({ call, siteId }: { call: ToolCall; siteId: string }) 
       const { data } = await api.post<{ success: boolean; snapshot_id: string; can_undo: boolean; message: string }>("/agent/write", {
         site_id:        siteId,
         operation:      preview.operation,
-        target_options: preview.target_options ?? undefined,
+        target_options: preview.target_options  ?? undefined,
+        plugin_path:    preview.plugin_path     ?? undefined,
+        user_id:        preview.user_id         ?? undefined,
+        constant:       preview.constant        ?? undefined,
+        value:          preview.value           ?? undefined,
       });
       setSnapshotId(data.snapshot_id);
       setCanUndo(data.can_undo);
