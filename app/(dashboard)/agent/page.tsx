@@ -247,10 +247,20 @@ function ToolCallCard({ call }: { call: ToolCall }) {
 }
 
 function TokenBar({ state }: { state: TokenState }) {
-  const fmt      = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-  // Bar shows used vs total capacity (base + all purchased extra)
-  const pct      = state.tokens_limit > 0 ? Math.min(100, (state.tokens_used / state.tokens_limit) * 100) : 0;
-  const warn     = pct >= 80;
+  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+
+  // Compute actual remaining using server-supplied extra_remaining + base headroom.
+  // tokens_used is a monthly counter (resets each month) — it does NOT represent
+  // total lifetime consumption. extra_remaining comes from the server and already
+  // accounts for all months of extra usage, so combining them gives the true picture.
+  const monthlyBase    = state.monthly_limit ?? state.tokens_limit;
+  const baseHeadroom   = Math.max(0, monthlyBase - state.tokens_used);
+  const extraHeadroom  = Math.max(0, state.extra_remaining ?? 0);
+  const actualRemaining = baseHeadroom + extraHeadroom;
+  const effectiveUsed  = Math.max(0, state.tokens_limit - actualRemaining);
+
+  const pct  = state.tokens_limit > 0 ? Math.min(100, (effectiveUsed / state.tokens_limit) * 100) : 0;
+  const warn = pct >= 80;
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border bg-muted/20 text-[11px] shrink-0">
@@ -260,10 +270,12 @@ function TokenBar({ state }: { state: TokenState }) {
           style={{ width: `${pct}%`, background: warn ? "#ef4444" : "var(--accent)" }} />
       </div>
       <span className="text-muted-foreground tabular-nums whitespace-nowrap">
-        {fmt(state.tokens_used)} / {fmt(state.tokens_limit)}
+        {fmt(effectiveUsed)} / {fmt(state.tokens_limit)}
       </span>
       {state.tokens_extra > 0 && (
-        <span className="text-green-600 font-medium">+{fmt(state.tokens_extra)} extra</span>
+        <span className={extraHeadroom <= 0 ? "text-red-500 font-medium" : "text-green-600 font-medium"}>
+          +{fmt(state.tokens_extra)} extra
+        </span>
       )}
     </div>
   );
