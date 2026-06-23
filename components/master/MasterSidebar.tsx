@@ -25,6 +25,7 @@ import {
   Mail,
   Megaphone,
   Download,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMasterPlatform } from "@/context/MasterPlatformContext";
@@ -47,6 +48,7 @@ const navGroups = [
       { href: "/master/coupons",         label: "Coupons",         icon: Tag,             minRole: "admin"       },
       { href: "/master/email-blast",     label: "Email Blast",     icon: Mail,            minRole: "admin"       },
       { href: "/master/announcements",   label: "Announcements",   icon: Megaphone,       minRole: "admin"       },
+      { href: "/master/pages",           label: "Pages (CMS)",     icon: Layers,          minRole: "admin"       },
       { href: "/master/export",          label: "Export Center",   icon: Download,        minRole: "super_admin" },
     ],
   },
