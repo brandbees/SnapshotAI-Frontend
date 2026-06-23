@@ -194,6 +194,14 @@ function WriteConfirmCard({ call, siteId }: { call: ToolCall; siteId: string }) 
           <p className="text-destructive">{resultMsg}</p>
         )}
 
+        {/* Irreversible warning — shown before user confirms */}
+        {phase === "idle" && !preview.can_undo && (
+          <div className="flex items-center gap-1.5 text-xs font-medium text-red-600">
+            <AlertTriangle size={11} />
+            <span>This action is irreversible — it cannot be undone.</span>
+          </div>
+        )}
+
         {/* Confirm / cancel buttons */}
         {phase === "idle" && (
           <div className="flex items-center gap-2 pt-0.5">
