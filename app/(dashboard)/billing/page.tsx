@@ -124,6 +124,10 @@ function BillingPage() {
   const [planLimits, setPlanLimits]   = useState<Record<string, PlanLimits>>({});
   const [history, setHistory]         = useState<BillingEvent[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [liveTokenState, setLiveTokenState] = useState<{
+    tokens_used: number; tokens_limit: number; tokens_extra: number;
+    extra_remaining: number; monthly_limit: number;
+  } | null>(null);
 
   const currentPlan = (agency?.plan ?? "free") as PlanKey;
   const sitesLimit  = PLAN_LIMITS[currentPlan] ?? 1;
