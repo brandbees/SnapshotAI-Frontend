@@ -60,6 +60,7 @@ export interface Site {
   last_audit_at?: string;
   created_at: string;
   latest_scores?: PillarScores;
+  overall_score?: number;
   malware_status?: "clean" | "threat";
   plugin_vuln_count?: number;
   plugin_data?: PluginData;

@@ -97,16 +97,17 @@ interface StatCardProps {
   icon: React.ReactNode;
   iconBg?: string;
   miniGauge?: number;
+  href?: string;
 }
 
-function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366f1", miniGauge }: StatCardProps) {
+function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366f1", miniGauge, href }: StatCardProps) {
   const subCls =
     subColor === "green" ? "text-green-600" :
     subColor === "amber" ? "text-amber-500" :
     subColor === "red"   ? "text-red-500"   : "text-muted-foreground";
 
-  return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+  const inner = (
+    <div className={`bg-white rounded-2xl border border-border shadow-sm p-5 h-full transition-all duration-150 ${href ? "cursor-pointer hover:shadow-md hover:border-[var(--accent)]/40 hover:-translate-y-px" : ""}`}>
       <div className="flex items-start justify-between mb-2">
         <span className="text-xs text-muted-foreground">{label}</span>
         <div
@@ -125,6 +126,9 @@ function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366
       {sub && <p className={`text-xs mt-2 font-medium ${subCls}`}>{sub}</p>}
     </div>
   );
+
+  if (href) return <Link href={href} className="block">{inner}</Link>;
+  return inner;
 }
 
 // ── Portfolio Health ──────────────────────────────────────────────────────────
@@ -134,7 +138,7 @@ function AlertRow({ icon, label, sub, severity }: {
 }) {
   const crit = severity === "critical";
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl border ${crit ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+    <div className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-opacity hover:opacity-80 ${crit ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
       <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${crit ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-500"}`}>
         {icon}
       </div>
@@ -150,29 +154,30 @@ function AlertRow({ icon, label, sub, severity }: {
 }
 
 function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
+  const router = useRouter();
   const { avg_score, total_sites, healthy, warning, critical, malware_detected, sites_down, ssl_expiring } = portfolio;
 
-  const score     = avg_score ?? 0;
+  const score      = avg_score ?? 0;
   const scoreLabel = avg_score == null ? "No data" : score >= 80 ? "Healthy" : score >= 50 ? "Needs Attention" : "Critical";
   const pct        = (n: number) => total_sites > 0 ? Math.round((n / total_sites) * 100) : 0;
   const hasAlerts  = malware_detected > 0 || sites_down > 0 || ssl_expiring > 0;
 
   // SVG arc gauge — 240° arc opening at the bottom (150° → 30° clockwise)
-  const W = 160, H = 110, cx = W / 2, cy = 70, R = 52;
+  const W = 200, H = 145, cx = W / 2, cy = 92, R = 67;
   function pt(deg: number) {
     const rad = (deg * Math.PI) / 180;
     return `${(cx + R * Math.cos(rad)).toFixed(2)} ${(cy + R * Math.sin(rad)).toFixed(2)}`;
   }
-  const bgArc  = `M ${pt(150)} A ${R} ${R} 0 1 1 ${pt(30)}`;
+  const bgArc     = `M ${pt(150)} A ${R} ${R} 0 1 1 ${pt(30)}`;
   const filledDeg = 150 + (score / 100) * 240;
-  const fgArc  = score > 0
+  const fgArc     = score > 0
     ? `M ${pt(150)} A ${R} ${R} 0 ${(score / 100) * 240 > 180 ? 1 : 0} 1 ${pt(filledDeg)}`
     : null;
 
   const statusRows = [
-    { label: "Healthy",  count: healthy,  color: "#16a34a", numBg: "#f0fdf4", trackBg: "#dcfce7" },
-    { label: "Warning",  count: warning,  color: "#d97706", numBg: "#fffbeb", trackBg: "#fef9c3" },
-    { label: "Critical", count: critical, color: "#dc2626", numBg: "#fef2f2", trackBg: "#fee2e2" },
+    { label: "Healthy",  count: healthy,  color: "#16a34a", numBg: "#f0fdf4", trackBg: "#dcfce7", filter: "healthy"  },
+    { label: "Warning",  count: warning,  color: "#d97706", numBg: "#fffbeb", trackBg: "#fef9c3", filter: "warning"  },
+    { label: "Critical", count: critical, color: "#dc2626", numBg: "#fef2f2", trackBg: "#fee2e2", filter: "critical" },
   ];
 
   const alertCount = (malware_detected > 0 ? 1 : 0) + (sites_down > 0 ? 1 : 0) + (ssl_expiring > 0 ? 1 : 0);
@@ -181,14 +186,75 @@ function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
       {/* ── Card 1: Score gauge ── */}
-      <div className="rounded-2xl overflow-hidden relative"
+      <Link href="/sites" className="rounded-2xl overflow-hidden relative block cursor-pointer group"
         style={{ background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" }}>
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
           style={{ background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)" }} />
         <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full pointer-events-none"
           style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)" }} />
+        {/* Hover insights overlay — fades in, gauge fades out */}
+        <div className="absolute inset-0 flex flex-col justify-center gap-4 px-6 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+          style={{ background: "rgba(18, 10, 60, 0.92)" }}>
+          <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.4)" }}>
+            Active Risks &amp; Improvements
+          </p>
+          <div className="space-y-3">
+            {/* Always shown: critical / warning counts as risk items */}
+            {critical > 0 && (
+              <div className="flex items-start gap-3">
+                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#f87171" }} />
+                <span className="text-xs leading-snug" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  <span className="font-bold text-white">{critical} {critical === 1 ? "site" : "sites"}</span> in critical state — score below 50
+                </span>
+              </div>
+            )}
+            {warning > 0 && (
+              <div className="flex items-start gap-3">
+                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#fbbf24" }} />
+                <span className="text-xs leading-snug" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  <span className="font-bold text-white">{warning} {warning === 1 ? "site" : "sites"}</span> need attention — score 50–79
+                </span>
+              </div>
+            )}
+            {malware_detected > 0 && (
+              <div className="flex items-start gap-3">
+                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#f87171" }} />
+                <span className="text-xs leading-snug" style={{ color: "#fca5a5" }}>
+                  <span className="font-bold">{malware_detected} malware {malware_detected === 1 ? "threat" : "threats"}</span> detected — immediate action required
+                </span>
+              </div>
+            )}
+            {sites_down > 0 && (
+              <div className="flex items-start gap-3">
+                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#f87171" }} />
+                <span className="text-xs leading-snug" style={{ color: "#fca5a5" }}>
+                  <span className="font-bold">{sites_down} {sites_down === 1 ? "site is" : "sites are"} offline</span> — uptime monitoring active
+                </span>
+              </div>
+            )}
+            {ssl_expiring > 0 && (
+              <div className="flex items-start gap-3">
+                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#fbbf24" }} />
+                <span className="text-xs leading-snug" style={{ color: "rgba(255,255,255,0.75)" }}>
+                  <span className="font-bold text-white">{ssl_expiring} SSL {ssl_expiring === 1 ? "certificate" : "certificates"}</span> expiring within 30 days
+                </span>
+              </div>
+            )}
+            {critical === 0 && warning === 0 && malware_detected === 0 && sites_down === 0 && ssl_expiring === 0 && (
+              <div className="flex items-start gap-3">
+                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#4ade80" }} />
+                <span className="text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  All {total_sites} {total_sites === 1 ? "site is" : "sites are"} healthy — no active risks
+                </span>
+              </div>
+            )}
+          </div>
+          <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.35)" }}>
+            Click to view all sites →
+          </span>
+        </div>
 
-        <div className="relative p-5 flex flex-col">
+        <div className="relative p-5 flex flex-col h-full justify-between transition-opacity duration-200 group-hover:opacity-0">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>
               Portfolio Health
@@ -199,44 +265,48 @@ function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
             </span>
           </div>
 
-          <div className="flex justify-center mt-1">
+          <div className="flex justify-center">
             <svg width={W} height={H} style={{ overflow: "visible" }}>
-              <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={11} strokeLinecap="round" />
+              <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={13} strokeLinecap="round" />
               {fgArc && (
-                <path d={fgArc} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={11} strokeLinecap="round"
-                  style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.4))" }} />
+                <path d={fgArc} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={13} strokeLinecap="round"
+                  style={{ filter: "drop-shadow(0 0 10px rgba(255,255,255,0.45))" }} />
               )}
-              <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle"
-                fill="white" fontSize={30} fontWeight={700} fontFamily="system-ui,sans-serif">
+              <text x={cx} y={cy - 4} textAnchor="middle" dominantBaseline="middle"
+                fill="white" fontSize={40} fontWeight={800} fontFamily="system-ui,sans-serif">
                 {avg_score ?? "—"}
               </text>
-              <text x={cx} y={cy + 17} textAnchor="middle" dominantBaseline="middle"
-                fill="rgba(255,255,255,0.4)" fontSize={10} fontFamily="system-ui,sans-serif">
+              <text x={cx} y={cy + 22} textAnchor="middle" dominantBaseline="middle"
+                fill="rgba(255,255,255,0.4)" fontSize={11} fontFamily="system-ui,sans-serif">
                 out of 100
               </text>
             </svg>
           </div>
 
-          <div className="flex justify-center -mt-1">
+          <div className="flex justify-center">
             <span className="text-[11px] font-bold px-3 py-1 rounded-full"
               style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.9)" }}>
               {scoreLabel}
             </span>
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* ── Card 2: Site status breakdown ── */}
       <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
         <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-4">Site Status</p>
         <div className="space-y-3.5">
-          {statusRows.map(({ label, count, color, numBg, trackBg }) => (
-            <div key={label} className="flex items-center gap-3">
+          {statusRows.map(({ label, count, color, numBg, trackBg, filter }) => (
+            <button
+              key={label}
+              onClick={() => router.push(`/sites?filter=${filter}`)}
+              className="w-full flex items-center gap-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer p-1 -mx-1"
+            >
               <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base font-bold tabular-nums"
                 style={{ background: numBg, color }}>
                 {count}
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 text-left">
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-xs font-medium text-foreground">{label}</span>
                   <span className="text-[10px] font-bold tabular-nums" style={{ color }}>{pct(count)}%</span>
@@ -246,13 +316,13 @@ function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
                     style={{ width: `${pct(count)}%`, background: color }} />
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
-        <div className="mt-4 pt-3.5 border-t border-border flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Monitored sites</span>
-          <span className="text-sm font-bold text-foreground tabular-nums">{total_sites}</span>
-        </div>
+        <Link href="/sites" className="mt-4 pt-3.5 border-t border-border flex items-center justify-between group hover:text-[var(--accent)] transition-colors">
+          <span className="text-xs text-muted-foreground group-hover:text-[var(--accent)]">Monitored sites</span>
+          <span className="text-sm font-bold text-foreground tabular-nums group-hover:text-[var(--accent)]">{total_sites}</span>
+        </Link>
       </div>
 
       {/* ── Card 3: Active alerts ── */}
@@ -279,28 +349,34 @@ function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
         ) : (
           <div className="space-y-2">
             {malware_detected > 0 && (
-              <AlertRow
-                icon={<Shield size={13} />}
-                label={`${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`}
-                sub="Immediate action required"
-                severity="critical"
-              />
+              <Link href="/malware" className="block">
+                <AlertRow
+                  icon={<Shield size={13} />}
+                  label={`${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`}
+                  sub="Immediate action required"
+                  severity="critical"
+                />
+              </Link>
             )}
             {sites_down > 0 && (
-              <AlertRow
-                icon={<WifiOff size={13} />}
-                label={`${sites_down} site${sites_down !== 1 ? "s" : ""} offline`}
-                sub="Check uptime monitor"
-                severity="critical"
-              />
+              <Link href="/uptime" className="block">
+                <AlertRow
+                  icon={<WifiOff size={13} />}
+                  label={`${sites_down} site${sites_down !== 1 ? "s" : ""} offline`}
+                  sub="Check uptime monitor"
+                  severity="critical"
+                />
+              </Link>
             )}
             {ssl_expiring > 0 && (
-              <AlertRow
-                icon={<Lock size={13} />}
-                label={`${ssl_expiring} SSL expiring soon`}
-                sub="Renew before expiry"
-                severity="warning"
-              />
+              <Link href="/security" className="block">
+                <AlertRow
+                  icon={<Lock size={13} />}
+                  label={`${ssl_expiring} SSL expiring soon`}
+                  sub="Renew before expiry"
+                  severity="warning"
+                />
+              </Link>
             )}
           </div>
         )}
@@ -726,6 +802,7 @@ export default function DashboardPage() {
           icon={<TrendingUp size={14} />}
           iconBg="#6366f1"
           miniGauge={avgScore ?? undefined}
+          href="/sites"
         />
         <StatCard
           label="Total Sites"
@@ -734,6 +811,7 @@ export default function DashboardPage() {
           subColor="green"
           icon={<Globe size={14} />}
           iconBg="#3b82f6"
+          href="/sites"
         />
         <StatCard
           label="Threats Detected"
@@ -742,6 +820,7 @@ export default function DashboardPage() {
           subColor={threatCount === 0 ? "green" : "red"}
           icon={<Shield size={14} />}
           iconBg={threatCount > 0 ? "#ef4444" : "#10b981"}
+          href="/malware"
         />
         <StatCard
           label="Avg Uptime"
@@ -750,6 +829,7 @@ export default function DashboardPage() {
           subColor="muted"
           icon={<Activity size={14} />}
           iconBg="#10b981"
+          href="/uptime"
         />
         <StatCard
           label="Plugin Status"
@@ -758,6 +838,7 @@ export default function DashboardPage() {
           subColor={connectedCount === sites.length ? "green" : "amber"}
           icon={<Puzzle size={14} />}
           iconBg={connectedCount === sites.length ? "#10b981" : "#f59e0b"}
+          href="/sites"
         />
         <StatCard
           label="Last Audit"
@@ -766,6 +847,7 @@ export default function DashboardPage() {
           subColor="muted"
           icon={<Clock size={14} />}
           iconBg="#6b7280"
+          href="/sites"
         />
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Globe, Search, SlidersHorizontal, RefreshCw, ChevronDown,
   CheckSquare, Square, X, Tag, Loader2,
@@ -19,15 +19,18 @@ import { AddSiteModal } from "@/components/sites/AddSiteModal";
 import { PLAN_LIMITS } from "@/lib/constants";
 import type { Site } from "@/types";
 
-type FilterOption = "all" | "online" | "offline" | "seo_issues" | "perf_issues";
+type FilterOption = "all" | "online" | "offline" | "seo_issues" | "perf_issues" | "healthy" | "warning" | "critical";
 type BulkActionType = "run_audit" | "trigger_scan" | "send_report";
 
 const FILTER_OPTIONS: { value: FilterOption; label: string }[] = [
-  { value: "all",        label: "All Sites"    },
-  { value: "online",     label: "Online Only"  },
-  { value: "offline",    label: "Offline Only" },
-  { value: "seo_issues", label: "SEO Issues"   },
-  { value: "perf_issues",label: "Perf Issues"  },
+  { value: "all",        label: "All Sites"      },
+  { value: "healthy",    label: "Healthy"        },
+  { value: "warning",    label: "Warning"        },
+  { value: "critical",   label: "Critical"       },
+  { value: "online",     label: "Online Only"    },
+  { value: "offline",    label: "Offline Only"   },
+  { value: "seo_issues", label: "SEO Issues"     },
+  { value: "perf_issues",label: "Perf Issues"    },
 ];
 
 const BULK_ACTIONS: { value: BulkActionType; label: string }[] = [
@@ -36,8 +39,18 @@ const BULK_ACTIONS: { value: BulkActionType; label: string }[] = [
   { value: "send_report",  label: "Send Report"   },
 ];
 
+function siteHealthBucket(s: Site): "healthy" | "warning" | "critical" {
+  if (s.overall_score == null) return "warning";
+  if (s.overall_score >= 80) return "healthy";
+  if (s.overall_score >= 50) return "warning";
+  return "critical";
+}
+
 function applyFilter(sites: Site[], filter: FilterOption): Site[] {
   switch (filter) {
+    case "healthy":     return sites.filter((s) => siteHealthBucket(s) === "healthy");
+    case "warning":     return sites.filter((s) => siteHealthBucket(s) === "warning");
+    case "critical":    return sites.filter((s) => siteHealthBucket(s) === "critical");
     case "online":      return sites.filter((s) => s.uptime_status === "up");
     case "offline":     return sites.filter((s) => s.uptime_status === "down");
     case "seo_issues":  return sites.filter((s) => (s.latest_scores?.seo ?? 100) < 80);
@@ -48,13 +61,18 @@ function applyFilter(sites: Site[], filter: FilterOption): Site[] {
 
 export default function SitesPage() {
   const router = useRouter();
-  const { sites, loading, error, refetch } = useSites();
+  const { sites, loading, error } = useSites();
   const { agency } = useAuth();
   const { roleCanDo } = useRole();
 
   const [showAdd, setShowAdd]               = useState(false);
   const [search, setSearch]                 = useState("");
-  const [filter, setFilter]                 = useState<FilterOption>("all");
+  const searchParams = useSearchParams();
+  const [filter, setFilter]                 = useState<FilterOption>(() => {
+    const p = searchParams.get("filter");
+    const valid: FilterOption[] = ["all","healthy","warning","critical","online","offline","seo_issues","perf_issues"];
+    return (valid.includes(p as FilterOption) ? p : "all") as FilterOption;
+  });
   const [activeTag, setActiveTag]           = useState<string | null>(null);
   const [showFilter, setShowFilter]         = useState(false);
   const [showBulkMenu, setShowBulkMenu]     = useState(false);

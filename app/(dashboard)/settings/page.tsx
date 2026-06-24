@@ -1127,6 +1127,7 @@ function BillingContent() {
   const [planLimits, setPlanLimits]   = useState<Record<string, PlanLimits>>({});
   const [history, setHistory]         = useState<BillingEvent[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [billingTab, setBillingTab] = useState("plans");
 
   const currentPlan  = (agency?.plan ?? "free") as PlanKey;
   const sitesLimit   = PLAN_LIMITS[currentPlan] ?? 1;
@@ -1251,10 +1252,30 @@ function BillingContent() {
   const storagePkgList = Object.entries(storagePkgs).map(([key, pkg]) => ({ key, ...pkg }));
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-10 bg-white border-b border-border px-6 py-2 flex items-center gap-1">
+        {(["plans", "tokens", "storage", "history", "coupon"] as const).map((id) => (
+          <button
+            key={id}
+            onClick={() => {
+              setBillingTab(id);
+              document.getElementById(`billing-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-colors ${
+              billingTab === id
+                ? "bg-[var(--accent)] text-white"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            {id}
+          </button>
+        ))}
+      </div>
+      <div className="p-6 space-y-6">
+
       {/* Current plan + usage */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-3 sm:col-span-1">
+        <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Current Plan</p>
           <div>
             <p className="text-2xl font-bold text-foreground">{PLAN_LABELS[currentPlan]}</p>
@@ -1273,67 +1294,75 @@ function BillingContent() {
         </div>
       </div>
 
-      {/* Checkout error banner */}
+      {/* Checkout error */}
       {checkoutError && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-0.5">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <AlertCircle size={16} className="shrink-0 mt-0.5" />
           <span className="flex-1">{checkoutError}</span>
           <button onClick={() => setCheckoutError(null)} className="text-red-400 hover:text-red-600 transition-colors shrink-0">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {/* Plan cards */}
-      <div>
-        <p className="text-sm font-semibold text-foreground mb-3">Available Plans</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── Plans ──────────────────────────────────────────────────────────── */}
+      <section id="billing-plans" className="scroll-mt-16 space-y-4">
+        <p className="text-sm font-semibold text-foreground">Available Plans</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           {PLANS.map((plan) => {
             const isCurrent   = plan === currentPlan;
             const price       = PLAN_PRICES[plan].monthly;
             const isDowngrade = PLANS.indexOf(plan) < PLANS.indexOf(currentPlan);
             const limits      = planLimits[plan];
             return (
-              <div key={plan} className={`rounded-2xl border p-4 flex flex-col gap-3 ${isCurrent ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-border bg-white"}`}>
-                {isCurrent && <span className="self-start px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[var(--accent)] text-white">Current</span>}
+              <div
+                key={plan}
+                className={`rounded-2xl border p-5 flex flex-col gap-4 ${
+                  isCurrent ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-border bg-white"
+                }`}
+              >
+                {isCurrent && (
+                  <span className="self-start px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[var(--accent)] text-white">
+                    Current
+                  </span>
+                )}
                 <div>
-                  <p className="font-bold text-sm text-foreground">{PLAN_LABELS[plan]}</p>
-                  <p className="text-xl font-bold text-foreground mt-0.5">
+                  <p className="font-bold text-base text-foreground">{PLAN_LABELS[plan]}</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">
                     {price === 0 ? "Free" : `$${price}`}
-                    {price > 0 && <span className="text-xs font-normal text-muted-foreground">/mo</span>}
+                    {price > 0 && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
                   </p>
                   {limits && (
-                    <div className="mt-1.5 space-y-0.5">
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                        <Brain size={10} /> {fmtTokens(limits.tokens)} AI tokens/mo
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Brain size={11} /> {fmtTokens(limits.tokens)} AI tokens/mo
                       </p>
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                        <HardDrive size={10} /> {formatBytes(limits.storage)} storage
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <HardDrive size={11} /> {formatBytes(limits.storage)} storage
                       </p>
                     </div>
                   )}
                 </div>
-                <ul className="space-y-1 flex-1">
-                  {PLAN_FEATURES[plan].map(f => (
-                    <li key={f} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <Check size={11} className="text-green-500 shrink-0 mt-0.5" /> {f}
+                <ul className="space-y-2 flex-1">
+                  {PLAN_FEATURES[plan].map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <Check size={12} className="text-green-500 shrink-0 mt-0.5" />
+                      <span>{f}</span>
                     </li>
                   ))}
                 </ul>
                 {!isCurrent && !isDowngrade && plan !== "free" && (
-                  <Button className="w-full" onClick={() => handleUpgrade(plan)} loading={checkoutLoading === plan}>Upgrade</Button>
+                  <Button className="w-full" onClick={() => handleUpgrade(plan)} loading={checkoutLoading === plan}>
+                    Upgrade
+                  </Button>
                 )}
-                {isCurrent   && <div className="text-center text-xs text-muted-foreground py-0.5">Your current plan</div>}
-                {isDowngrade && !isCurrent && <div className="text-center text-xs text-muted-foreground py-0.5">Lower tier</div>}
+                {isCurrent && <div className="text-center text-xs text-muted-foreground py-1">Your current plan</div>}
+                {isDowngrade && !isCurrent && <div className="text-center text-xs text-muted-foreground py-1">Lower tier</div>}
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
 
       {/* Quick feature stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1343,13 +1372,18 @@ function BillingContent() {
           { icon: Zap,   title: "Scheduled audits", sub: currentPlan === "free" ? "Upgrade to enable" : "Weekly & monthly", show: true },
         ].filter(s => s.show).map(({ icon: Icon, title, sub }) => (
           <div key={title} className="rounded-xl border border-border bg-muted/20 p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0"><Icon size={16} className="text-muted-foreground" /></div>
-            <div><p className="text-sm font-semibold text-foreground">{title}</p><p className="text-xs text-muted-foreground">{sub}</p></div>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Icon size={16} className="text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">{title}</p>
+              <p className="text-xs text-muted-foreground">{sub}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Agency upgrade callout — individual only */}
+      {/* Agency upgrade callout */}
       {isIndividual && (
         <div className="rounded-xl border border-border bg-muted/20 p-5 flex items-start gap-4">
           <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -1361,18 +1395,16 @@ function BillingContent() {
               Switch your account to Agency to unlock multi-site management, white-label branding, client portals, and team collaboration.
             </p>
           </div>
-          <a
-            href="mailto:support@brandbees.io?subject=Switch to Agency account"
-            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border bg-white text-foreground hover:bg-muted/60 transition-colors"
-          >
+          <a href="mailto:support@brandbees.io?subject=Switch to Agency account"
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border bg-white text-foreground hover:bg-muted/60 transition-colors">
             Contact us
           </a>
         </div>
       )}
 
-      {/* AI Token Top-up */}
+      {/* ── AI Tokens ──────────────────────────────────────────────────────── */}
       {currentPlan !== "free" && (
-        <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-4">
+        <section id="billing-tokens" className="scroll-mt-16 rounded-xl border border-border bg-muted/20 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Brain size={15} className="text-[var(--accent)]" />
             <p className="text-sm font-semibold text-foreground">AI Assistant Tokens</p>
@@ -1410,10 +1442,10 @@ function BillingContent() {
               <div key={i} className="rounded-xl border border-border bg-white p-4 h-28 animate-pulse bg-muted/30" />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Storage */}
+      {/* ── Storage ────────────────────────────────────────────────────────── */}
       {currentPlan !== "free" && (() => {
         const storageExtra = agency?.storage_extra_bytes ?? 0;
         const storageUsed  = agency?.storage_used_bytes  ?? 0;
@@ -1421,7 +1453,7 @@ function BillingContent() {
         const storagePct   = Math.min(100, (storageUsed / Math.max(storageTotal, 1)) * 100);
         const storageWarn  = storagePct >= 80;
         return (
-          <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-4">
+          <section id="billing-storage" className="scroll-mt-16 rounded-xl border border-border bg-muted/20 p-5 space-y-4">
             <div className="flex items-center gap-2">
               <HardDrive size={15} className="text-[var(--accent)]" />
               <p className="text-sm font-semibold text-foreground">Storage</p>
@@ -1460,12 +1492,12 @@ function BillingContent() {
                 <div key={i} className="rounded-xl border border-border bg-white p-4 h-28 animate-pulse bg-muted/30" />
               ))}
             </div>
-          </div>
+          </section>
         );
       })()}
 
-      {/* Purchase History */}
-      <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-4">
+      {/* ── Purchase History ───────────────────────────────────────────────── */}
+      <section id="billing-history" className="scroll-mt-16 rounded-xl border border-border bg-muted/20 p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Receipt size={15} className="text-[var(--accent)]" />
           <p className="text-sm font-semibold text-foreground">Purchase History</p>
@@ -1517,21 +1549,30 @@ function BillingContent() {
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Coupon */}
-      <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-3">
-        <p className="text-sm font-semibold text-foreground">Redeem Coupon</p>
-        <div className="flex gap-3 items-start">
+      {/* ── Coupon ─────────────────────────────────────────────────────────── */}
+      <section id="billing-coupon" className="scroll-mt-16 rounded-xl border border-border bg-muted/20 p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Tag size={15} className="text-[var(--accent)]" />
+          <p className="text-sm font-semibold text-foreground">Redeem Coupon</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Have a coupon code? Enter it below to upgrade your plan or unlock features.</p>
+        <div className="flex gap-3 items-start max-w-md">
           <div className="relative flex-1">
             <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="ENTER-COUPON-CODE" className="pl-8 font-mono uppercase tracking-widest"
-              onKeyDown={(e) => e.key === "Enter" && handleCouponRedeem()} />
+            <Input
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              placeholder="ENTER-COUPON-CODE"
+              className="pl-8 font-mono uppercase tracking-widest"
+              onKeyDown={(e) => e.key === "Enter" && handleCouponRedeem()}
+            />
           </div>
           <Button onClick={handleCouponRedeem} loading={redeemLoading} disabled={!couponCode.trim()}>Apply</Button>
         </div>
-      </div>
+      </section>
+    </div>
     </div>
   );
 }
@@ -1599,7 +1640,7 @@ function SettingsPageInner() {
       </div>
 
       {/* Tabbed panel */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-border shadow-sm">
         {/* Tab bar */}
         <div className="flex items-center gap-1 p-1.5 border-b border-border overflow-x-auto">
           {visibleTabs.map(({ id, label, icon: Icon }) => (
@@ -1619,15 +1660,18 @@ function SettingsPageInner() {
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          {activeTab === "general"       && <GeneralTab />}
-          {activeTab === "branding"      && <BrandingTab />}
-          {activeTab === "notifications" && <NotificationsTab />}
-          {activeTab === "activity"      && <ActivityTab />}
-          {activeTab === "team"          && <TeamTab />}
-          {activeTab === "integrations"  && <IntegrationsTab />}
-          {activeTab === "billing"       && <BillingTab />}
-        </div>
+        {activeTab === "billing" ? (
+          <BillingTab />
+        ) : (
+          <div className="p-6">
+            {activeTab === "general"       && <GeneralTab />}
+            {activeTab === "branding"      && <BrandingTab />}
+            {activeTab === "notifications" && <NotificationsTab />}
+            {activeTab === "activity"      && <ActivityTab />}
+            {activeTab === "team"          && <TeamTab />}
+            {activeTab === "integrations"  && <IntegrationsTab />}
+          </div>
+        )}
       </div>
     </div>
   );

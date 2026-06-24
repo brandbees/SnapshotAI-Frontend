@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, Circle, X, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, Circle, X, ChevronDown, ChevronUp, ListChecks } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import type { Agency, Site } from "@/types";
@@ -66,7 +66,7 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
     label: "Schedule a report",
     done: hasSchedule,
     href: sites[0] ? `/sites/${sites[0].id}` : "/sites",
-    hrefLabel: isIndividual ? "Open site settings" : "Open site settings",
+    hrefLabel: "Open site settings",
   });
 
   if (!isIndividual) {
@@ -83,18 +83,17 @@ function buildItems(agency: Agency, sites: Site[]): ChecklistItem[] {
 }
 
 export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps) {
-  const [items, setItems] = useState<ChecklistItem[]>(() => buildItems(agency, sites));
+  const [items, setItems]       = useState<ChecklistItem[]>(() => buildItems(agency, sites));
   const [dismissed, setDismissed] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true); // start collapsed
 
-  // Check if agency is < 30 days old
   const isNew = (() => {
     if (!agency.created_at) return true;
     const age = Date.now() - new Date(agency.created_at).getTime();
     return age < 30 * 24 * 3600 * 1000;
   })();
 
-  // Resolve async items (clients, team members) — agency only
+  // Resolve async items (clients, team members)
   useEffect(() => {
     const isIndividual = agency.account_type === "individual";
     if (isIndividual) return;
@@ -120,7 +119,7 @@ export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps)
           })
         );
       } catch {
-        // non-critical — leave defaults
+        // non-critical
       }
     }
     fetchAsyncState();
@@ -130,99 +129,88 @@ export function OnboardingChecklist({ agency, sites }: OnboardingChecklistProps)
   useEffect(() => {
     setItems((prev) => {
       const next = buildItems(agency, sites);
-      // preserve async-resolved values
       return next.map((item) => {
         const existing = prev.find((p) => p.id === item.id);
-        if (item.id === "add_client" || item.id === "invite_team") {
-          return existing ?? item;
-        }
+        if (item.id === "add_client" || item.id === "invite_team") return existing ?? item;
         return item;
       });
     });
   }, [agency, sites]);
 
-  const doneCount = items.filter((i) => i.done).length;
-  const total = items.length;
-  const pct = Math.round((doneCount / total) * 100);
-  const allDone = doneCount === total;
-
-  // Persist dismissal in localStorage
+  // Load persisted state — must run after mount (localStorage unavailable on server)
   useEffect(() => {
-    const stored = localStorage.getItem("bbss_checklist_dismissed");
-    if (stored === "true") setDismissed(true);
+    if (localStorage.getItem("bbss_checklist_dismissed") === "true") setDismissed(true);
+    // Only un-collapse if the user explicitly expanded it before
+    if (localStorage.getItem("bbss_checklist_collapsed") === "false") setCollapsed(false);
   }, []);
 
-  function dismiss() {
+  const doneCount = items.filter((i) => i.done).length;
+  const total     = items.length;
+  const pct       = Math.round((doneCount / total) * 100);
+  const allDone   = doneCount === total;
+
+  function dismiss(e: React.MouseEvent) {
+    e.stopPropagation();
     localStorage.setItem("bbss_checklist_dismissed", "true");
     setDismissed(true);
+  }
+
+  function toggleCollapse() {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("bbss_checklist_collapsed", String(next));
   }
 
   if (!isNew || dismissed || allDone) return null;
 
   return (
     <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Getting started</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {doneCount} of {total} steps complete
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-gray-100 transition-colors"
-          >
-            {collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-          </button>
-          <button
-            onClick={dismiss}
-            title="Dismiss"
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-gray-100 transition-colors"
-          >
-            <X size={15} />
-          </button>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="px-5 pb-3">
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      {/* Compact header — always visible, click to expand/collapse */}
+      <button
+        onClick={toggleCollapse}
+        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left"
+      >
+        <ListChecks size={15} className="shrink-0" style={{ color: "var(--accent)" }} />
+        <p className="text-sm font-semibold text-foreground">Getting started</p>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{doneCount}/{total} complete</span>
+        {/* Inline progress bar */}
+        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[140px]">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{ width: `${pct}%`, background: "var(--accent)" }}
           />
         </div>
-      </div>
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
+          <span
+            onClick={dismiss}
+            title="Dismiss permanently"
+            className="p-1 rounded-lg text-muted-foreground hover:bg-gray-200 hover:text-foreground transition-colors"
+          >
+            <X size={13} />
+          </span>
+          <span className="text-muted-foreground">
+            {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </span>
+        </div>
+      </button>
 
-      {/* Steps */}
+      {/* Expandable checklist */}
       {!collapsed && (
         <div className="border-t border-border divide-y divide-border">
           {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 px-5 py-3"
-            >
+            <div key={item.id} className="flex items-center gap-3 px-5 py-3">
               {item.done ? (
                 <CheckCircle2 size={18} className="text-green-500 shrink-0" />
               ) : (
                 <Circle size={18} className="text-gray-300 shrink-0" />
               )}
-              <span
-                className={
-                  "text-sm flex-1 " +
-                  (item.done ? "text-muted-foreground line-through" : "text-foreground")
-                }
-              >
+              <span className={"text-sm flex-1 " + (item.done ? "text-muted-foreground line-through" : "text-foreground")}>
                 {item.label}
               </span>
               {!item.done && item.href && (
                 <Link
                   href={item.href}
-                  className="text-xs font-medium shrink-0"
+                  className="text-xs font-medium shrink-0 hover:underline"
                   style={{ color: "var(--accent)" }}
                 >
                   {item.hrefLabel}

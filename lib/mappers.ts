@@ -252,6 +252,7 @@ export function mapSite(raw: RawSite): Site {
     last_audit_at: raw.last_audit_at ?? undefined,
     created_at: raw.created_at,
     latest_scores: mapScores(raw),
+    overall_score: raw.overall_score ?? undefined,
     malware_status:
       raw.malware_score != null
         ? raw.malware_score >= 80 ? "clean" : "threat"
