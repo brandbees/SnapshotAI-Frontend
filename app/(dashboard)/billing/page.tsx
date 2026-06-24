@@ -148,6 +148,10 @@ function BillingPage() {
     api.get<{ sites: Site[] }>("/sites").then(({ data }) => setSites(data.sites ?? [])).catch(() => {});
     api.get<{ seats_used: number }>("/team").then(({ data }) => setSeatsUsed(data.seats_used)).catch(() => {});
 
+    // Fresh token state — bypasses stale auth context cache
+    api.get<{ tokens_used: number; tokens_limit: number; tokens_extra: number; extra_remaining: number; monthly_limit: number }>("/agent/tokens")
+      .then(({ data }) => setLiveTokenState(data)).catch(() => {});
+
     // Live package prices and plan limits from backend (master-configurable)
     api.get<{ packages: Record<string, TokenPackage> }>("/billing/tokens/packages")
       .then(({ data }) => setTokenPkgs(data.packages)).catch(() => {});
@@ -280,13 +284,15 @@ function BillingPage() {
 
       {/* AI Token usage */}
       {(() => {
-        const tokenExtra      = agency?.ai_tokens_extra      ?? 0;
-        const tokenExtraUsed  = agency?.ai_tokens_extra_used ?? 0;
-        const tokenUsed       = agency?.ai_tokens_used       ?? 0;
-        const tokenTotal      = dynTokenLimit + tokenExtra;
-        // Compute actual remaining: base headroom this month + extra headroom (lifetime)
-        const baseHeadroom    = Math.max(0, dynTokenLimit - tokenUsed);
-        const extraHeadroom   = Math.max(0, tokenExtra - tokenExtraUsed);
+        // Prefer fresh DB read (liveTokenState) over stale auth-context agency fields
+        const tokenExtra     = liveTokenState?.tokens_extra  ?? agency?.ai_tokens_extra      ?? 0;
+        const tokenUsed      = liveTokenState?.tokens_used   ?? agency?.ai_tokens_used       ?? 0;
+        const monthlyBase    = liveTokenState?.monthly_limit ?? dynTokenLimit;
+        const tokenTotal     = liveTokenState?.tokens_limit  ?? (monthlyBase + tokenExtra);
+        const baseHeadroom   = Math.max(0, monthlyBase - tokenUsed);
+        const extraHeadroom  = liveTokenState
+          ? Math.max(0, liveTokenState.extra_remaining)
+          : Math.max(0, tokenExtra - (agency?.ai_tokens_extra_used ?? 0));
         const actualRemaining = baseHeadroom + extraHeadroom;
         const effectiveUsed   = Math.max(0, tokenTotal - actualRemaining);
         const tokenPct        = tokenTotal > 0 ? Math.min(100, (effectiveUsed / tokenTotal) * 100) : 0;
