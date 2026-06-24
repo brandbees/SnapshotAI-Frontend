@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle } from "lucide-react";
 import { useInView } from "./hooks";
 
-export function CTASection() {
+export function CTASection({ cms = {} }: { cms?: Record<string, string> }) {
+  const c = (k: string, d: string) => cms[k] || d;
   const { ref, inView } = useInView(0.2);
 
   return (
@@ -22,30 +23,29 @@ export function CTASection() {
 
           <div className="relative">
             <p className="text-xs font-semibold uppercase tracking-widest text-sky-200 mb-4">
-              Start today — it&apos;s free
+              {c("eyebrow", "Start today — it's free")}
             </p>
             <h2 className="text-4xl sm:text-5xl font-black text-white mb-5 leading-tight">
-              Ready to make site monitoring
-              <br />a competitive advantage?
+              {c("heading", "Ready to make site monitoring a competitive advantage?")}
             </h2>
             <p className="text-sky-100 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-              Join 240+ agencies using Snapshot AI to automate audits, impress clients, and protect every WordPress site they manage.
+              {c("subtitle", "Join 240+ agencies using Snapshot AI to automate audits, impress clients, and protect every WordPress site they manage.")}
             </p>
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
               <Link
-                href="/register"
+                href={c("cta_url", "/register")}
                 className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white text-sky-700 font-bold text-sm shadow-xl hover:bg-sky-50 transition-all hover:-translate-y-0.5"
               >
-                Start Free — No Card Needed
+                {c("cta_label", "Start Free — No Card Needed")}
                 <ArrowRight size={16} />
               </Link>
               <Link
-                href="#pricing"
+                href={c("cta2_url", "#pricing")}
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl border border-white/25 bg-white/10 text-white font-semibold text-sm hover:bg-white/20 transition-all"
               >
-                Compare Plans
+                {c("cta2_label", "Compare Plans")}
               </Link>
             </div>
 

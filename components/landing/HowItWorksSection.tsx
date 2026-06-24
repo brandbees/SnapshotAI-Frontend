@@ -170,7 +170,8 @@ function SystemFlowDiagram({ inView }: { inView: boolean }) {
 
 /* ── Main section ─────────────────────────────────────────────────────────── */
 
-export function HowItWorksSection() {
+export function HowItWorksSection({ cms = {} }: { cms?: Record<string, string> }) {
+  const c = (k: string, d: string) => cms[k] || d;
   const { ref, inView } = useInView(0.1);
 
   return (
@@ -198,7 +199,7 @@ export function HowItWorksSection() {
               inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            Simple setup
+            {c("eyebrow", "Simple setup")}
           </p>
           <h2
             className={`text-4xl font-black text-white mb-4 transition-all duration-500 ${
@@ -206,7 +207,7 @@ export function HowItWorksSection() {
             }`}
             style={{ transitionDelay: "100ms" }}
           >
-            Up and running in 3 steps.
+            {c("heading", "Up and running in 3 steps.")}
           </h2>
           <p
             className={`text-sky-100 text-lg transition-all duration-500 ${
@@ -214,7 +215,7 @@ export function HowItWorksSection() {
             }`}
             style={{ transitionDelay: "200ms" }}
           >
-            From zero to a full client site audit in under 5 minutes. No developer required.
+            {c("subtitle", "From zero to a full client site audit in under 5 minutes. No developer required.")}
           </p>
         </div>
 
@@ -250,7 +251,7 @@ export function HowItWorksSection() {
                 {/* Visual mockup */}
                 <Mockup />
 
-                <h3 className="text-lg font-bold text-white mb-2.5">{step.title}</h3>
+                <h3 className="text-lg font-bold text-white mb-2.5">{c(`step_${i + 1}`, step.title)}</h3>
                 <p className="text-base text-sky-100 leading-relaxed">{step.desc}</p>
               </div>
             );
@@ -268,10 +269,10 @@ export function HowItWorksSection() {
           style={{ transitionDelay: "850ms" }}
         >
           <Link
-            href="/register"
+            href={c("cta_url", "/register")}
             className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white text-sky-700 font-bold text-sm shadow-xl hover:bg-sky-50 transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-2 focus:ring-offset-sky-600"
           >
-            Get started in 5 minutes
+            {c("cta_label", "Get started in 5 minutes")}
             <ArrowRight size={15} />
           </Link>
         </div>

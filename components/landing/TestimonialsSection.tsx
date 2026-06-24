@@ -28,8 +28,32 @@ const TESTIMONIALS = [
   },
 ];
 
-export function TestimonialsSection() {
+const COLORS   = ["#0ea5e9", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
+const initials = (name: string) =>
+  name.split(/\s+/).slice(0, 2).map(s => s[0]?.toUpperCase() ?? "").join("") || "?";
+
+export function TestimonialsSection({ cms = {} }: { cms?: Record<string, string> }) {
+  const c = (k: string, d: string) => cms[k] || d;
   const { ref, inView } = useInView(0.1);
+
+  // Merge CMS repeater items on top of hardcoded defaults
+  const items = (() => {
+    if (cms.items) {
+      try {
+        const parsed = JSON.parse(cms.items);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: Record<string, string>, i: number) => ({
+            quote:    item.quote    || TESTIMONIALS[i]?.quote    || "",
+            name:     item.name     || TESTIMONIALS[i]?.name     || "",
+            role:     item.role     || TESTIMONIALS[i]?.role     || "",
+            initials: initials(item.name || TESTIMONIALS[i]?.name || ""),
+            color:    COLORS[i % COLORS.length],
+          }));
+        }
+      } catch {}
+    }
+    return TESTIMONIALS;
+  })();
 
   return (
     <section id="testimonials" className="py-24 bg-white">
@@ -42,7 +66,7 @@ export function TestimonialsSection() {
               inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            What agencies say
+            {c("eyebrow", "What agencies say")}
           </p>
           <h2
             className={`text-4xl font-black text-gray-900 mb-4 transition-all duration-500 ${
@@ -50,7 +74,7 @@ export function TestimonialsSection() {
             }`}
             style={{ transitionDelay: "100ms" }}
           >
-            Agencies love BrandBeesAI.
+            {c("heading", "Agencies love BrandBeesAI.")}
           </h2>
           <p
             className={`text-gray-500 text-lg transition-all duration-500 ${
@@ -58,16 +82,18 @@ export function TestimonialsSection() {
             }`}
             style={{ transitionDelay: "200ms" }}
           >
-            Real teams. Real results. See what our customers have to say.
+            {c("subtitle", "Real teams. Real results. See what our customers have to say.")}
           </p>
         </div>
 
         {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map((t, i) => (
+          {items.map((t, i) => {
+            const { quote, name, role } = t;
+            return (
             <div
               key={i}
-              className={`bg-[#f8f9fb] rounded-2xl border border-gray-100 p-6 transition-all duration-700 hover:shadow-md hover:-translate-y-1 ${
+              className={`bg-gray-50 rounded-2xl border border-gray-100 p-6 transition-all duration-700 hover:shadow-md hover:-translate-y-1 ${
                 inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}
               style={{ transitionDelay: `${i * 120}ms` }}
@@ -82,7 +108,7 @@ export function TestimonialsSection() {
               </div>
 
               <p className="text-gray-600 text-base leading-relaxed mb-6">
-                &ldquo;{t.quote}&rdquo;
+                &ldquo;{quote}&rdquo;
               </p>
 
               <div className="flex items-center gap-3">
@@ -93,12 +119,13 @@ export function TestimonialsSection() {
                   {t.initials}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{t.name}</p>
-                  <p className="text-xs text-gray-500">{t.role}</p>
+                  <p className="text-sm font-semibold text-gray-900">{name}</p>
+                  <p className="text-xs text-gray-500">{role}</p>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

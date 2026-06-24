@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap, MapPin, Mail, Phone } from "lucide-react";
+import { Zap, MapPin, Mail } from "lucide-react";
 
 const LINKS = {
   Product: [
@@ -36,7 +36,9 @@ const SOCIALS = [
   { label: "yt", title: "YouTube",       bg: "#FF0000" },
 ];
 
-export function LandingFooter() {
+export function LandingFooter({ cms = {} }: { cms?: Record<string, string> }) {
+  const tagline   = cms.tagline   || "AI-powered WordPress site monitoring and reporting for modern digital agencies.";
+  const copyright = cms.copyright || `© ${new Date().getFullYear()} BrandBees Snapshot AI. All rights reserved.`;
   return (
     <footer className="bg-slate-900">
       {/* Main footer body */}
@@ -60,7 +62,7 @@ export function LandingFooter() {
             </Link>
 
             <p className="text-sm text-slate-400 leading-relaxed mb-5 max-w-[220px]">
-              AI-powered WordPress site monitoring and reporting for modern digital agencies.
+              {tagline}
             </p>
 
             {/* Social icons */}
@@ -115,13 +117,7 @@ export function LandingFooter() {
 
         {/* Bottom bar */}
         <div className="border-t border-slate-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-slate-600">
-            © {new Date().getFullYear()}{" "}
-            <a href="https://brandbees.net" className="hover:text-slate-400 transition-colors">
-              BrandBees
-            </a>
-            {" "}Snapshot AI. All rights reserved.
-          </p>
+          <p className="text-xs text-slate-600">{copyright}</p>
           <div className="flex items-center gap-4">
             <p className="text-xs text-slate-600">
               Powered by{" "}

@@ -180,11 +180,12 @@ function FeatureCard({
   );
 }
 
-export function FeaturesSection() {
+export function FeaturesSection({ cms = {} }: { cms?: Record<string, string> }) {
+  const c = (k: string, d: string) => cms[k] || d;
   const { ref, inView } = useInView(0.05);
 
   return (
-    <section id="features" className="py-24 bg-[#f8f9fb]">
+    <section id="features" className="py-24 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
@@ -194,7 +195,7 @@ export function FeaturesSection() {
               inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            Everything you need
+            {c("eyebrow", "Everything you need")}
           </p>
           <h2
             className={`text-4xl font-black text-gray-900 mb-4 transition-all duration-500 ${
@@ -202,7 +203,7 @@ export function FeaturesSection() {
             }`}
             style={{ transitionDelay: "100ms" }}
           >
-            One platform. Full coverage.
+            {c("heading", "One platform. Full coverage.")}
           </h2>
           <p
             className={`text-gray-500 text-lg transition-all duration-500 ${
@@ -210,8 +211,7 @@ export function FeaturesSection() {
             }`}
             style={{ transitionDelay: "200ms" }}
           >
-            Stop juggling tools. SnapshotAI covers every dimension of WordPress site management
-            so you can focus on growing your agency.
+            {c("subtitle", "Stop juggling tools. SnapshotAI covers every dimension of WordPress site management so you can focus on growing your agency.")}
           </p>
         </div>
 

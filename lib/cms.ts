@@ -12,6 +12,8 @@ export interface PageContent {
 
 export type GlobalContent = Record<string, Record<string, string>>;
 
+// API_BASE_URL already ends with /api (e.g. http://localhost:3001/api)
+// Strip trailing slash so we can append paths cleanly.
 const BASE = API_BASE_URL.replace(/\/+$/, "");
 
 /**
@@ -21,28 +23,31 @@ const BASE = API_BASE_URL.replace(/\/+$/, "");
  */
 export async function getPageContent(pageKey: string): Promise<PageContent> {
   try {
-    const res = await fetch(`${BASE}/api/content/${pageKey}`, {
+    const res = await fetch(`${BASE}/content/${pageKey}`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json() as PageContent;
-  } catch {
+  } catch (err) {
+    console.error(`[CMS] getPageContent("${pageKey}") failed:`, err);
     return { page_key: pageKey, sections: [] };
   }
 }
 
 /**
- * Fetch global header + footer content.
- * Falls back to empty object (hardcoded defaults kick in on the component side).
+ * Fetch global content (header, footer, popup, …).
+ * Returns a flat map of section_key → field overrides.
+ * Falls back to empty object so hardcoded defaults kick in.
  */
 export async function getGlobalContent(): Promise<GlobalContent> {
   try {
-    const res = await fetch(`${BASE}/api/content/global`, {
+    const res = await fetch(`${BASE}/content/global`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json() as GlobalContent;
-  } catch {
+  } catch (err) {
+    console.error("[CMS] getGlobalContent() failed:", err);
     return {};
   }
 }

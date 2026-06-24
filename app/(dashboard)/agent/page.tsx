@@ -383,7 +383,10 @@ export default function AgentPage() {
       const errCode = resp?.data?.error;
       const errMsg  = resp?.data?.message;
       if (resp?.data?.tokens_used != null) {
-        setTokenState({ tokens_used: resp.data.tokens_used, tokens_limit: resp.data.tokens_limit ?? 0, tokens_extra: resp.data.tokens_extra ?? 0, extra_remaining: resp.data.extra_remaining, monthly_limit: resp.data.monthly_limit });
+        // Re-fetch from DB so the bar matches billing page (avoids showing stale limit-reached state)
+        api.get<TokenState>("/agent/tokens").then(({ data }) => setTokenState(data)).catch(() => {
+          setTokenState({ tokens_used: resp!.data!.tokens_used!, tokens_limit: resp!.data!.tokens_limit ?? 0, tokens_extra: resp!.data!.tokens_extra ?? 0, extra_remaining: resp!.data!.extra_remaining, monthly_limit: resp!.data!.monthly_limit });
+        });
         setError("Token limit reached. Purchase more tokens to continue.");
       } else if (errCode === 'rate_limit' || resp?.status === 429) {
         setError(errMsg ?? "AI service is temporarily rate-limited. Please try again in a few minutes.");

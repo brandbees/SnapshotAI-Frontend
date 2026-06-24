@@ -173,7 +173,7 @@ export function PricingSection() {
   const { ref, inView } = useInView(0.08);
 
   return (
-    <section id="pricing" className="py-24 bg-[#f8f9fb]">
+    <section id="pricing" className="py-24 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}

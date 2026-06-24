@@ -107,7 +107,8 @@ const PILLS = [
   "AI recommendations",
 ];
 
-export function HeroSection() {
+export function HeroSection({ cms = {} }: { cms?: Record<string, string> }) {
+  const c = (k: string, d: string) => cms[k] || d;
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -117,12 +118,6 @@ export function HeroSection() {
 
   return (
     <section className="relative overflow-hidden bg-white pt-24 pb-0 lg:pt-32">
-      {/* Background gradient blobs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 right-0 w-[700px] h-[500px] bg-sky-100/70 rounded-full blur-3xl translate-x-1/4" />
-        <div className="absolute top-1/2 left-0 w-80 h-80 bg-indigo-50/80 rounded-full blur-3xl -translate-x-1/2" />
-        <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-sky-50 rounded-full blur-2xl" />
-      </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center pb-16 lg:pb-24">
@@ -136,7 +131,7 @@ export function HeroSection() {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-              AI-Powered WordPress Monitoring for Agencies
+              {c("eyebrow", "AI-Powered WordPress Monitoring for Agencies")}
             </div>
 
             {/* Headline */}
@@ -146,13 +141,13 @@ export function HeroSection() {
               }`}
               style={{ transitionDelay: "100ms" }}
             >
-              Monitor every
+              {c("heading_line1", "Monitor every")}
               <br />
               <span className="bg-gradient-to-r from-sky-500 to-indigo-500 bg-clip-text text-transparent">
-                Client site
+                {c("heading_highlight", "Client site")}
               </span>
               <br />
-              like a pro.
+              {c("heading_line3", "like a pro.")}
             </h1>
 
             {/* Subtext */}
@@ -162,7 +157,7 @@ export function HeroSection() {
               }`}
               style={{ transitionDelay: "200ms" }}
             >
-              Automatically score performance, catch malware, track SEO, and deliver stunning AI-powered reports — so you can focus on growing your agency.
+              {c("subtitle", "Automatically score performance, catch malware, track SEO, and deliver stunning AI-powered reports — so you can focus on growing your agency.")}
             </p>
 
             {/* CTA buttons */}
@@ -173,17 +168,17 @@ export function HeroSection() {
               style={{ transitionDelay: "300ms" }}
             >
               <Link
-                href="/register"
+                href={c("cta_url", "/register")}
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm shadow-lg shadow-sky-500/20 transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-2"
               >
-                Start Free — No Card Needed
+                {c("cta_label", "Start Free — No Card Needed")}
                 <ArrowRight size={16} />
               </Link>
               <button className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm transition-all hover:-translate-y-0.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300">
                 <div className="w-6 h-6 rounded-full bg-sky-100 flex items-center justify-center">
                   <Play size={9} className="ml-0.5 fill-sky-600 text-sky-600" />
                 </div>
-                Watch 2-min Demo
+                {c("cta2_label", "Watch 2-min Demo")}
               </button>
             </div>
 
@@ -225,7 +220,7 @@ export function HeroSection() {
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-900">
-                  Trusted by 240+ digital agencies
+                  {c("social_proof", "Trusted by 240+ digital agencies")}
                 </p>
                 <div className="flex items-center gap-0.5 mt-0.5">
                   {"★★★★★".split("").map((s, i) => (

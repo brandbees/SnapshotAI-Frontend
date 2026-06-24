@@ -3,18 +3,56 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X, Zap, Clock } from "lucide-react";
 
-export function OfferPopup() {
-  const [open, setOpen] = useState(false);
+const LS_KEY    = "bb_offer_shown";
+const DEFAULTS  = {
+  delay_seconds: "5",
+  show_max:      "3",
+  badge:         "Limited Time Offer",
+  badge_sub:     "Launch special · Ends soon",
+  heading:       "Get 30% off your first 3 months",
+  body:          "Sign up today and lock in 30% off any paid plan for 3 months. Join 240+ agencies already monitoring smarter.",
+  promo_code:    "LAUNCH30",
+  cta:           "Claim Offer — Start Free →",
+  cta_url:       "/register",
+  dismiss_text:  "No thanks, I'll pay full price",
+};
+
+interface Props {
+  // enabled = popup section is on in CMS; data = field overrides from master panel
+  enabled: boolean;
+  data:    Record<string, string>;
+}
+
+export function OfferPopup({ enabled, data }: Props) {
+  const [open,    setOpen]    = useState(false);
+  const [copied,  setCopied]  = useState(false);
+
+  const f = (key: keyof typeof DEFAULTS) => data[key] ?? DEFAULTS[key];
 
   useEffect(() => {
-    if (sessionStorage.getItem("offer-dismissed")) return;
-    const t = setTimeout(() => setOpen(true), 4500);
-    return () => clearTimeout(t);
-  }, []);
+    if (!enabled) return;
 
-  const dismiss = () => {
-    setOpen(false);
-    sessionStorage.setItem("offer-dismissed", "1");
+    const max   = Math.max(1, parseInt(f("show_max"),      10) || 3);
+    const delay = Math.max(0, parseInt(f("delay_seconds"), 10) || 5);
+    const shown = parseInt(localStorage.getItem(LS_KEY) ?? "0", 10);
+
+    if (shown >= max) return;
+
+    const t = setTimeout(() => {
+      setOpen(true);
+      localStorage.setItem(LS_KEY, String(shown + 1));
+    }, delay * 1000);
+
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled]);
+
+  const dismiss = () => setOpen(false);
+
+  const copy = () => {
+    navigator.clipboard?.writeText(f("promo_code"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (!open) return null;
@@ -49,46 +87,46 @@ export function OfferPopup() {
             <div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold mb-1">
                 <Clock size={10} />
-                Limited Time Offer
+                {f("badge")}
               </span>
-              <p className="text-xs text-gray-400">Launch special · Ends soon</p>
+              <p className="text-xs text-gray-400">{f("badge_sub")}</p>
             </div>
           </div>
 
           <h2 className="text-2xl font-black text-gray-900 leading-tight mb-2">
-            Get 30% off your first 3 months
+            {f("heading")}
           </h2>
           <p className="text-sm text-gray-500 leading-relaxed mb-5">
-            Sign up today and lock in 30% off any paid plan for 3 months. Join 240+ agencies already monitoring smarter.
+            {f("body")}
           </p>
 
           {/* Promo code box */}
           <div className="flex items-center gap-3 bg-gray-50 border border-dashed border-gray-200 rounded-xl px-4 py-3 mb-5">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">Promo code</p>
-              <p className="text-lg font-black text-gray-900 tracking-[0.15em]">LAUNCH30</p>
+              <p className="text-lg font-black text-gray-900 tracking-[0.15em]">{f("promo_code")}</p>
             </div>
             <button
-              onClick={() => navigator.clipboard?.writeText("LAUNCH30")}
-              className="shrink-0 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-600 text-xs font-semibold border border-sky-200 hover:bg-sky-100 transition-colors"
+              onClick={copy}
+              className="shrink-0 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-600 text-xs font-semibold border border-sky-200 hover:bg-sky-100 transition-colors min-w-[52px]"
             >
-              Copy
+              {copied ? "✓" : "Copy"}
             </button>
           </div>
 
           <Link
-            href="/register"
+            href={f("cta_url")}
             onClick={dismiss}
             className="block text-center px-5 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-sm shadow-lg shadow-sky-500/25 transition-all mb-3"
           >
-            Claim Offer — Start Free →
+            {f("cta")}
           </Link>
 
           <button
             onClick={dismiss}
             className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors py-1"
           >
-            No thanks, I'll pay full price
+            {f("dismiss_text")}
           </button>
         </div>
       </div>

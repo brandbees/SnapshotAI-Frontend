@@ -169,7 +169,7 @@ export function FAQSection() {
                 <a
                   key={i}
                   href={card.href}
-                  className="flex items-start gap-4 p-5 rounded-2xl border border-gray-100 bg-[#f8f9fb] hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all group"
+                  className="flex items-start gap-4 p-5 rounded-2xl border border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all group"
                 >
                   <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
