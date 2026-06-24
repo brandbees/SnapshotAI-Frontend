@@ -483,12 +483,12 @@ export default function AgencyDetailPage() {
   // Usage computed values
   const tokenMonthlyLimit = PLAN_TOKEN_LIMITS[agency.plan]   ?? 1_000;
   const storageBaseLimit  = PLAN_STORAGE_LIMITS[agency.plan] ?? 104_857_600;
-  const tokenTotal        = tokenMonthlyLimit + (agency.ai_tokens_extra ?? 0);
-  const storageTotal      = storageBaseLimit  + (agency.storage_extra_bytes ?? 0);
-  const storageUsed       = agency.storage_used_bytes ?? 0;
+  const tokenTotal        = tokenMonthlyLimit + Number(agency.ai_tokens_extra ?? 0);
+  const storageTotal      = storageBaseLimit  + Number(agency.storage_extra_bytes ?? 0);
+  const storageUsed       = Number(agency.storage_used_bytes ?? 0);
   // Correct effective-used: base headroom + extra headroom = actual remaining; total - remaining = used
-  const tokenBaseHeadroom  = Math.max(0, tokenMonthlyLimit - (agency.ai_tokens_used ?? 0));
-  const tokenExtraHeadroom = Math.max(0, (agency.ai_tokens_extra ?? 0) - (agency.ai_tokens_extra_used ?? 0));
+  const tokenBaseHeadroom  = Math.max(0, tokenMonthlyLimit - Number(agency.ai_tokens_used ?? 0));
+  const tokenExtraHeadroom = Math.max(0, Number(agency.ai_tokens_extra ?? 0) - Number(agency.ai_tokens_extra_used ?? 0));
   const tokenRemaining     = tokenBaseHeadroom + tokenExtraHeadroom;
   const tokenUsed          = Math.max(0, tokenTotal - tokenRemaining);
   const tokenPct           = tokenTotal > 0 ? Math.min(100, (tokenUsed / tokenTotal) * 100) : 0;
