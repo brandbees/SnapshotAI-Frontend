@@ -28,9 +28,10 @@ interface Agency {
   is_suspended: boolean;
   account_type: "agency" | "individual";
   // Usage
-  ai_tokens_used:     number;
-  ai_tokens_extra:    number;
-  ai_tokens_reset_at: string | null;
+  ai_tokens_used:      number;
+  ai_tokens_extra:     number;
+  ai_tokens_extra_used: number;
+  ai_tokens_reset_at:  string | null;
   storage_used_bytes:  number;
   storage_extra_bytes: number;
 }
@@ -482,11 +483,15 @@ export default function AgencyDetailPage() {
   // Usage computed values
   const tokenMonthlyLimit = PLAN_TOKEN_LIMITS[agency.plan]   ?? 1_000;
   const storageBaseLimit  = PLAN_STORAGE_LIMITS[agency.plan] ?? 104_857_600;
-  const tokenTotal   = tokenMonthlyLimit + (agency.ai_tokens_extra   ?? 0);
-  const storageTotal = storageBaseLimit  + (agency.storage_extra_bytes ?? 0);
-  const tokenUsed    = agency.ai_tokens_used    ?? 0;
-  const storageUsed  = agency.storage_used_bytes ?? 0;
-  const tokenPct     = tokenTotal  > 0 ? Math.min(100, (tokenUsed   / tokenTotal)  * 100) : 0;
+  const tokenTotal        = tokenMonthlyLimit + (agency.ai_tokens_extra ?? 0);
+  const storageTotal      = storageBaseLimit  + (agency.storage_extra_bytes ?? 0);
+  const storageUsed       = agency.storage_used_bytes ?? 0;
+  // Correct effective-used: base headroom + extra headroom = actual remaining; total - remaining = used
+  const tokenBaseHeadroom  = Math.max(0, tokenMonthlyLimit - (agency.ai_tokens_used ?? 0));
+  const tokenExtraHeadroom = Math.max(0, (agency.ai_tokens_extra ?? 0) - (agency.ai_tokens_extra_used ?? 0));
+  const tokenRemaining     = tokenBaseHeadroom + tokenExtraHeadroom;
+  const tokenUsed          = Math.max(0, tokenTotal - tokenRemaining);
+  const tokenPct           = tokenTotal > 0 ? Math.min(100, (tokenUsed / tokenTotal) * 100) : 0;
   const storagePct   = storageTotal > 0 ? Math.min(100, (storageUsed / storageTotal) * 100) : 0;
 
   const TABS: { key: Tab; label: string; icon: React.ElementType; count?: number }[] = [
@@ -978,7 +983,7 @@ export default function AgencyDetailPage() {
                           {agency.ai_tokens_reset_at && ` · resets ${new Date(agency.ai_tokens_reset_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}`}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
-                          {fmtTokens(Math.max(0, tokenTotal - tokenUsed))} remaining
+                          {fmtTokens(tokenRemaining)} remaining
                         </span>
                       </div>
                     </div>
