@@ -104,6 +104,7 @@ export interface RawSite {
   // Joined from latest scan (GET /api/sites only)
   is_clean?: boolean | null;
   threats?: unknown;
+  overall_threat_score?: number | null;
   plugin_vuln_count?: number | null;
 }
 
@@ -158,11 +159,30 @@ function mapScores(raw: RawSite | RawAudit): PillarScores | undefined {
   ) {
     return undefined;
   }
+
+  // Derive malware display score from the dedicated scanner's threat score when
+  // available — it's more accurate than the audit's lightweight malware check.
+  // overall_threat_score: 0 = clean (show 100), 54 = high risk (show 46).
+  const threatScore = (raw as RawSite).overall_threat_score;
+  const isClean    = (raw as RawSite).is_clean;
+  let malware: number;
+  if (isClean === true) {
+    malware = 100;
+  } else if (isClean === false && typeof threatScore === "number") {
+    malware = Math.max(0, 100 - threatScore);
+  } else if (isClean === false) {
+    // Threats exist but no threat score — treat as low score
+    malware = Math.min(raw.malware_score ?? 40, 40);
+  } else {
+    // No scan yet — fall back to audit malware score
+    malware = raw.malware_score ?? 100;
+  }
+
   return {
     performance: raw.performance_score ?? 0,
     seo: raw.seo_score ?? 0,
     security: raw.security_score ?? 0,
-    malware: raw.malware_score ?? 100,
+    malware,
   };
 }
 
