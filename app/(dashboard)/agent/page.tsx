@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Bot, Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
          Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X,
-         AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2 } from "lucide-react";
+         AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2,
+         Terminal, Lock, KeyRound, ChevronUp, Wifi, WifiOff, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { mapSite, type RawSite } from "@/lib/mappers";
@@ -47,14 +48,20 @@ interface ToolCall {
 }
 
 const TOOL_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  run_audit:               { label: "Audit triggered",        icon: Play,        color: "#6366f1" },
-  send_report:             { label: "Report queued",          icon: FileText,    color: "#0ea5e9" },
-  update_schedule:         { label: "Schedule updated",       icon: Calendar,    color: "#10b981" },
-  list_sites:              { label: "Sites fetched",          icon: List,        color: "#8b5cf6" },
-  get_scores:              { label: "Scores retrieved",       icon: Zap,         color: "#f59e0b" },
-  get_malware_status:      { label: "Malware status checked", icon: ShieldCheck, color: "#ef4444" },
-  get_live_site_data:      { label: "Live data fetched",      icon: Database,    color: "#0891b2" },
-  preview_write_operation: { label: "Write preview ready",    icon: Wrench,      color: "#7c3aed" },
+  run_audit:                { label: "Audit triggered",           icon: Play,        color: "#6366f1" },
+  send_report:              { label: "Report queued",             icon: FileText,    color: "#0ea5e9" },
+  update_schedule:          { label: "Schedule updated",          icon: Calendar,    color: "#10b981" },
+  list_sites:               { label: "Sites fetched",             icon: List,        color: "#8b5cf6" },
+  get_scores:               { label: "Scores retrieved",          icon: Zap,         color: "#f59e0b" },
+  get_malware_status:       { label: "Malware status checked",    icon: ShieldCheck, color: "#ef4444" },
+  analyze_malware_findings: { label: "AI malware analysis",       icon: Sparkles,    color: "#7c3aed" },
+  get_live_site_data:       { label: "Live data fetched",         icon: Database,    color: "#0891b2" },
+  preview_write_operation:  { label: "Write preview ready",       icon: Wrench,      color: "#7c3aed" },
+  ssh_read_file:            { label: "File read via SSH",         icon: Terminal,    color: "#0f766e" },
+  ssh_list_directory:       { label: "Directory listed via SSH",  icon: Terminal,    color: "#0f766e" },
+  ssh_find_pattern:         { label: "Pattern search via SSH",    icon: Terminal,    color: "#0f766e" },
+  ssh_read_log:             { label: "Log read via SSH",          icon: Terminal,    color: "#0f766e" },
+  ssh_check_permissions:    { label: "Permissions checked via SSH", icon: Terminal,  color: "#0f766e" },
 };
 
 interface WritePreview {
@@ -228,6 +235,188 @@ function WriteConfirmCard({ call, siteId }: { call: ToolCall; siteId: string }) 
   );
 }
 
+// ── SSH panel ─────────────────────────────────────────────────────────────────
+
+interface SshStatus {
+  active:       boolean;
+  host?:        string;
+  username?:    string;
+  connected_at?: string;
+}
+
+function SshPanel({ siteId, onStatusChange }: { siteId: string; onStatusChange: (active: boolean) => void }) {
+  const [status, setStatus]         = useState<SshStatus | null>(null);
+  const [expanded, setExpanded]     = useState(false);
+  const [authMode, setAuthMode]     = useState<"password" | "key">("password");
+  const [host, setHost]             = useState("");
+  const [port, setPort]             = useState("22");
+  const [username, setUsername]     = useState("");
+  const [password, setPassword]     = useState("");
+  const [privateKey, setPrivateKey] = useState("");
+  const [showPw, setShowPw]         = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connError, setConnError]   = useState<string | null>(null);
+
+  // Fetch session status when site changes
+  useEffect(() => {
+    if (!siteId) { setStatus(null); return; }
+    api.get<SshStatus>(`/agent/ssh/status/${siteId}`)
+      .then(({ data }) => { setStatus(data); onStatusChange(data.active); })
+      .catch(() => { setStatus({ active: false }); onStatusChange(false); });
+  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const connect = async () => {
+    setConnecting(true);
+    setConnError(null);
+    try {
+      await api.post("/agent/ssh/connect", {
+        site_id:    siteId,
+        host:       host.trim(),
+        port:       Number(port) || 22,
+        username:   username.trim(),
+        password:   authMode === "password" ? password : undefined,
+        privateKey: authMode === "key"      ? privateKey.trim() : undefined,
+      });
+      const { data } = await api.get<SshStatus>(`/agent/ssh/status/${siteId}`);
+      setStatus(data);
+      onStatusChange(data.active);
+      setExpanded(false);
+      // Clear credentials from state — they're in Redis now
+      setPassword(""); setPrivateKey("");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setConnError(msg ?? "Connection failed. Check credentials and try again.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const disconnect = async () => {
+    try {
+      await api.delete(`/agent/ssh/disconnect/${siteId}`);
+    } catch { /* best-effort */ }
+    setStatus({ active: false });
+    onStatusChange(false);
+    setExpanded(false);
+  };
+
+  if (!siteId) return null;
+
+  // Connected state — compact status bar
+  if (status?.active) {
+    return (
+      <div className="flex items-center justify-between px-6 py-2 bg-teal-50 border-b border-teal-100 text-[11px]">
+        <div className="flex items-center gap-2 text-teal-700">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
+          <Terminal size={11} className="shrink-0" />
+          <span className="font-medium">SSH connected</span>
+          <span className="text-teal-600">{status.username}@{status.host}</span>
+          <span className="text-teal-500">· read-only</span>
+        </div>
+        <button onClick={disconnect}
+          className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
+          <WifiOff size={10} /> Disconnect
+        </button>
+      </div>
+    );
+  }
+
+  // Not connected — collapsed trigger or expanded form
+  return (
+    <div className="border-b border-border bg-white">
+      {/* Collapsed row */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-6 py-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-1.5">
+          <Terminal size={11} />
+          <span>Connect SSH for live file analysis</span>
+        </div>
+        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+      </button>
+
+      {expanded && (
+        <div className="px-6 pb-4 pt-1 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-[10px] text-muted-foreground mb-1">Host</label>
+              <input value={host} onChange={e => setHost(e.target.value)}
+                placeholder="192.168.1.1 or example.com"
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">Port</label>
+              <input value={port} onChange={e => setPort(e.target.value)}
+                placeholder="22"
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-1">Username</label>
+            <input value={username} onChange={e => setUsername(e.target.value)}
+              placeholder="ubuntu, root, www-data…"
+              className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+          </div>
+
+          {/* Auth mode toggle */}
+          <div className="flex items-center gap-1 text-[10px]">
+            <button onClick={() => setAuthMode("password")}
+              className={`px-2.5 py-1 rounded-lg border transition-colors ${authMode === "password" ? "border-[color:var(--accent)] text-[color:var(--accent)] bg-[color:var(--accent-light)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
+              <span className="flex items-center gap-1"><Lock size={9} /> Password</span>
+            </button>
+            <button onClick={() => setAuthMode("key")}
+              className={`px-2.5 py-1 rounded-lg border transition-colors ${authMode === "key" ? "border-[color:var(--accent)] text-[color:var(--accent)] bg-[color:var(--accent-light)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
+              <span className="flex items-center gap-1"><KeyRound size={9} /> Private Key</span>
+            </button>
+          </div>
+
+          {authMode === "password" ? (
+            <div className="relative">
+              <label className="block text-[10px] text-muted-foreground mb-1">Password</label>
+              <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="SSH password"
+                className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+              <button type="button" onClick={() => setShowPw(v => !v)}
+                className="absolute right-2 top-6 text-muted-foreground hover:text-foreground transition-colors">
+                {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">Private Key (PEM)</label>
+              <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)}
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                rows={4}
+                className="w-full text-[10px] font-mono px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)] resize-none" />
+            </div>
+          )}
+
+          {connError && <p className="text-[11px] text-destructive">{connError}</p>}
+
+          <div className="flex items-center gap-2">
+            <button onClick={connect}
+              disabled={connecting || !host.trim() || !username.trim() || (authMode === "password" ? !password : !privateKey.trim())}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
+              style={{ background: "var(--accent)" }}>
+              {connecting ? <Loader2 size={11} className="animate-spin" /> : <Wifi size={11} />}
+              {connecting ? "Connecting…" : "Connect"}
+            </button>
+            <button onClick={() => setExpanded(false)}
+              className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <p className="text-[10px] text-muted-foreground ml-1">
+              Credentials are stored in memory only and expire after 30 min.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Strip artifacts that Llama models sometimes emit as literal text:
 //  - <function=... /> / <function>...</function> syntax
 //  - Raw JSON lines that are tool call arguments (e.g. {"query":"...","site_id":"..."})
@@ -315,6 +504,7 @@ export default function AgentPage() {
   const [tokenState, setTokenState]     = useState<TokenState | null>(null);
   const [showSiteModal, setShowSiteModal] = useState(false);
   const [pendingMessage, setPendingMessage] = useState("");
+  const [sshActive, setSshActive] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
@@ -421,7 +611,12 @@ export default function AgentPage() {
   };
 
   const handleSiteChange = (id: string) => {
+    // Disconnect SSH from previous site (best-effort, fire-and-forget)
+    if (selectedSiteId && sshActive) {
+      api.delete(`/agent/ssh/disconnect/${selectedSiteId}`).catch(() => {});
+    }
     setSelectedSiteId(id);
+    setSshActive(false);
     setMessages([]);
     setToolCallsMap({});
     setError(null);
@@ -475,7 +670,13 @@ export default function AgentPage() {
                 {copied ? "Copied!" : "Copy transcript"}
               </button>
               <button
-                onClick={() => { setMessages([]); setToolCallsMap({}); setError(null); }}
+                onClick={() => {
+                  if (selectedSiteId && sshActive) {
+                    api.delete(`/agent/ssh/disconnect/${selectedSiteId}`).catch(() => {});
+                    setSshActive(false);
+                  }
+                  setMessages([]); setToolCallsMap({}); setError(null);
+                }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
               >
                 <RotateCcw size={11} /> New chat
@@ -499,6 +700,11 @@ export default function AgentPage() {
           </div>
         </div>
       </div>
+
+      {/* ── SSH panel (site-specific, below top bar) ────────────────────────── */}
+      {!isFreePlan && selectedSiteId && (
+        <SshPanel siteId={selectedSiteId} onStatusChange={setSshActive} />
+      )}
 
       {/* ── Free plan upgrade wall ───────────────────────────────────────────── */}
       {isFreePlan && (

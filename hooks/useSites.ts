@@ -28,10 +28,10 @@ export function useSites() {
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async (invalidate = false) => {
+  const fetch = useCallback(async (invalidate = false, silent = false) => {
     if (invalidate) cacheClear(CACHE_KEY);
     setError(null);
-    if (!cacheGet(CACHE_KEY)) setLoading(true);
+    if (!silent && !cacheGet(CACHE_KEY)) setLoading(true);
     try {
       const { data } = await api.get<{ sites: RawSite[]; portfolio?: PortfolioStats } | RawSite[]>("/sites");
       const raw: RawSite[] = Array.isArray(data)
@@ -71,7 +71,7 @@ export function useSites() {
   useEffect(() => {
     const hasDisconnected = sites.some((s) => !s.plugin_connected);
     if (!hasDisconnected) return;
-    const id = setInterval(() => fetch(true), 30_000);
+    const id = setInterval(() => fetch(true, true), 30_000);
     return () => clearInterval(id);
   }, [sites, fetch]);
 

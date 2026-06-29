@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Activity, TrendingUp, Search, Shield, Bug, Eye, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { truncateUrl, scoreHex } from "@/lib/utils";
@@ -49,6 +50,8 @@ function UptimeDonut({ pct }: { pct: number }) {
 export function SiteCard({ site, onClick }: SiteCardProps) {
   const router = useRouter();
   const { agency } = useAuth();
+  const [hovered, setHovered] = useState(false);
+
   const isClientPortal = agency?.is_client_portal ?? false;
   const uptime   = site.uptime_percentage ?? 0;
   const isOnline = site.uptime_status === "up";
@@ -62,11 +65,17 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
   const siteHref = `/sites/${site.id}`;
 
   return (
-    <div className="group relative bg-white rounded-2xl border border-border shadow-sm hover:shadow-xl hover:border-[var(--accent)]/30 transition-all duration-200 overflow-hidden flex flex-col">
-
-      {/* ── Card content (dims slightly on hover) ── */}
-      <div className="flex flex-col transition-opacity duration-200 group-hover:opacity-60">
-
+    <div
+      className="relative bg-white rounded-2xl border border-border shadow-sm transition-all duration-200 overflow-hidden flex flex-col cursor-pointer"
+      style={hovered ? { boxShadow: "0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1)", borderColor: "var(--accent)" } : {}}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* ── Card content (dims on hover) ── */}
+      <div
+        className="flex flex-col transition-opacity duration-200"
+        style={{ opacity: hovered && !isClientPortal ? 0.5 : 1 }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 pb-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -127,28 +136,41 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
       {/* ── Hover overlay — agency only ── */}
       {!isClientPortal && (
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-          style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(4px)" }}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 rounded-2xl transition-opacity duration-200"
+          style={{
+            background: "rgba(255,255,255,0.93)",
+            backdropFilter: "blur(4px)",
+            opacity: hovered ? 1 : 0,
+            pointerEvents: hovered ? "auto" : "none",
+          }}
         >
-          {/* Quick View */}
           <button
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            className="pointer-events-auto w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-150
-              border-[var(--accent)] text-[var(--accent)] bg-white hover:bg-[var(--accent)] hover:text-white hover:shadow-md
-              translate-y-3 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
-            style={{ transitionDelay: "30ms" }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-150 hover:text-white hover:shadow-md"
+            style={{
+              borderColor: "var(--accent)",
+              color: "var(--accent)",
+              background: "white",
+              transform: hovered ? "translateY(0)" : "translateY(10px)",
+              opacity: hovered ? 1 : 0,
+              transitionDelay: "30ms",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent)"; (e.currentTarget as HTMLButtonElement).style.color = "white"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "white"; (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
           >
             <Eye size={15} />
             Quick View
           </button>
 
-          {/* Detailed View */}
           <button
             onClick={(e) => { e.stopPropagation(); router.push(siteHref); }}
-            className="pointer-events-auto w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-150
-              hover:brightness-110 hover:shadow-lg shadow-md
-              translate-y-3 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
-            style={{ background: "var(--accent)", transitionDelay: "70ms" }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white shadow-md hover:brightness-110 hover:shadow-lg transition-all duration-150"
+            style={{
+              background: "var(--accent)",
+              transform: hovered ? "translateY(0)" : "translateY(10px)",
+              opacity: hovered ? 1 : 0,
+              transitionDelay: "60ms",
+            }}
           >
             Detailed View
             <ArrowRight size={15} />
