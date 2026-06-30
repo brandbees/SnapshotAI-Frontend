@@ -256,9 +256,6 @@ export default function MasterDashboardPage() {
               Claude tokens used{s.claude_tokens_month ? ` — ${s.claude_tokens_month}` : " this month"}
             </p>
           </div>
-          <p className="text-xs font-medium" style={{ color: "#c97d2e" }}>
-            ≈ ${((s.claude_tokens_used ?? 0) / 1_000_000 * 9).toFixed(3)} est. cost (Sonnet avg)
-          </p>
         </div>
 
         {/* Groq / fallback tokens */}
@@ -273,11 +270,6 @@ export default function MasterDashboardPage() {
             <p className="text-2xl font-bold text-foreground">{fmtTokens(s.total_tokens_used)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">tokens consumed this month across all agencies</p>
           </div>
-          {s.total_tokens_extra > 0 && (
-            <p className="text-xs font-medium" style={{ color: "#8b5cf6" }}>
-              +{fmtTokens(s.total_tokens_extra)} extra tokens purchased
-            </p>
-          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
