@@ -606,6 +606,10 @@ export default function AgentPage() {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
     setInput("");
+    // Reset textarea height back to single line after send
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
     await sendWithSite(trimmed, selectedSiteId, true);
   }, [loading, selectedSiteId, sendWithSite]);
 
@@ -1034,7 +1038,13 @@ export default function AgentPage() {
                 <textarea
                   ref={inputRef}
                   value={input}
-                  onChange={e => setInput(e.target.value)}
+                  onChange={e => {
+                    setInput(e.target.value);
+                    // Auto-expand: reset to auto then grow to scrollHeight, capped at ~5 lines
+                    const el = e.target;
+                    el.style.height = "auto";
+                    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+                  }}
                   onKeyDown={handleKeyDown}
                   placeholder={
                     !canUseAgent
@@ -1045,8 +1055,8 @@ export default function AgentPage() {
                   }
                   rows={1}
                   disabled={!canUseAgent}
-                  className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground py-1 max-h-32 border-0 ring-0 disabled:cursor-not-allowed"
-                  style={{ outline: "none", boxShadow: "none", overflowY: "auto", color: "#1a1209", caretColor: "#a07840" }}
+                  className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground py-1 border-0 ring-0 disabled:cursor-not-allowed"
+                  style={{ outline: "none", boxShadow: "none", overflowY: "auto", color: "#1a1209", caretColor: "#a07840", minHeight: "28px", maxHeight: "140px" }}
                 />
                 <button
                   onClick={() => send(input)}
