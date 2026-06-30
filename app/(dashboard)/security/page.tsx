@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Shield, ShieldCheck, Search, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown,
   AlertTriangle, CheckCircle2, Wifi, Pencil, Bug, Key, Settings, FileWarning, Upload,
+  XCircle, Info,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -282,6 +283,78 @@ export default function SecurityPage() {
           {audited.length} of {sites.length} audited
         </span>
       </div>
+
+      {/* ── Intelligence Summary ── */}
+      {(() => {
+        const totalFlags  = sites.reduce((n, s) => n + countRiskFlags(s), 0);
+        const pluginVulns = sites.reduce((n, s) => n + (s.plugin_vuln_count ?? 0), 0);
+        const hasCritical = criticalCount > 0;
+        const hasWarning  = warnCount > 0;
+
+        const bullets: { text: string; color: string; icon: React.ReactNode }[] = [];
+
+        if (malwareCount > 0)
+          bullets.push({ text: `${malwareCount} site${malwareCount > 1 ? "s have" : " has"} active malware threats — immediate remediation required`, color: "#dc2626", icon: <XCircle size={11} /> });
+        if (criticalCount > 0)
+          bullets.push({ text: `${criticalCount} site${criticalCount > 1 ? "s are" : " is"} in Critical range (score below 50) — high exposure to attacks`, color: "#dc2626", icon: <AlertTriangle size={11} /> });
+        if (sslIssues > 0)
+          bullets.push({ text: `${sslIssues} SSL certificate${sslIssues > 1 ? "s" : ""} expiring within 30 days — visitors will see security warnings`, color: "#d97706", icon: <AlertTriangle size={11} /> });
+        if (pluginVulns > 0)
+          bullets.push({ text: `${pluginVulns} plugin CVE${pluginVulns > 1 ? "s" : ""} detected across your sites — update affected plugins to patch`, color: "#d97706", icon: <AlertTriangle size={11} /> });
+        if (totalFlags > 0)
+          bullets.push({ text: `${totalFlags} configuration risk flag${totalFlags > 1 ? "s" : ""} found (XML-RPC, default login URL, writable config, etc.)`, color: "#f59e0b", icon: <Info size={11} /> });
+        if (warnCount > 0 && !hasCritical)
+          bullets.push({ text: `${warnCount} site${warnCount > 1 ? "s" : ""} in Warning range — review vulnerability flags and harden configurations`, color: "#d97706", icon: <Info size={11} /> });
+        if (bullets.length === 0 && audited.length > 0)
+          bullets.push({ text: "All audited sites are in good standing — no critical issues detected", color: "#16a34a", icon: <CheckCircle2 size={11} /> });
+        if (audited.length === 0)
+          bullets.push({ text: "Run a security audit on your sites to populate this dashboard", color: "#6b7280", icon: <Info size={11} /> });
+
+        const headline = malwareCount > 0
+          ? "Active malware detected — action required"
+          : hasCritical
+          ? `${criticalCount} site${criticalCount > 1 ? "s" : ""} at critical security risk`
+          : hasWarning
+          ? "Some sites need attention to improve their security posture"
+          : audited.length === 0
+          ? "No audit data yet"
+          : "Security posture looks healthy across your portfolio";
+
+        const headlineColor = malwareCount > 0 || hasCritical ? "#dc2626" : hasWarning ? "#d97706" : audited.length === 0 ? "#6b7280" : "#16a34a";
+        const headlineBg    = malwareCount > 0 || hasCritical ? "#fef2f2" : hasWarning ? "#fffbeb" : audited.length === 0 ? "#f8fafc" : "#f0fdf4";
+        const headlineBorder= malwareCount > 0 || hasCritical ? "#fecaca" : hasWarning ? "#fde68a" : audited.length === 0 ? "#e2e8f0" : "#bbf7d0";
+
+        return (
+          <div className="rounded-2xl border p-5" style={{ background: headlineBg, borderColor: headlineBorder }}>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                style={{ background: `${headlineColor}18` }}>
+                {malwareCount > 0 || hasCritical
+                  ? <XCircle size={15} style={{ color: headlineColor }} />
+                  : hasWarning
+                  ? <AlertTriangle size={15} style={{ color: headlineColor }} />
+                  : audited.length === 0
+                  ? <Shield size={15} style={{ color: headlineColor }} />
+                  : <ShieldCheck size={15} style={{ color: headlineColor }} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold" style={{ color: headlineColor }}>{headline}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+                  Score is based on: configuration hardening (XML-RPC, login URL, file editor, debug mode, writable files), SSL certificate health, plugin CVE exposure, and malware status.
+                </p>
+                <ul className="space-y-1.5">
+                  {bullets.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: b.color }}>
+                      <span className="shrink-0 mt-0.5">{b.icon}</span>
+                      <span className="leading-snug">{b.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Security Grade Hero ── */}
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
