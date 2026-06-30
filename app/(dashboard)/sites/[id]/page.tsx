@@ -4518,6 +4518,10 @@ function SiteDetailContent() {
             clearInterval(scanPollRef.current!);
             scanPollRef.current = null;
             setScanLoading(false);
+            if (data.status === "completed") {
+              // Invalidate site cache so header/overview malware score reflects the new scan
+              window.dispatchEvent(new Event("bb:refresh"));
+            }
             if (data.status === "failed") {
               setScanError("Scan failed. Please try again.");
             }
