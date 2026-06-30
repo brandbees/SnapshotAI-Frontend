@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bot, Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
+import { Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
          Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X,
          AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2,
          Terminal, Lock, KeyRound, ChevronUp, Wifi, WifiOff, Eye, EyeOff } from "lucide-react";
@@ -429,25 +429,32 @@ function sanitizeMessage(text: string): string {
     .trim();
 }
 
-function ToolCallCard({ call }: { call: ToolCall }) {
-  const meta = TOOL_META[call.name] ?? { label: call.name, icon: Zap, color: "#6366f1" };
-  const Icon = meta.icon;
-  const msg  = typeof call.result?.message === "string" ? call.result.message : null;
-  const err  = typeof call.result?.error   === "string" ? call.result.error   : null;
+// Consolidated tool call pills — deduplicates repeated calls (e.g. "Live data fetched ×3")
+function ToolCallsSummary({ calls }: { calls: ToolCall[] }) {
+  const grouped = calls.reduce<{ name: string; count: number; meta: typeof TOOL_META[string]; hasError: boolean }[]>((acc, tc) => {
+    const meta = TOOL_META[tc.name] ?? { label: tc.name, icon: Zap, color: "#6366f1" };
+    const existing = acc.find(g => g.name === tc.name);
+    const hasError = typeof tc.result?.error === "string";
+    if (existing) { existing.count++; if (hasError) existing.hasError = true; }
+    else acc.push({ name: tc.name, count: 1, meta, hasError });
+    return acc;
+  }, []);
 
   return (
-    <div className="flex items-start gap-2.5 mt-2 px-3 py-2.5 rounded-xl border text-xs"
-      style={{ background: `${meta.color}08`, borderColor: `${meta.color}30` }}>
-      <div className="w-5 h-5 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-        style={{ background: `${meta.color}18` }}>
-        <Icon size={11} style={{ color: meta.color }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <span className="font-semibold" style={{ color: meta.color }}>{meta.label}</span>
-        {msg && <p className="text-muted-foreground mt-0.5 leading-snug">{msg}</p>}
-        {err && <p className="text-destructive mt-0.5">{err}</p>}
-      </div>
-      {call.result?.success === true && <Check size={12} className="text-green-500 shrink-0 mt-0.5" />}
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {grouped.map((g, i) => {
+        const Icon = g.meta.icon;
+        const color = g.hasError ? "#dc2626" : g.meta.color;
+        return (
+          <span key={i}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium"
+            style={{ background: `${color}10`, color, border: `1px solid ${color}25` }}>
+            <Icon size={9} />
+            {g.meta.label}{g.count > 1 ? <span className="opacity-60">×{g.count}</span> : null}
+            {!g.hasError && <Check size={8} className="opacity-50" />}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -648,8 +655,9 @@ export default function AgentPage() {
       {/* ── Top bar ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 px-6 py-3.5 bg-white border-b border-border shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--accent-light)" }}>
-            <Bot size={16} style={{ color: "var(--accent)" }} />
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+            style={{ background: "linear-gradient(135deg, #c8a96e 0%, #a07840 100%)" }}>
+            <Sparkles size={15} className="text-white" />
           </div>
           <div>
             <h1 className="text-sm font-semibold text-foreground leading-none">AI Assistant</h1>
@@ -755,97 +763,177 @@ export default function AgentPage() {
       )}
 
       {/* ── Messages ─────────────────────────────────────────────────────────── */}
-      {!isFreePlan && <div className="flex-1 overflow-y-auto min-h-0 bg-[#f8fafc]">
-        <div className="max-w-3xl mx-auto px-6 py-8">
+      {!isFreePlan && (
+        <div className="flex-1 overflow-y-auto min-h-0 relative"
+          style={{ background: "radial-gradient(ellipse 100% 55% at 50% 0%, #f5e9d0 0%, #f7f4ef 45%, #f5f3f0 100%)" }}>
 
-          {isEmpty ? (
-            <div className="flex flex-col items-center text-center py-10">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-sm" style={{ background: "var(--accent-light)" }}>
-                <Sparkles size={28} style={{ color: "var(--accent)" }} />
-              </div>
-              <h2 className="text-base font-semibold text-foreground">
-                {selectedSite ? `Ask me about ${selectedSite.name || selectedSite.url}` : "What do you want to know?"}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1.5 mb-8 max-w-sm">
-                I have live access to audit scores, security signals, malware scans, and plugin data — and I can take actions like running audits and sending reports.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
-                {suggestions.map(({ q, icon }) => (
-                  <button
-                    key={q}
-                    onClick={() => send(q)}
-                    className="group flex items-start gap-3 text-left px-4 py-3.5 rounded-xl border border-border bg-white hover:border-[color:var(--accent)] hover:shadow-sm transition-all text-sm text-foreground"
-                  >
-                    <span className="text-base leading-none mt-0.5 shrink-0">{icon}</span>
-                    <span className="leading-snug">{q}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  {msg.role === "assistant" && (
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-1" style={{ background: "var(--accent-light)" }}>
-                      <Bot size={13} style={{ color: "var(--accent)" }} />
-                    </div>
-                  )}
-                  <div className="max-w-[78%] flex flex-col gap-1">
-                    <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                        msg.role === "user"
-                          ? "text-white rounded-tr-none shadow-sm"
-                          : "bg-white border border-border text-foreground rounded-tl-none shadow-sm"
-                      }`}
-                      style={msg.role === "user" ? { background: "var(--accent)" } : undefined}
+          {/* Subtle top glow */}
+          <div className="absolute inset-x-0 top-0 h-32 pointer-events-none"
+            style={{ background: "linear-gradient(to bottom, rgba(200,169,110,0.08), transparent)" }} />
+
+          <div className="relative max-w-3xl mx-auto px-6 py-10">
+
+            {isEmpty ? (
+              <div className="flex flex-col items-center text-center">
+                {/* Glowing hero icon */}
+                <div className="relative mb-8 mt-4">
+                  {/* Outer glow rings */}
+                  <div className="absolute inset-0 rounded-full scale-[2.2] opacity-[0.12]"
+                    style={{ background: "radial-gradient(circle, #c8a96e, transparent 70%)" }} />
+                  <div className="absolute inset-0 rounded-full scale-[1.6] opacity-[0.18]"
+                    style={{ background: "radial-gradient(circle, #c8a96e, transparent 70%)" }} />
+                  <div className="w-24 h-24 rounded-3xl flex items-center justify-center relative shadow-2xl"
+                    style={{ background: "linear-gradient(145deg, #d4b278 0%, #a07840 50%, #7a5a28 100%)", boxShadow: "0 20px 60px rgba(160,120,64,0.4), 0 4px 16px rgba(0,0,0,0.15)" }}>
+                    <Sparkles size={38} className="text-white drop-shadow-sm" />
+                  </div>
+                  <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center shadow-md"
+                    style={{ background: "var(--accent)" }}>
+                    <Zap size={12} className="text-white" />
+                  </div>
+                </div>
+
+                <h2 className="text-2xl font-bold tracking-tight mb-2" style={{ color: "#1a1209" }}>
+                  {selectedSite ? `Let's look at ${selectedSite.name || selectedSite.url}` : "How can I help today?"}
+                </h2>
+                <p className="text-sm leading-relaxed mb-10 max-w-xs" style={{ color: "#8a7560" }}>
+                  Live access to your audit scores, security signals, malware scans, and plugin data.
+                </p>
+
+                {/* Suggestion grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+                  {suggestions.map(({ q, icon }) => (
+                    <button
+                      key={q}
+                      onClick={() => send(q)}
+                      className="group flex items-start gap-3 text-left px-4 py-4 rounded-2xl text-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+                      style={{
+                        background: "rgba(255,255,255,0.75)",
+                        border: "1px solid rgba(200,169,110,0.25)",
+                        backdropFilter: "blur(8px)",
+                        boxShadow: "0 2px 8px rgba(160,120,64,0.08), 0 1px 2px rgba(0,0,0,0.04)",
+                        color: "#2d1f0e",
+                      }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.background = "rgba(255,255,255,0.95)";
+                        el.style.borderColor = "rgba(160,120,64,0.5)";
+                        el.style.boxShadow = "0 8px 24px rgba(160,120,64,0.15), 0 2px 6px rgba(0,0,0,0.06)";
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.background = "rgba(255,255,255,0.75)";
+                        el.style.borderColor = "rgba(200,169,110,0.25)";
+                        el.style.boxShadow = "0 2px 8px rgba(160,120,64,0.08), 0 1px 2px rgba(0,0,0,0.04)";
+                      }}
                     >
-                      {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
-                    </div>
-                    {/* Tool call cards — shown below the assistant message */}
-                    {msg.role === "assistant" && toolCallsMap[i] && toolCallsMap[i].map((tc, j) => (
-                      tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview
-                        ? <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} />
-                        : <ToolCallCard key={j} call={tc} />
-                    ))}
-                  </div>
+                      <span className="text-lg leading-none shrink-0 mt-0.5">{icon}</span>
+                      <span className="leading-snug font-medium">{q}</span>
+                    </button>
+                  ))}
                 </div>
-              ))}
 
-              {loading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-1" style={{ background: "var(--accent-light)" }}>
-                    <Bot size={13} style={{ color: "var(--accent)" }} />
-                  </div>
-                  <div className="px-4 py-3.5 rounded-2xl rounded-tl-none bg-white border border-border shadow-sm">
-                    <div className="flex gap-1.5 items-center">
-                      <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0ms]" style={{ background: "var(--accent)" }} />
-                      <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:150ms]" style={{ background: "var(--accent)" }} />
-                      <span className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:300ms]" style={{ background: "var(--accent)" }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex justify-center">
-                  <div className="text-xs bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-center max-w-sm">
-                    <p className="text-destructive font-medium">{error}</p>
-                    {isTokenLimitError && (
-                      <a href="/settings?tab=billing"
-                        className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-accent hover:underline">
-                        <ExternalLink size={11} /> Buy more tokens
-                      </a>
+                <p className="text-[11px] mt-10 tracking-wide" style={{ color: "#b8a590" }}>
+                  SNAPSHOT AI · Actions require your confirmation
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {msg.role === "assistant" && (
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1"
+                        style={{
+                          background: "linear-gradient(145deg, #d4b278 0%, #8a6030 100%)",
+                          boxShadow: "0 2px 8px rgba(160,120,64,0.4)",
+                        }}>
+                        <Sparkles size={13} className="text-white" />
+                      </div>
                     )}
+                    <div className="max-w-[76%] flex flex-col gap-2">
+                      <div
+                        className={`text-sm leading-relaxed whitespace-pre-wrap ${
+                          msg.role === "user" ? "text-white" : "text-foreground"
+                        }`}
+                        style={msg.role === "user"
+                          ? {
+                              padding: "10px 16px",
+                              background: "var(--accent)",
+                              borderRadius: "18px 18px 4px 18px",
+                              boxShadow: "0 2px 12px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1)",
+                              fontWeight: 450,
+                            }
+                          : {
+                              padding: "12px 16px",
+                              background: "rgba(255,255,255,0.7)",
+                              borderRadius: "4px 18px 18px 18px",
+                              backdropFilter: "blur(16px)",
+                              WebkitBackdropFilter: "blur(16px)",
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.8)",
+                            }}
+                      >
+                        {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
+                      </div>
+                      {/* Tool calls — write confirmations as cards, everything else as compact pills */}
+                      {msg.role === "assistant" && toolCallsMap[i] && (() => {
+                        const calls = toolCallsMap[i];
+                        const writeCalls = calls.filter(tc => tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview);
+                        const regularCalls = calls.filter(tc => !(tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview));
+                        return (
+                          <>
+                            {writeCalls.map((tc, j) => <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} />)}
+                            {regularCalls.length > 0 && <ToolCallsSummary calls={regularCalls} />}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
-                </div>
-              )}
+                ))}
 
-              <div ref={bottomRef} />
-            </div>
-          )}
+                {loading && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
+                      style={{
+                        background: "linear-gradient(145deg, #d4b278 0%, #a07840 100%)",
+                        boxShadow: "0 4px 12px rgba(160,120,64,0.35)",
+                      }}>
+                      <Sparkles size={14} className="text-white" />
+                    </div>
+                    <div className="flex items-center gap-1.5 px-4 py-3.5"
+                      style={{
+                        background: "rgba(255,255,255,0.7)",
+                        borderRadius: "4px 18px 18px 18px",
+                        backdropFilter: "blur(16px)",
+                        WebkitBackdropFilter: "blur(16px)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.8)",
+                      }}>
+                      {[0, 160, 320].map(delay => (
+                        <span key={delay} className="w-2 h-2 rounded-full animate-bounce"
+                          style={{ background: "#b89050", opacity: 0.7, animationDelay: `${delay}ms`, animationDuration: "1.1s" }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="flex justify-center">
+                    <div className="text-xs bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-center max-w-sm">
+                      <p className="text-destructive font-medium">{error}</p>
+                      {isTokenLimitError && (
+                        <a href="/settings?tab=billing"
+                          className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-accent hover:underline">
+                          <ExternalLink size={11} /> Buy more tokens
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div ref={bottomRef} />
+              </div>
+            )}
+          </div>
         </div>
-      </div>}
+      )}
 
       {/* ── Choose Site modal ────────────────────────────────────────────────── */}
       {showSiteModal && (
@@ -894,41 +982,60 @@ export default function AgentPage() {
       )}
 
       {/* ── Input bar ────────────────────────────────────────────────────────── */}
-      {!isFreePlan && <div className="shrink-0 bg-[#f8fafc] border-t border-border px-6 pb-5 pt-4">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex gap-3 items-end bg-white rounded-2xl px-4 py-3 shadow-sm focus-within:shadow-md transition-shadow">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                !canUseAgent
-                  ? "Upgrade to Agency Plus to use the AI Assistant…"
-                  : selectedSite
-                  ? `Ask about ${selectedSite.name || selectedSite.url}…`
-                  : "Ask anything about your sites, or say 'run audit on…'"
-              }
-              rows={1}
-              disabled={!canUseAgent}
-              className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground py-0.5 max-h-32 border-0 ring-0 disabled:cursor-not-allowed"
-              style={{ outline: "none", boxShadow: "none", overflowY: "auto" }}
-            />
-            <button
-              onClick={() => send(input)}
-              disabled={!input.trim() || loading || !canUseAgent}
-              className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 disabled:opacity-35 disabled:cursor-not-allowed transition-opacity"
-              style={{ background: "var(--accent)" }}
-              aria-label="Send"
-            >
-              {loading ? <Loader2 size={14} className="text-white animate-spin" /> : <Send size={14} className="text-white" />}
-            </button>
+      {!isFreePlan && (
+        <div className="shrink-0 px-6 pb-6 pt-4"
+          style={{ background: "linear-gradient(to top, #f0ece4 0%, #f5f3ef 100%)", borderTop: "1px solid #e4ddd3" }}>
+          <div className="max-w-3xl mx-auto">
+            {/* Gradient-bordered input container */}
+            <div className="p-px rounded-2xl"
+              style={{ background: "linear-gradient(135deg, #c8a96e40, #e8e0d4 40%, #d4b27840)" }}>
+              <div className="flex gap-3 items-end rounded-2xl px-4 py-3"
+                style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    !canUseAgent
+                      ? "Upgrade to unlock AI Assistant…"
+                      : selectedSite
+                      ? `Ask about ${selectedSite.name || selectedSite.url}…`
+                      : "Ask anything about your sites…"
+                  }
+                  rows={1}
+                  disabled={!canUseAgent}
+                  className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground py-1 max-h-32 border-0 ring-0 disabled:cursor-not-allowed"
+                  style={{ outline: "none", boxShadow: "none", overflowY: "auto", color: "#1a1209", caretColor: "#a07840" }}
+                />
+                <button
+                  onClick={() => send(input)}
+                  disabled={!input.trim() || loading || !canUseAgent}
+                  className="flex items-center justify-center shrink-0 transition-all disabled:cursor-not-allowed"
+                  style={{
+                    width: 36, height: 36,
+                    borderRadius: 12,
+                    background: input.trim() && !loading && canUseAgent
+                      ? "linear-gradient(135deg, #c8a96e 0%, #8a6030 100%)"
+                      : "var(--accent)",
+                    opacity: (!input.trim() || loading || !canUseAgent) ? 0.35 : 1,
+                    boxShadow: input.trim() && canUseAgent ? "0 2px 8px rgba(160,120,64,0.4)" : "none",
+                    transition: "all 0.2s ease",
+                  }}
+                  aria-label="Send"
+                >
+                  {loading
+                    ? <Loader2 size={15} className="text-white animate-spin" />
+                    : <Send size={14} className="text-white" style={{ transform: "translateX(1px)" }} />}
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px] text-center mt-2.5 tracking-wide" style={{ color: "#b8a88a" }}>
+              ENTER TO SEND · SHIFT+ENTER FOR NEW LINE
+            </p>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2 text-center">
-            Enter to send · Shift+Enter for new line · I can run audits, send reports, and update schedules
-          </p>
         </div>
-      </div>}
+      )}
 
     </div>
   );
