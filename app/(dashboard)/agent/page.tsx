@@ -891,9 +891,9 @@ export default function AgentPage() {
                         {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
                       </div>
 
-                      {/* Regular tool call pills (non-write) */}
+                      {/* Regular tool call pills — exclude ALL preview_write_operation calls (success shown as card, failure shown nowhere) */}
                       {msg.role === "assistant" && toolCallsMap[i] && (() => {
-                        const regularCalls = toolCallsMap[i].filter(tc => !(tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview));
+                        const regularCalls = toolCallsMap[i].filter(tc => tc.name !== "preview_write_operation");
                         return regularCalls.length > 0 ? <ToolCallsSummary calls={regularCalls} /> : null;
                       })()}
                     </div>
