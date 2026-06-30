@@ -92,10 +92,53 @@ const OP_LABELS: Record<string, string> = {
   clear_all_transients:      "Clear All Transients",
 };
 
-function WriteConfirmCard({ call, siteId, onSuccess }: {
+function WriteBatch({ writeCalls, siteId, onSuccess, isMulti }: {
+  writeCalls: ToolCall[];
+  siteId: string;
+  onSuccess?: (operation: string, resultMsg: string, counts: Record<string, unknown>) => void;
+  isMulti: boolean;
+}) {
+  const [bulkTrigger, setBulkTrigger] = useState(0);
+  const [bulkFired, setBulkFired]     = useState(false);
+
+  const confirmAll = () => {
+    setBulkTrigger(t => t + 1);
+    setBulkFired(true);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Header row */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-1.5" style={{ color: "#d97706" }}>
+          <AlertTriangle size={11} />
+          <span className="text-[11px] font-semibold tracking-wide uppercase">
+            Action{isMulti ? "s require" : " requires"} confirmation
+          </span>
+        </div>
+        {isMulti && !bulkFired && (
+          <button
+            onClick={confirmAll}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-white text-[11px] font-semibold transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 1px 6px rgba(180,83,9,0.35)" }}
+          >
+            <CheckCircle2 size={11} />
+            Confirm All ({writeCalls.length})
+          </button>
+        )}
+      </div>
+      {writeCalls.map((tc, j) => (
+        <WriteConfirmCard key={j} call={tc} siteId={siteId} onSuccess={onSuccess} bulkTrigger={bulkTrigger} />
+      ))}
+    </div>
+  );
+}
+
+function WriteConfirmCard({ call, siteId, onSuccess, bulkTrigger }: {
   call: ToolCall;
   siteId: string;
   onSuccess?: (operation: string, resultMsg: string, counts: Record<string, unknown>) => void;
+  bulkTrigger?: number;
 }) {
   const preview = call.result as unknown as WritePreview;
   const [phase, setPhase]         = useState<"idle" | "running" | "done" | "undo_running" | "undone" | "error">("idle");
@@ -104,15 +147,9 @@ function WriteConfirmCard({ call, siteId, onSuccess }: {
   const [canUndo, setCanUndo]     = useState<boolean>(false);
   const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed) return null;
-
-  const riskIcon = preview.risk_level === "low"
-    ? <CheckCircle2 size={13} className="text-green-600 shrink-0" />
-    : preview.risk_level === "medium"
-    ? <AlertTriangle size={13} className="text-yellow-500 shrink-0" />
-    : <AlertTriangle size={13} className="text-red-500 shrink-0" />;
-
-  const confirm = async () => {
+  // Hoisted so useEffect can reference it before the early-return guard
+  const confirm = useCallback(async () => {
+    if (phase !== "idle") return;
     setPhase("running");
     try {
       const { data } = await api.post<{ success: boolean; snapshot_id: string; can_undo: boolean; message: string }>("/agent/write", {
@@ -135,7 +172,22 @@ function WriteConfirmCard({ call, siteId, onSuccess }: {
       setResultMsg(msg ?? "Operation failed. Please try again.");
       setPhase("error");
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, siteId, preview.operation]);
+
+  // Bulk-trigger: when parent increments bulkTrigger, fire confirm if still idle
+  useEffect(() => {
+    if (bulkTrigger && bulkTrigger > 0) confirm();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkTrigger]);
+
+  if (dismissed) return null;
+
+  const riskIcon = preview.risk_level === "low"
+    ? <CheckCircle2 size={13} className="text-green-600 shrink-0" />
+    : preview.risk_level === "medium"
+    ? <AlertTriangle size={13} className="text-yellow-500 shrink-0" />
+    : <AlertTriangle size={13} className="text-red-500 shrink-0" />;
 
   const undo = async () => {
     setPhase("undo_running");
@@ -889,14 +941,9 @@ export default function AgentPage() {
                         const calls = toolCallsMap[i];
                         const writeCalls = calls.filter(tc => tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview);
                         if (!writeCalls.length) return null;
+                        const isMulti = writeCalls.length > 1;
                         return (
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-1.5 px-1" style={{ color: "#d97706" }}>
-                              <AlertTriangle size={11} />
-                              <span className="text-[11px] font-semibold tracking-wide uppercase">Action requires confirmation</span>
-                            </div>
-                            {writeCalls.map((tc, j) => <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} onSuccess={handleWriteSuccess} />)}
-                          </div>
+                          <WriteBatch writeCalls={writeCalls} siteId={selectedSiteId} onSuccess={handleWriteSuccess} isMulti={isMulti} />
                         );
                       })()}
 
