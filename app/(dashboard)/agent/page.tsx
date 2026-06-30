@@ -812,6 +812,7 @@ export default function AgentPage() {
                         backdropFilter: "blur(8px)",
                         boxShadow: "0 2px 8px rgba(160,120,64,0.08), 0 1px 2px rgba(0,0,0,0.04)",
                         color: "#2d1f0e",
+                        cursor: "pointer",
                       }}
                       onMouseEnter={e => {
                         const el = e.currentTarget as HTMLButtonElement;
@@ -850,6 +851,22 @@ export default function AgentPage() {
                       </div>
                     )}
                     <div className="max-w-[76%] flex flex-col gap-2">
+                      {/* Write confirmation cards shown FIRST so user acts before reading result */}
+                      {msg.role === "assistant" && toolCallsMap[i] && (() => {
+                        const calls = toolCallsMap[i];
+                        const writeCalls = calls.filter(tc => tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview);
+                        if (!writeCalls.length) return null;
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-1.5 px-1" style={{ color: "#d97706" }}>
+                              <AlertTriangle size={11} />
+                              <span className="text-[11px] font-semibold tracking-wide uppercase">Action requires confirmation</span>
+                            </div>
+                            {writeCalls.map((tc, j) => <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} />)}
+                          </div>
+                        );
+                      })()}
+
                       <div
                         className={`text-sm leading-relaxed whitespace-pre-wrap ${
                           msg.role === "user" ? "text-white" : "text-foreground"
@@ -873,17 +890,11 @@ export default function AgentPage() {
                       >
                         {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
                       </div>
-                      {/* Tool calls — write confirmations as cards, everything else as compact pills */}
+
+                      {/* Regular tool call pills (non-write) */}
                       {msg.role === "assistant" && toolCallsMap[i] && (() => {
-                        const calls = toolCallsMap[i];
-                        const writeCalls = calls.filter(tc => tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview);
-                        const regularCalls = calls.filter(tc => !(tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview));
-                        return (
-                          <>
-                            {writeCalls.map((tc, j) => <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} />)}
-                            {regularCalls.length > 0 && <ToolCallsSummary calls={regularCalls} />}
-                          </>
-                        );
+                        const regularCalls = toolCallsMap[i].filter(tc => !(tc.name === "preview_write_operation" && (tc.result as unknown as WritePreview).write_preview));
+                        return regularCalls.length > 0 ? <ToolCallsSummary calls={regularCalls} /> : null;
                       })()}
                     </div>
                   </div>
