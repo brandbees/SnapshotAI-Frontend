@@ -71,10 +71,10 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* ── Card content (dims on hover) ── */}
+      {/* ── Card content (visible through frosted overlay) ── */}
       <div
-        className="flex flex-col transition-opacity duration-200"
-        style={{ opacity: hovered && !isClientPortal ? 0.5 : 1 }}
+        className="flex flex-col transition-all duration-200"
+        style={{ filter: hovered && !isClientPortal ? "blur(0.5px)" : "none" }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 pb-3">
@@ -138,25 +138,39 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
         <div
           className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 rounded-2xl transition-opacity duration-200"
           style={{
-            background: "rgba(255,255,255,0.93)",
-            backdropFilter: "blur(4px)",
+            background: "rgba(255,255,255,0.60)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             opacity: hovered ? 1 : 0,
             pointerEvents: hovered ? "auto" : "none",
           }}
         >
           <button
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-150 hover:text-white hover:shadow-md"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-150 active:scale-95"
             style={{
               borderColor: "var(--accent)",
               color: "var(--accent)",
-              background: "white",
+              background: "rgba(255,255,255,0.85)",
+              cursor: "pointer",
               transform: hovered ? "translateY(0)" : "translateY(10px)",
               opacity: hovered ? 1 : 0,
               transitionDelay: "30ms",
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--accent)"; (e.currentTarget as HTMLButtonElement).style.color = "white"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "white"; (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
+            onMouseEnter={e => {
+              const btn = e.currentTarget as HTMLButtonElement;
+              btn.style.background = "var(--accent)";
+              btn.style.color = "white";
+              btn.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)";
+              btn.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={e => {
+              const btn = e.currentTarget as HTMLButtonElement;
+              btn.style.background = "rgba(255,255,255,0.85)";
+              btn.style.color = "var(--accent)";
+              btn.style.boxShadow = "none";
+              btn.style.transform = "translateY(0)";
+            }}
           >
             <Eye size={15} />
             Quick View
@@ -164,12 +178,26 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
 
           <button
             onClick={(e) => { e.stopPropagation(); router.push(siteHref); }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white shadow-md hover:brightness-110 hover:shadow-lg transition-all duration-150"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-150 active:scale-95"
             style={{
               background: "var(--accent)",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
               transform: hovered ? "translateY(0)" : "translateY(10px)",
               opacity: hovered ? 1 : 0,
               transitionDelay: "60ms",
+            }}
+            onMouseEnter={e => {
+              const btn = e.currentTarget as HTMLButtonElement;
+              btn.style.filter = "brightness(1.12)";
+              btn.style.boxShadow = "0 8px 22px rgba(0,0,0,0.25)";
+              btn.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={e => {
+              const btn = e.currentTarget as HTMLButtonElement;
+              btn.style.filter = "none";
+              btn.style.boxShadow = "0 4px 14px rgba(0,0,0,0.18)";
+              btn.style.transform = "translateY(0)";
             }}
           >
             Detailed View
@@ -183,8 +211,8 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
         <div className="px-3 pb-3 -mt-1">
           <button
             onClick={(e) => { e.stopPropagation(); router.push(siteHref); }}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: "var(--accent)" }}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:shadow-md active:scale-95"
+            style={{ background: "var(--accent)", cursor: "pointer" }}
           >
             View Details
           </button>

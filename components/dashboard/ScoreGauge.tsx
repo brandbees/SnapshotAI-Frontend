@@ -46,8 +46,8 @@ export function ScoreGauge({
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      {/* Donut ring */}
-      <div className="relative shrink-0" style={{ width: cfg.px, height: cfg.px }}>
+      {/* Donut ring — pointerEvents none so parent card cursor:pointer is not overridden by Recharts SVG */}
+      <div className="relative shrink-0" style={{ width: cfg.px, height: cfg.px, pointerEvents: "none" }}>
         <PieChart width={cfg.px} height={cfg.px}>
           <Pie
             data={[{ value: pct }, { value: 100 - pct }]}

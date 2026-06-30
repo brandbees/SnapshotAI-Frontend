@@ -235,6 +235,7 @@ function OverviewTab({
   canRunAudit,
   brandColor,
   benchmarks,
+  setTab,
 }: {
   site: Site;
   audits: Audit[];
@@ -243,6 +244,7 @@ function OverviewTab({
   canRunAudit: boolean;
   brandColor: string;
   benchmarks: Benchmarks | null;
+  setTab: (tab: Tab) => void;
 }) {
   const scores = site.latest_scores;
   const prevAudit = audits[1];
@@ -254,12 +256,13 @@ function OverviewTab({
   const pillarConfig: {
     key: "performance" | "seo" | "security" | "malware";
     label: string;
+    tab: Tab;
     isMalware?: boolean;
   }[] = [
-    { key: "performance", label: "Performance" },
-    { key: "seo",         label: "SEO" },
-    { key: "security",    label: "Security" },
-    { key: "malware",     label: "Malware", isMalware: true },
+    { key: "performance", label: "Performance",    tab: "performance" },
+    { key: "seo",         label: "SEO",            tab: "seo" },
+    { key: "security",    label: "Security",       tab: "security" },
+    { key: "malware",     label: "Malware Health", tab: "malware", isMalware: true },
   ];
 
   // Collect top issues from available site data
@@ -330,7 +333,7 @@ function OverviewTab({
       {/* 4 score gauges */}
       {scores ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {pillarConfig.map(({ key, label, isMalware }) => {
+          {pillarConfig.map(({ key, label, tab, isMalware }) => {
             const score = scores[key];
             const prevScore = prevAudit?.scores?.[key];
             const delta = prevScore !== undefined ? score - prevScore : undefined;
@@ -340,7 +343,13 @@ function OverviewTab({
             const avg = benchmarks?.[key] ?? null;
             const avgDiff = avg !== null ? score - avg : null;
             return (
-              <div key={key} className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center min-h-[190px] gap-1">
+              <div
+                key={key}
+                className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center min-h-[190px] gap-1 cursor-pointer transition-all duration-150 hover:shadow-md hover:border-accent/40 hover:-translate-y-0.5 active:scale-[0.98]"
+                style={{ cursor: "pointer" }}
+                onClick={() => setTab(tab)}
+                title={`Open ${label} tab`}
+              >
                 <ScoreGauge score={score} label={label} sublabel={sub} sublabelVariant={variant} size="lg" isMalware={!!isMalware} />
                 {avg !== null && (
                   <div className="flex items-center gap-1.5 mt-1">
@@ -352,6 +361,11 @@ function OverviewTab({
                       </span>
                     )}
                   </div>
+                )}
+                {isMalware && (
+                  <p className="text-[10px] text-muted-foreground text-center mt-1.5 leading-snug px-2">
+                    100 = fully clean · lower = threats detected
+                  </p>
                 )}
               </div>
             );
@@ -4748,6 +4762,7 @@ function SiteDetailContent() {
             canRunAudit={canRunAudit}
             brandColor={brandColor}
             benchmarks={benchmarks}
+            setTab={setActiveTab}
           />
         )}
         {activeTab === "issues"      && <IssuesTab site={site} brandColor={brandColor} />}

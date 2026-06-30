@@ -160,21 +160,26 @@ function mapScores(raw: RawSite | RawAudit): PillarScores | undefined {
     return undefined;
   }
 
-  // Derive malware display score from the dedicated scanner's threat score when
-  // available — it's more accurate than the audit's lightweight malware check.
-  // overall_threat_score: 0 = clean (show 100), 54 = high risk (show 46).
-  const threatScore = (raw as RawSite).overall_threat_score;
-  const isClean    = (raw as RawSite).is_clean;
+  // Derive malware display score from the dedicated malware scan.
+  // Use overall_threat_score from scan_results lateral join — set only by dedicated
+  // scans, never overwritten by the audit. sites.threat_score is NOT used here
+  // because it can be stale (e.g. set from a scan before threats were resolved).
+  // Scale: threat 0 = health 100 (clean), threat 54 = health 46 (high risk).
+  const siteRaw     = raw as RawSite;
+  const threatScore = siteRaw.overall_threat_score;
+  const isClean     = siteRaw.is_clean;
   let malware: number;
-  if (isClean === true) {
-    malware = 100;
-  } else if (isClean === false && typeof threatScore === "number") {
+  if (typeof threatScore === "number") {
+    // Dedicated scan set overall_threat_score — convert to health score
     malware = Math.max(0, 100 - threatScore);
+  } else if (isClean === true) {
+    // No dedicated scan score but audit/scan says clean
+    malware = 100;
   } else if (isClean === false) {
-    // Threats exist but no threat score — treat as low score
+    // Threats exist but no numeric score — treat as degraded
     malware = Math.min(raw.malware_score ?? 40, 40);
   } else {
-    // No scan yet — fall back to audit malware score
+    // No scan at all — fall back to audit malware score
     malware = raw.malware_score ?? 100;
   }
 
