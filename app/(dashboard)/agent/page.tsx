@@ -92,7 +92,11 @@ const OP_LABELS: Record<string, string> = {
   clear_all_transients:      "Clear All Transients",
 };
 
-function WriteConfirmCard({ call, siteId }: { call: ToolCall; siteId: string }) {
+function WriteConfirmCard({ call, siteId, onSuccess }: {
+  call: ToolCall;
+  siteId: string;
+  onSuccess?: (operation: string, resultMsg: string, counts: Record<string, unknown>) => void;
+}) {
   const preview = call.result as unknown as WritePreview;
   const [phase, setPhase]         = useState<"idle" | "running" | "done" | "undo_running" | "undone" | "error">("idle");
   const [resultMsg, setResultMsg] = useState<string>("");
@@ -122,8 +126,10 @@ function WriteConfirmCard({ call, siteId }: { call: ToolCall; siteId: string }) 
       });
       setSnapshotId(data.snapshot_id);
       setCanUndo(data.can_undo);
-      setResultMsg(data.message ?? "Operation completed.");
+      const msg = data.message ?? "Operation completed.";
+      setResultMsg(msg);
       setPhase("done");
+      onSuccess?.(preview.operation, msg, (preview.counts ?? {}) as Record<string, unknown>);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setResultMsg(msg ?? "Operation failed. Please try again.");
@@ -603,6 +609,29 @@ export default function AgentPage() {
     await sendWithSite(trimmed, selectedSiteId, true);
   }, [loading, selectedSiteId, sendWithSite]);
 
+  // After a write operation confirms, auto-send a follow-up so the AI can report before/after
+  const handleWriteSuccess = useCallback((operation: string, resultMsg: string, counts: Record<string, unknown>) => {
+    // Build a hidden system-level prompt; no user bubble added (addUserMsg = false)
+    const sizeOps: Record<string, { query: string; beforeKey: string; label: string }> = {
+      optimize_db_tables:        { query: "db_table_sizes",  beforeKey: "total_mb",  label: "total database size" },
+      delete_post_revisions:     { query: "revision_bloat",  beforeKey: "revisions", label: "post revision count" },
+      delete_expired_transients: { query: "large_transients", beforeKey: "expired",  label: "expired transient count" },
+      delete_orphaned_postmeta:  { query: "db_table_sizes",  beforeKey: "tables",    label: "database table count" },
+    };
+    const sizeOp = sizeOps[operation];
+    let followUp: string;
+    if (sizeOp && counts[sizeOp.beforeKey] != null) {
+      followUp = `[SYSTEM — write operation complete] Operation "${operation}" just executed. ` +
+        `Result: ${resultMsg}. Before: ${sizeOp.label} was ${counts[sizeOp.beforeKey]}. ` +
+        `Now call get_live_site_data with query="${sizeOp.query}" to get the current (after) value, ` +
+        `then give the user a concise before → after comparison. Keep it short.`;
+    } else {
+      followUp = `[SYSTEM — write operation complete] Operation "${operation}" just executed successfully. ` +
+        `Result: ${resultMsg}. Give the user a brief confirmation of what was accomplished. Keep it to 1-2 sentences.`;
+    }
+    sendWithSite(followUp, selectedSiteId, false);
+  }, [selectedSiteId, sendWithSite]);
+
   const handleSiteModalSelect = useCallback(async (siteId: string) => {
     setShowSiteModal(false);
     setSelectedSiteId(siteId);
@@ -862,7 +891,7 @@ export default function AgentPage() {
                               <AlertTriangle size={11} />
                               <span className="text-[11px] font-semibold tracking-wide uppercase">Action requires confirmation</span>
                             </div>
-                            {writeCalls.map((tc, j) => <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} />)}
+                            {writeCalls.map((tc, j) => <WriteConfirmCard key={j} call={tc} siteId={selectedSiteId} onSuccess={handleWriteSuccess} />)}
                           </div>
                         );
                       })()}
