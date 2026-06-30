@@ -27,6 +27,8 @@ interface Stats {
   total_tokens_extra: number;
   total_storage_used_bytes: number;
   total_storage_extra_bytes: number;
+  claude_tokens_used: number;
+  claude_tokens_month: string | null;
 }
 
 interface SignupPoint { date: string; count: number }
@@ -238,10 +240,31 @@ export default function MasterDashboardPage() {
       </div>
 
       {/* Stat cards — row 3: resource usage */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        {/* Claude (Advanced model) */}
         <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Token Usage</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Advanced Model (Claude)</span>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(212,159,90,0.12)" }}>
+              <Brain size={15} style={{ color: "#c97d2e" }} />
+            </div>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-foreground">{fmtTokens(s.claude_tokens_used ?? 0)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Claude tokens used{s.claude_tokens_month ? ` — ${s.claude_tokens_month}` : " this month"}
+            </p>
+          </div>
+          <p className="text-xs font-medium" style={{ color: "#c97d2e" }}>
+            ≈ ${((s.claude_tokens_used ?? 0) / 1_000_000 * 9).toFixed(3)} est. cost (Sonnet avg)
+          </p>
+        </div>
+
+        {/* Groq / fallback tokens */}
+        <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Token Usage (Groq)</span>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
               <Brain size={15} style={{ color: "#8b5cf6" }} />
             </div>
