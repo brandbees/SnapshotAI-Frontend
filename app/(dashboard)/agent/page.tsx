@@ -57,11 +57,15 @@ const TOOL_META: Record<string, { label: string; icon: React.ElementType; color:
   analyze_malware_findings: { label: "AI malware analysis",       icon: Sparkles,    color: "#7c3aed" },
   get_live_site_data:       { label: "Live data fetched",         icon: Database,    color: "#0891b2" },
   preview_write_operation:  { label: "Write preview ready",       icon: Wrench,      color: "#7c3aed" },
-  ssh_read_file:            { label: "File read via SSH",         icon: Terminal,    color: "#0f766e" },
-  ssh_list_directory:       { label: "Directory listed via SSH",  icon: Terminal,    color: "#0f766e" },
-  ssh_find_pattern:         { label: "Pattern search via SSH",    icon: Terminal,    color: "#0f766e" },
-  ssh_read_log:             { label: "Log read via SSH",          icon: Terminal,    color: "#0f766e" },
-  ssh_check_permissions:    { label: "Permissions checked via SSH", icon: Terminal,  color: "#0f766e" },
+  ssh_read_file:            { label: "File read via SSH",          icon: Terminal,    color: "#0f766e" },
+  ssh_list_directory:       { label: "Directory listed via SSH",   icon: Terminal,    color: "#0f766e" },
+  ssh_find_pattern:         { label: "Pattern search via SSH",     icon: Terminal,    color: "#0f766e" },
+  ssh_read_log:             { label: "Log read via SSH",           icon: Terminal,    color: "#0f766e" },
+  ssh_check_permissions:    { label: "Permissions checked via SSH",icon: Terminal,    color: "#0f766e" },
+  ssh_execute_command:      { label: "Command executed via SSH",   icon: Terminal,    color: "#0d6f5e" },
+  ssh_write_file:           { label: "File written via SSH",       icon: Terminal,    color: "#0d6f5e" },
+  ssh_delete_file:          { label: "File deleted via SSH",       icon: Terminal,    color: "#b91c1c" },
+  ssh_backup_file:          { label: "Backup created via SSH",     icon: Terminal,    color: "#0d6f5e" },
 };
 
 interface WritePreview {
@@ -369,7 +373,7 @@ function SshPanel({ siteId, onStatusChange }: { siteId: string; onStatusChange: 
           <Terminal size={11} className="shrink-0" />
           <span className="font-medium">SSH connected</span>
           <span className="text-teal-600">{status.username}@{status.host}</span>
-          <span className="text-teal-500">· read-only</span>
+          <span className="text-teal-500">· full access</span>
         </div>
         <button onClick={disconnect}
           className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
@@ -552,11 +556,217 @@ function TokenBar({ state }: { state: TokenState }) {
   );
 }
 
+// ── Locked SSH bar — shown for non-SSH-eligible plans ────────────────────────
+
+function LockedSshBar() {
+  return (
+    <div className="flex items-center justify-between px-6 py-2 bg-gray-50 border-b border-border text-[11px]">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Lock size={11} className="shrink-0" />
+        <span className="font-medium">SSH Access</span>
+        <span className="text-gray-400">· Upgrade to Agency plan to unlock full server control</span>
+      </div>
+      <Link href="/settings?tab=billing"
+        className="text-[11px] font-semibold hover:underline"
+        style={{ color: "var(--accent)" }}>
+        Upgrade
+      </Link>
+    </div>
+  );
+}
+
+// ── SSH Connect Modal — shown when needs_ssh: true and plan is SSH-eligible ──
+
+function SshConnectModal({ siteId, onConnected, onClose }: {
+  siteId:      string;
+  onConnected: () => void;
+  onClose:     () => void;
+}) {
+  const [authMode, setAuthMode]     = useState<"password" | "key">("password");
+  const [host, setHost]             = useState("");
+  const [port, setPort]             = useState("22");
+  const [username, setUsername]     = useState("");
+  const [password, setPassword]     = useState("");
+  const [privateKey, setPrivateKey] = useState("");
+  const [showPw, setShowPw]         = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connError, setConnError]   = useState<string | null>(null);
+
+  const connect = async () => {
+    setConnecting(true);
+    setConnError(null);
+    try {
+      await api.post("/agent/ssh/connect", {
+        site_id:    siteId,
+        host:       host.trim(),
+        port:       Number(port) || 22,
+        username:   username.trim(),
+        password:   authMode === "password" ? password : undefined,
+        privateKey: authMode === "key"      ? privateKey.trim() : undefined,
+      });
+      setPassword(""); setPrivateKey("");
+      onConnected();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setConnError(msg ?? "Connection failed. Check credentials and try again.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-teal-50">
+              <Terminal size={15} className="text-teal-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">SSH Required for This Operation</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Connect to enable full server control via the AI Agent</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Guidelines */}
+        <div className="px-5 pt-4 pb-2">
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[11px] space-y-1.5 mb-4">
+            <p className="font-semibold text-amber-800 flex items-center gap-1.5">
+              <AlertTriangle size={11} /> What SSH unlocks
+            </p>
+            <ul className="text-amber-700 space-y-1 ml-1">
+              <li>· Delete malware files directly from the server</li>
+              <li>· Run WP-CLI commands (install/remove plugins, reset passwords, export DB)</li>
+              <li>· Edit wp-config.php, .htaccess, and any server file</li>
+              <li>· Execute any shell command on your server</li>
+            </ul>
+            <p className="text-amber-600 pt-1">The agent auto-backs up important files before modifying or deleting them. Credentials are held in memory only (30 min TTL) and never saved to the database.</p>
+          </div>
+
+          {/* Form */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className="block text-[10px] text-muted-foreground mb-1">Host</label>
+                <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.1 or example.com"
+                  className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] text-muted-foreground mb-1">Port</label>
+                <input value={port} onChange={e => setPort(e.target.value)} placeholder="22"
+                  className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">Username</label>
+              <input value={username} onChange={e => setUsername(e.target.value)} placeholder="ubuntu, root, www-data…"
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
+            </div>
+            <div className="flex items-center gap-1 text-[10px]">
+              {(["password", "key"] as const).map(mode => (
+                <button key={mode} onClick={() => setAuthMode(mode)}
+                  className={`px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 ${authMode === mode ? "border-teal-500 text-teal-600 bg-teal-50" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                  {mode === "password" ? <><Lock size={9} /> Password</> : <><KeyRound size={9} /> Private Key</>}
+                </button>
+              ))}
+            </div>
+            {authMode === "password" ? (
+              <div className="relative">
+                <label className="block text-[10px] text-muted-foreground mb-1">Password</label>
+                <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="SSH password"
+                  className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-2 top-6 text-muted-foreground hover:text-foreground">
+                  {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] text-muted-foreground mb-1">Private Key (PEM)</label>
+                <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)}
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" rows={4}
+                  className="w-full text-[10px] font-mono px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500 resize-none" />
+              </div>
+            )}
+            {connError && <p className="text-[11px] text-destructive">{connError}</p>}
+          </div>
+        </div>
+
+        <div className="px-5 pb-5 pt-3 flex gap-2">
+          <button onClick={connect}
+            disabled={connecting || !host.trim() || !username.trim() || (authMode === "password" ? !password : !privateKey.trim())}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90 bg-teal-600">
+            {connecting ? <Loader2 size={13} className="animate-spin" /> : <Wifi size={13} />}
+            {connecting ? "Connecting…" : "Connect SSH"}
+          </button>
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm text-muted-foreground border border-border hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SSH Upgrade Modal — shown when needs_ssh: true but plan is not eligible ──
+
+function SshUpgradeModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-teal-50">
+            <Lock size={24} className="text-teal-600" />
+          </div>
+          <h2 className="text-base font-bold text-foreground mb-2">SSH Access Required</h2>
+          <p className="text-xs text-muted-foreground mb-5 leading-relaxed">
+            Advanced operations beyond the 27 predefined actions require SSH access, available on Agency and Agency Plus plans.
+          </p>
+          <div className="bg-gray-50 rounded-xl p-4 mb-5 text-left text-[11px] space-y-2">
+            <p className="font-semibold text-foreground">Upgrade to unlock:</p>
+            <div className="space-y-1.5 text-muted-foreground">
+              {[
+                "Delete malware files directly from the server",
+                "Run any WP-CLI command",
+                "Edit server files (wp-config.php, .htaccess)",
+                "Execute any shell command via AI Agent",
+                "Install and manage plugins via CLI",
+              ].map(item => (
+                <div key={item} className="flex items-start gap-2">
+                  <Terminal size={9} className="mt-0.5 shrink-0 text-teal-600" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <Link href="/settings?tab=billing"
+            className="block w-full py-2.5 rounded-xl text-white text-sm font-semibold text-center mb-2 transition-opacity hover:opacity-90"
+            style={{ background: "var(--accent)" }}>
+            Upgrade to Agency Plan
+          </Link>
+          <button onClick={onClose}
+            className="w-full py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-gray-50 transition-colors">
+            Maybe later
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AgentPage() {
   const { agency } = useAuth();
   const isFreePlan   = agency?.plan === 'free';
   const isIndividual = agency?.account_type === "individual";
   const canUseAgent  = !!agency && !isFreePlan;
+  const canUseSsh    = agency?.plan === 'agency' || agency?.plan === 'agency_plus';
 
   const [sites, setSites]               = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
@@ -567,9 +777,11 @@ export default function AgentPage() {
   const [error, setError]               = useState<string | null>(null);
   const [copied, setCopied]             = useState(false);
   const [tokenState, setTokenState]     = useState<TokenState | null>(null);
-  const [showSiteModal, setShowSiteModal] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState("");
-  const [sshActive, setSshActive] = useState(false);
+  const [showSiteModal, setShowSiteModal]         = useState(false);
+  const [showSshModal, setShowSshModal]           = useState(false);
+  const [showSshUpgradeModal, setShowSshUpgradeModal] = useState(false);
+  const [pendingMessage, setPendingMessage]       = useState("");
+  const [sshActive, setSshActive]                 = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
@@ -611,6 +823,8 @@ export default function AgentPage() {
         extra_remaining?: number;
         monthly_limit?: number;
         needs_site_selection?: boolean;
+        needs_ssh?: boolean;
+        can_ssh?:   boolean;
       }>("/agent/chat", {
         message: text,
         site_id: siteId || undefined,
@@ -620,6 +834,20 @@ export default function AgentPage() {
       if (data.needs_site_selection) {
         setPendingMessage(text);
         setShowSiteModal(true);
+        setLoading(false);
+        return;
+      }
+
+      if (data.needs_ssh) {
+        setPendingMessage(text);
+        if (data.reply) {
+          setMessages(prev => [...prev, { role: "assistant", content: data.reply, created_at: new Date().toISOString() }]);
+        }
+        if (data.can_ssh) {
+          setShowSshModal(true);
+        } else {
+          setShowSshUpgradeModal(true);
+        }
         setLoading(false);
         return;
       }
@@ -697,6 +925,16 @@ export default function AgentPage() {
       await sendWithSite(msg, siteId, false);
     }
   }, [pendingMessage, sendWithSite]);
+
+  const handleSshConnected = useCallback(async () => {
+    setShowSshModal(false);
+    setSshActive(true);
+    const msg = pendingMessage;
+    setPendingMessage("");
+    if (msg) {
+      await sendWithSite(msg, selectedSiteId, false);
+    }
+  }, [pendingMessage, selectedSiteId, sendWithSite]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
@@ -796,7 +1034,9 @@ export default function AgentPage() {
 
       {/* ── SSH panel (site-specific, below top bar) ────────────────────────── */}
       {!isFreePlan && selectedSiteId && (
-        <SshPanel siteId={selectedSiteId} onStatusChange={setSshActive} />
+        canUseSsh
+          ? <SshPanel siteId={selectedSiteId} onStatusChange={setSshActive} />
+          : <LockedSshBar />
       )}
 
       {/* ── Free plan upgrade wall ───────────────────────────────────────────── */}
@@ -1024,6 +1264,20 @@ export default function AgentPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── SSH Connect modal ────────────────────────────────────────────────── */}
+      {showSshModal && selectedSiteId && (
+        <SshConnectModal
+          siteId={selectedSiteId}
+          onConnected={handleSshConnected}
+          onClose={() => setShowSshModal(false)}
+        />
+      )}
+
+      {/* ── SSH Upgrade modal ─────────────────────────────────────────────────── */}
+      {showSshUpgradeModal && (
+        <SshUpgradeModal onClose={() => setShowSshUpgradeModal(false)} />
       )}
 
       {/* ── Choose Site modal ────────────────────────────────────────────────── */}
