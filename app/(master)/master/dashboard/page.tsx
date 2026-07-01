@@ -29,6 +29,8 @@ interface Stats {
   total_storage_extra_bytes: number;
   claude_tokens_used: number;
   claude_tokens_month: string | null;
+  groq_tokens_used: number;
+  groq_tokens_month: string | null;
 }
 
 interface SignupPoint { date: string; count: number }
@@ -267,8 +269,8 @@ export default function MasterDashboardPage() {
             </div>
           </div>
           <div>
-            <p className="text-2xl font-bold text-foreground">{fmtTokens(s.total_tokens_used)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">tokens consumed this month across all agencies</p>
+            <p className="text-2xl font-bold text-foreground">{fmtTokens(s.groq_tokens_used ?? 0)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Groq tokens used{s.groq_tokens_month ? ` — ${s.groq_tokens_month}` : ' this month'}</p>
           </div>
         </div>
 
