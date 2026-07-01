@@ -306,7 +306,7 @@ interface SshStatus {
   connected_at?: string;
 }
 
-function SshPanel({ siteId, onStatusChange }: { siteId: string; onStatusChange: (active: boolean) => void }) {
+function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; onStatusChange: (active: boolean) => void; refreshTrigger?: number }) {
   const [status, setStatus]         = useState<SshStatus | null>(null);
   const [expanded, setExpanded]     = useState(false);
   const [authMode, setAuthMode]     = useState<"password" | "key">("password");
@@ -319,13 +319,13 @@ function SshPanel({ siteId, onStatusChange }: { siteId: string; onStatusChange: 
   const [connecting, setConnecting] = useState(false);
   const [connError, setConnError]   = useState<string | null>(null);
 
-  // Fetch session status when site changes
+  // Fetch session status when site changes or after modal-based connect
   useEffect(() => {
     if (!siteId) { setStatus(null); return; }
     api.get<SshStatus>(`/agent/ssh/status/${siteId}`)
       .then(({ data }) => { setStatus(data); onStatusChange(data.active); })
       .catch(() => { setStatus({ active: false }); onStatusChange(false); });
-  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [siteId, refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const connect = async () => {
     setConnecting(true);
@@ -591,6 +591,7 @@ function SshConnectModal({ siteId, onConnected, onClose }: {
   const [showPw, setShowPw]         = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connError, setConnError]   = useState<string | null>(null);
+  const [infoOpen, setInfoOpen]     = useState(false);
 
   const connect = async () => {
     setConnecting(true);
@@ -616,99 +617,112 @@ function SshConnectModal({ siteId, onConnected, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-teal-50">
-              <Terminal size={15} className="text-teal-600" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-teal-50">
+              <Terminal size={13} className="text-teal-600" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-foreground">SSH Required for This Operation</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Connect to enable full server control via the AI Agent</p>
+              <h2 className="text-sm font-semibold text-foreground leading-none">SSH Required</h2>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Connect your server to continue</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground transition-colors">
-            <X size={14} />
+            <X size={13} />
           </button>
         </div>
 
-        {/* Guidelines */}
-        <div className="px-5 pt-4 pb-2">
-          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[11px] space-y-1.5 mb-4">
-            <p className="font-semibold text-amber-800 flex items-center gap-1.5">
-              <AlertTriangle size={11} /> What SSH unlocks
-            </p>
-            <ul className="text-amber-700 space-y-1 ml-1">
-              <li>· Delete malware files directly from the server</li>
-              <li>· Run WP-CLI commands (install/remove plugins, reset passwords, export DB)</li>
-              <li>· Edit wp-config.php, .htaccess, and any server file</li>
-              <li>· Execute any shell command on your server</li>
-            </ul>
-            <p className="text-amber-600 pt-1">The agent auto-backs up important files before modifying or deleting them. Credentials are held in memory only (30 min TTL) and never saved to the database.</p>
+        <div className="px-5 py-4 space-y-3">
+          {/* Collapsible info box */}
+          <div className="rounded-lg border border-amber-100 bg-amber-50 overflow-hidden">
+            <button
+              onClick={() => setInfoOpen(v => !v)}
+              className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold text-amber-800 hover:bg-amber-100/60 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle size={10} /> What SSH enables &amp; how it works
+              </span>
+              {infoOpen ? <ChevronUp size={11} className="text-amber-600" /> : <ChevronDown size={11} className="text-amber-600" />}
+            </button>
+            {infoOpen && (
+              <div className="px-3 pb-3 text-[11px] text-amber-700 space-y-1.5 border-t border-amber-100">
+                <p className="pt-2 text-amber-600">Grants the agent full read/write access to your server:</p>
+                <ul className="space-y-0.5 ml-1">
+                  <li>· Delete, edit, or create any file on the server</li>
+                  <li>· Run WP-CLI, shell commands, manage packages</li>
+                  <li>· Read logs, check configs, modify .htaccess</li>
+                </ul>
+                <p className="text-amber-600 pt-1">Files are auto-backed up before any modification. Credentials are kept in memory only (30 min) and never stored in the database.</p>
+              </div>
+            )}
           </div>
 
           {/* Form */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className="block text-[10px] text-muted-foreground mb-1">Host</label>
-                <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.1 or example.com"
-                  className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
-              </div>
-              <div>
-                <label className="block text-[10px] text-muted-foreground mb-1">Port</label>
-                <input value={port} onChange={e => setPort(e.target.value)} placeholder="22"
-                  className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] text-muted-foreground mb-1">Username</label>
-              <input value={username} onChange={e => setUsername(e.target.value)} placeholder="ubuntu, root, www-data…"
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-[10px] text-muted-foreground mb-1">Host</label>
+              <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.1 or example.com"
                 className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
             </div>
-            <div className="flex items-center gap-1 text-[10px]">
-              {(["password", "key"] as const).map(mode => (
-                <button key={mode} onClick={() => setAuthMode(mode)}
-                  className={`px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 ${authMode === mode ? "border-teal-500 text-teal-600 bg-teal-50" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                  {mode === "password" ? <><Lock size={9} /> Password</> : <><KeyRound size={9} /> Private Key</>}
-                </button>
-              ))}
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">Port</label>
+              <input value={port} onChange={e => setPort(e.target.value)} placeholder="22"
+                className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
             </div>
-            {authMode === "password" ? (
-              <div className="relative">
-                <label className="block text-[10px] text-muted-foreground mb-1">Password</label>
-                <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="SSH password"
-                  className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
-                <button type="button" onClick={() => setShowPw(v => !v)}
-                  className="absolute right-2 top-6 text-muted-foreground hover:text-foreground">
-                  {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
-                </button>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-[10px] text-muted-foreground mb-1">Private Key (PEM)</label>
-                <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)}
-                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" rows={4}
-                  className="w-full text-[10px] font-mono px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500 resize-none" />
-              </div>
-            )}
-            {connError && <p className="text-[11px] text-destructive">{connError}</p>}
           </div>
-        </div>
 
-        <div className="px-5 pb-5 pt-3 flex gap-2">
-          <button onClick={connect}
-            disabled={connecting || !host.trim() || !username.trim() || (authMode === "password" ? !password : !privateKey.trim())}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90 bg-teal-600">
-            {connecting ? <Loader2 size={13} className="animate-spin" /> : <Wifi size={13} />}
-            {connecting ? "Connecting…" : "Connect SSH"}
-          </button>
-          <button onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm text-muted-foreground border border-border hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-1">Username</label>
+            <input value={username} onChange={e => setUsername(e.target.value)} placeholder="ubuntu, root, www-data…"
+              className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
+          </div>
+
+          <div className="flex items-center gap-1 text-[10px]">
+            {(["password", "key"] as const).map(mode => (
+              <button key={mode} onClick={() => setAuthMode(mode)}
+                className={`px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 ${authMode === mode ? "border-teal-500 text-teal-600 bg-teal-50" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                {mode === "password" ? <><Lock size={9} /> Password</> : <><KeyRound size={9} /> Private Key</>}
+              </button>
+            ))}
+          </div>
+
+          {authMode === "password" ? (
+            <div className="relative">
+              <label className="block text-[10px] text-muted-foreground mb-1">Password</label>
+              <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="SSH password"
+                className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500" />
+              <button type="button" onClick={() => setShowPw(v => !v)}
+                className="absolute right-2 top-6 text-muted-foreground hover:text-foreground">
+                {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">Private Key (PEM)</label>
+              <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)}
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" rows={3}
+                className="w-full text-[10px] font-mono px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-teal-500 resize-none" />
+            </div>
+          )}
+
+          {connError && <p className="text-[11px] text-destructive">{connError}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={connect}
+              disabled={connecting || !host.trim() || !username.trim() || (authMode === "password" ? !password : !privateKey.trim())}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90 bg-teal-600">
+              {connecting ? <Loader2 size={13} className="animate-spin" /> : <Wifi size={13} />}
+              {connecting ? "Connecting…" : "Connect SSH"}
+            </button>
+            <button onClick={onClose}
+              className="px-4 py-2 rounded-xl text-sm text-muted-foreground border border-border hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -782,6 +796,7 @@ export default function AgentPage() {
   const [showSshUpgradeModal, setShowSshUpgradeModal] = useState(false);
   const [pendingMessage, setPendingMessage]       = useState("");
   const [sshActive, setSshActive]                 = useState(false);
+  const [sshPanelRefresh, setSshPanelRefresh]     = useState(0);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
@@ -929,6 +944,7 @@ export default function AgentPage() {
   const handleSshConnected = useCallback(async () => {
     setShowSshModal(false);
     setSshActive(true);
+    setSshPanelRefresh(v => v + 1);
     const msg = pendingMessage;
     setPendingMessage("");
     if (msg) {
@@ -1035,7 +1051,7 @@ export default function AgentPage() {
       {/* ── SSH panel (site-specific, below top bar) ────────────────────────── */}
       {!isFreePlan && selectedSiteId && (
         canUseSsh
-          ? <SshPanel siteId={selectedSiteId} onStatusChange={setSshActive} />
+          ? <SshPanel siteId={selectedSiteId} onStatusChange={setSshActive} refreshTrigger={sshPanelRefresh} />
           : <LockedSshBar />
       )}
 
