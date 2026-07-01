@@ -55,6 +55,7 @@ const TOOL_META: Record<string, { label: string; icon: React.ElementType; color:
   get_scores:               { label: "Scores retrieved",          icon: Zap,         color: "#f59e0b" },
   get_malware_status:       { label: "Malware status checked",    icon: ShieldCheck, color: "#ef4444" },
   analyze_malware_findings: { label: "AI malware analysis",       icon: Sparkles,    color: "#7c3aed" },
+  analyze_plugin_usage:     { label: "Plugin usage analyzed",      icon: Sparkles,    color: "#7c3aed" },
   get_live_site_data:       { label: "Live data fetched",         icon: Database,    color: "#0891b2" },
   preview_write_operation:  { label: "Write preview ready",       icon: Wrench,      color: "#7c3aed" },
   ssh_read_file:            { label: "File read via SSH",          icon: Terminal,    color: "#0f766e" },
@@ -489,6 +490,51 @@ function sanitizeMessage(text: string): string {
     .replace(/\[TOOL_CALL\][^\n]*/g, '')
     .replace(/^\s*\{"query":"[^"]*","site_id":"[^"]*"\}\s*$/gm, '')
     .trim();
+}
+
+// Render agent text: converts "- item" / "1. item" lines to styled lists,
+// prose lines become block spans. Keeps the message readable without heavy markdown.
+function renderAgentText(text: string): React.ReactNode {
+  const lines = text.split('\n');
+  const out: React.ReactNode[] = [];
+  type Mode = 'prose' | 'ul' | 'ol';
+  let mode: Mode = 'prose';
+  let buffer: string[] = [];
+  let k = 0;
+
+  const commit = () => {
+    if (!buffer.length) return;
+    if (mode === 'ul') {
+      out.push(
+        <ul key={k++} style={{ listStyleType: 'disc', paddingLeft: '1.25em', margin: '2px 0 6px' }}>
+          {buffer.map((t, i) => <li key={i} style={{ marginBottom: 1 }}>{t}</li>)}
+        </ul>
+      );
+    } else if (mode === 'ol') {
+      out.push(
+        <ol key={k++} style={{ listStyleType: 'decimal', paddingLeft: '1.25em', margin: '2px 0 6px' }}>
+          {buffer.map((t, i) => <li key={i} style={{ marginBottom: 1 }}>{t}</li>)}
+        </ol>
+      );
+    } else {
+      const t = buffer.join('\n').trim();
+      if (t) out.push(<span key={k++} style={{ display: 'block', marginBottom: 4 }}>{t}</span>);
+    }
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    const ul = line.match(/^[-•]\s+(.*)/);
+    const ol = line.match(/^\d+[.)]\s+(.*)/);
+    const next: Mode = ul ? 'ul' : ol ? 'ol' : 'prose';
+    if (next !== mode) { commit(); mode = next; }
+    if (ul) buffer.push(ul[1]);
+    else if (ol) buffer.push(ol[1]);
+    else buffer.push(line);
+  }
+  commit();
+
+  return out.length ? <>{out}</> : <>{text}</>;
 }
 
 // Consolidated tool call pills — deduplicates repeated calls (e.g. "Live data fetched ×3")
@@ -1210,8 +1256,8 @@ export default function AgentPage() {
                       })()}
 
                       <div
-                        className={`text-sm leading-relaxed whitespace-pre-wrap ${
-                          msg.role === "user" ? "text-white" : "text-foreground"
+                        className={`text-sm leading-relaxed ${
+                          msg.role === "user" ? "text-white whitespace-pre-wrap" : "text-foreground"
                         }`}
                         style={msg.role === "user"
                           ? {
@@ -1230,7 +1276,7 @@ export default function AgentPage() {
                               boxShadow: "0 1px 3px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.8)",
                             }}
                       >
-                        {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
+                        {msg.role === "assistant" ? renderAgentText(sanitizeMessage(msg.content)) : msg.content}
                       </div>
                     </div>
                   </div>
