@@ -31,6 +31,9 @@ interface Stats {
   claude_tokens_month: string | null;
   groq_tokens_used: number;
   groq_tokens_month: string | null;
+  narrative_tokens_used: number;
+  malware_analysis_tokens_used: number;
+  claude_fallback_count: number;
 }
 
 interface SignupPoint { date: string; count: number }
@@ -244,34 +247,70 @@ export default function MasterDashboardPage() {
       {/* Stat cards — row 3: resource usage */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-        {/* Claude (Advanced model) */}
-        <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
+        {/* AI Token Usage — full per-operation breakdown */}
+        <div className="sm:col-span-2 bg-white rounded-2xl border border-border p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Advanced Model (Claude)</span>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(212,159,90,0.12)" }}>
-              <Brain size={15} style={{ color: "#c97d2e" }} />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(212,159,90,0.12)" }}>
+                <Brain size={15} style={{ color: "#c97d2e" }} />
+              </div>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Token Usage</span>
             </div>
+            <span className="text-[11px] text-muted-foreground">
+              {s.claude_tokens_month ?? s.groq_tokens_month ?? new Date().toISOString().slice(0, 7)}
+            </span>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">{fmtTokens(s.claude_tokens_used ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Claude tokens used{s.claude_tokens_month ? ` — ${s.claude_tokens_month}` : " this month"}
-            </p>
-          </div>
-        </div>
 
-        {/* Groq / fallback tokens */}
-        <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Token Usage (Groq)</span>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
-              <Brain size={15} style={{ color: "#8b5cf6" }} />
-            </div>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">{fmtTokens(s.groq_tokens_used ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Groq tokens used{s.groq_tokens_month ? ` — ${s.groq_tokens_month}` : ' this month'}</p>
-          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left text-[10px] text-muted-foreground font-medium pb-1.5">Operation</th>
+                <th className="text-left text-[10px] text-muted-foreground font-medium pb-1.5">Model</th>
+                <th className="text-right text-[10px] text-muted-foreground font-medium pb-1.5">Tokens</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {(() => {
+                const claudeAgent   = Math.max(0, (s.claude_tokens_used ?? 0) - (s.malware_analysis_tokens_used ?? 0));
+                const malware       = s.malware_analysis_tokens_used ?? 0;
+                const narratives    = s.narrative_tokens_used ?? 0;
+                const groqFallback  = Math.max(0, (s.groq_tokens_used ?? 0) - narratives);
+                const totalClaude   = s.claude_tokens_used ?? 0;
+                const totalGroq     = s.groq_tokens_used ?? 0;
+
+                const rows: { label: string; model: string; modelColor: string; tokens: number }[] = [
+                  { label: "Agent (chat + SSH)",  model: "Claude",  modelColor: "#c97d2e", tokens: claudeAgent },
+                  { label: "Malware analysis",    model: "Claude",  modelColor: "#c97d2e", tokens: malware },
+                  { label: "Narratives",          model: "Groq",    modelColor: "#8b5cf6", tokens: narratives },
+                  { label: `Groq fallback${s.claude_fallback_count ? ` (×${s.claude_fallback_count})` : ""}`, model: "Groq", modelColor: "#8b5cf6", tokens: groqFallback },
+                ];
+
+                return rows.map((row) => (
+                  <tr key={row.label}>
+                    <td className="py-1.5 text-foreground">{row.label}</td>
+                    <td className="py-1.5">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md" style={{ background: `${row.modelColor}18`, color: row.modelColor }}>
+                        {row.model}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-right font-mono text-foreground">{fmtTokens(row.tokens)}</td>
+                  </tr>
+                ));
+              })()}
+            </tbody>
+            <tfoot className="border-t-2 border-border">
+              <tr>
+                <td className="pt-2 text-[10px] font-semibold text-muted-foreground uppercase">Total Claude</td>
+                <td />
+                <td className="pt-2 text-right font-mono font-semibold" style={{ color: "#c97d2e" }}>{fmtTokens(s.claude_tokens_used ?? 0)}</td>
+              </tr>
+              <tr>
+                <td className="text-[10px] font-semibold text-muted-foreground uppercase">Total Groq</td>
+                <td />
+                <td className="text-right font-mono font-semibold" style={{ color: "#8b5cf6" }}>{fmtTokens(s.groq_tokens_used ?? 0)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
         <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
