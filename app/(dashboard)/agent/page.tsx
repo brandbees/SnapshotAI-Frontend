@@ -492,8 +492,26 @@ function sanitizeMessage(text: string): string {
     .trim();
 }
 
+// Parse inline markdown: **bold** and *italic* within a plain string → React nodes.
+function renderInline(text: string, key?: number): React.ReactNode {
+  // Split on **...** or *...* (non-greedy). Preserve the delimiter to know which tag to use.
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/);
+  if (parts.length === 1) return text;
+  return (
+    <span key={key}>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**'))
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith('*') && part.endsWith('*'))
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        return part;
+      })}
+    </span>
+  );
+}
+
 // Render agent text: converts "- item" / "1. item" lines to styled lists,
-// prose lines become block spans. Keeps the message readable without heavy markdown.
+// prose lines become block spans. Inline **bold** and *italic* are rendered too.
 function renderAgentText(text: string): React.ReactNode {
   const lines = text.split('\n');
   const out: React.ReactNode[] = [];
@@ -507,18 +525,18 @@ function renderAgentText(text: string): React.ReactNode {
     if (mode === 'ul') {
       out.push(
         <ul key={k++} style={{ listStyleType: 'disc', paddingLeft: '1.25em', margin: '2px 0 6px' }}>
-          {buffer.map((t, i) => <li key={i} style={{ marginBottom: 1 }}>{t}</li>)}
+          {buffer.map((t, i) => <li key={i} style={{ marginBottom: 1 }}>{renderInline(t)}</li>)}
         </ul>
       );
     } else if (mode === 'ol') {
       out.push(
         <ol key={k++} style={{ listStyleType: 'decimal', paddingLeft: '1.25em', margin: '2px 0 6px' }}>
-          {buffer.map((t, i) => <li key={i} style={{ marginBottom: 1 }}>{t}</li>)}
+          {buffer.map((t, i) => <li key={i} style={{ marginBottom: 1 }}>{renderInline(t)}</li>)}
         </ol>
       );
     } else {
       const t = buffer.join('\n').trim();
-      if (t) out.push(<span key={k++} style={{ display: 'block', marginBottom: 4 }}>{t}</span>);
+      if (t) out.push(<span key={k++} style={{ display: 'block', marginBottom: 4 }}>{renderInline(t)}</span>);
     }
     buffer = [];
   };
