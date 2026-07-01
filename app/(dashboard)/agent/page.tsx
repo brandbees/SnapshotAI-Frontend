@@ -1203,6 +1203,12 @@ export default function AgentPage() {
                         );
                       })()}
 
+                      {/* Regular tool call pills shown BEFORE the text bubble so the answer is always visible at the bottom */}
+                      {msg.role === "assistant" && toolCallsMap[i] && (() => {
+                        const regularCalls = toolCallsMap[i].filter(tc => tc.name !== "preview_write_operation");
+                        return regularCalls.length > 0 ? <ToolCallsSummary calls={regularCalls} /> : null;
+                      })()}
+
                       <div
                         className={`text-sm leading-relaxed whitespace-pre-wrap ${
                           msg.role === "user" ? "text-white" : "text-foreground"
@@ -1226,12 +1232,6 @@ export default function AgentPage() {
                       >
                         {msg.role === "assistant" ? sanitizeMessage(msg.content) : msg.content}
                       </div>
-
-                      {/* Regular tool call pills — exclude ALL preview_write_operation calls (success shown as card, failure shown nowhere) */}
-                      {msg.role === "assistant" && toolCallsMap[i] && (() => {
-                        const regularCalls = toolCallsMap[i].filter(tc => tc.name !== "preview_write_operation");
-                        return regularCalls.length > 0 ? <ToolCallsSummary calls={regularCalls} /> : null;
-                      })()}
                     </div>
                   </div>
                 ))}
