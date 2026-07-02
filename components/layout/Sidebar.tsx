@@ -114,45 +114,43 @@ export function Sidebar() {
       )}
     >
       {/* Logo */}
-      <div className={cn(
-        "flex items-center border-b border-border shrink-0",
-        collapsed ? "justify-center px-0 py-5 h-[65px]" : "gap-3 px-5 py-5"
-      )}>
-        {collapsed ? (
-          logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="h-7 w-7 object-contain" />
+      <div className="flex items-center h-[65px] border-b border-border shrink-0 px-3 gap-2">
+        {/* Brand mark */}
+        <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Agency logo"
+              className={cn("object-contain shrink-0", collapsed ? "h-7 w-7" : "h-8 max-h-8 max-w-[120px]")}
+            />
           ) : (
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: "var(--accent)" }}
-            >
-              <Wifi size={16} className="text-white" />
-            </div>
-          )
-        ) : logoUrl ? (
-          <img
-            src={logoUrl}
-            alt="Agency logo"
-            className="h-8 max-h-8 max-w-[140px] object-contain"
-          />
-        ) : (
-          <>
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: "var(--accent)" }}
-            >
-              <Wifi size={16} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground leading-none truncate">
-                {agency?.brand_name || "BrandBees"}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                SnapshotAI
-              </p>
-            </div>
-          </>
-        )}
+            <>
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: "var(--accent)" }}
+              >
+                <Wifi size={16} className="text-white" />
+              </div>
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-foreground leading-none truncate">
+                    {agency?.brand_name || "BrandBees"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">SnapshotAI</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Collapse toggle */}
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors"
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
       </div>
 
       {/* Nav */}
@@ -299,22 +297,6 @@ export function Sidebar() {
           )
         )}
 
-        {/* Collapse toggle */}
-        <button
-          onClick={toggleCollapsed}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "mt-2 w-full flex items-center rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors py-2",
-            collapsed ? "justify-center px-0" : "gap-2 px-2"
-          )}
-        >
-          {collapsed ? <ChevronRight size={14} /> : (
-            <>
-              <ChevronLeft size={14} />
-              <span>Collapse</span>
-            </>
-          )}
-        </button>
       </div>
 
       <ChangelogModal
