@@ -4519,11 +4519,17 @@ function SiteDetailContent() {
             scanPollRef.current = null;
             setScanLoading(false);
             if (data.status === "completed") {
-              // Invalidate site cache so header/overview malware score reflects the new scan
               window.dispatchEvent(new Event("bb:refresh"));
+              const threats = data.threats_found ?? 0;
+              if (threats === 0) {
+                toast.success("Malware scan complete — no threats found.");
+              } else {
+                toast.warning(`Malware scan complete — ${threats} finding${threats !== 1 ? "s" : ""} detected.`, { duration: 6000 });
+              }
             }
             if (data.status === "failed") {
               setScanError("Scan failed. Please try again.");
+              toast.error("Malware scan failed. Please try again.");
             }
           }
         } catch {
