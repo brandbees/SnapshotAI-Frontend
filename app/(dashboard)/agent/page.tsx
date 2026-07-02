@@ -1059,29 +1059,29 @@ export default function AgentPage() {
     <div className="-m-6 flex flex-col" style={{ height: "calc(100dvh - 3.5rem)" }}>
 
       {/* ── Top bar ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 px-6 py-3.5 bg-white border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 py-3.5 bg-white border-b border-border shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
             style={{ background: "linear-gradient(135deg, #c8a96e 0%, #a07840 100%)" }}>
             <Sparkles size={15} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-sm font-semibold text-foreground leading-none">AI Assistant</h1>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Powered by real audit &amp; scan data</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 hidden sm:block">Powered by real audit &amp; scan data</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {tokenState && canUseAgent && <TokenBar state={tokenState} />}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {tokenState && canUseAgent && <div className="hidden sm:flex"><TokenBar state={tokenState} /></div>}
 
           {messages.length > 0 && (
             <>
               <button
                 onClick={copyTranscript}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
+                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
               >
                 {copied ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
-                {copied ? "Copied!" : "Copy transcript"}
+                <span className="hidden sm:inline">{copied ? "Copied!" : "Copy transcript"}</span>
               </button>
               <button
                 onClick={() => {
@@ -1091,18 +1091,18 @@ export default function AgentPage() {
                   }
                   setMessages([]); setToolCallsMap({}); setError(null);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
+                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
               >
-                <RotateCcw size={11} /> New chat
+                <RotateCcw size={11} /><span className="hidden sm:inline"> New chat</span>
               </button>
             </>
           )}
           <div className="relative">
-            <Globe size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Globe size={13} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <select
               value={selectedSiteId}
               onChange={e => handleSiteChange(e.target.value)}
-              className="pl-8 pr-7 py-1.5 text-xs border border-border rounded-lg bg-white appearance-none text-foreground min-w-[150px]"
+              className="pl-7 sm:pl-8 pr-6 sm:pr-7 py-1.5 text-xs border border-border rounded-lg bg-white appearance-none text-foreground w-[120px] sm:min-w-[150px]"
               style={{ outline: "none" }}
             >
               <option value="">All sites</option>
@@ -1110,7 +1110,7 @@ export default function AgentPage() {
                 <option key={s.id} value={s.id}>{s.name || s.url}</option>
               ))}
             </select>
-            <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown size={11} className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           </div>
         </div>
       </div>
