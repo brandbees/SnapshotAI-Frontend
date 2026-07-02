@@ -544,6 +544,9 @@ function renderAgentText(text: string): React.ReactNode {
   for (const line of lines) {
     const ul = line.match(/^[-•]\s+(.*)/);
     const ol = line.match(/^\d+[.)]\s+(.*)/);
+    // Blank lines inside a list block are ignored so LLM blank-line-separated
+    // numbered items don't reset the counter by spawning separate <ol> elements.
+    if (!ul && !ol && line.trim() === '' && (mode === 'ul' || mode === 'ol')) continue;
     const next: Mode = ul ? 'ul' : ol ? 'ol' : 'prose';
     if (next !== mode) { commit(); mode = next; }
     if (ul) buffer.push(ul[1]);
@@ -1053,7 +1056,7 @@ export default function AgentPage() {
   const isEmpty      = messages.length === 0;
 
   return (
-    <div className="-m-6 flex flex-col" style={{ height: "calc(100vh - 3.5rem)" }}>
+    <div className="-m-6 flex flex-col" style={{ height: "calc(100dvh - 3.5rem)" }}>
 
       {/* ── Top bar ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 px-6 py-3.5 bg-white border-b border-border shrink-0">
@@ -1408,8 +1411,12 @@ export default function AgentPage() {
 
       {/* ── Input bar ────────────────────────────────────────────────────────── */}
       {!isFreePlan && (
-        <div className="shrink-0 px-6 pb-6 pt-4"
-          style={{ background: "linear-gradient(to top, #f0ece4 0%, #f5f3ef 100%)", borderTop: "1px solid #e4ddd3" }}>
+        <div className="shrink-0 px-4 sm:px-6 pt-4"
+          style={{
+            background: "linear-gradient(to top, #f0ece4 0%, #f5f3ef 100%)",
+            borderTop: "1px solid #e4ddd3",
+            paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))",
+          }}>
           <div className="max-w-3xl mx-auto">
             {/* Gradient-bordered input container */}
             <div className="p-px rounded-2xl"
