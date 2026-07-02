@@ -19,6 +19,8 @@ import {
   Users,
   Sparkles,
   Bell,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,6 +56,10 @@ export function Sidebar() {
   const router = useRouter();
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("bb_sidebar_collapsed") === "1";
+  });
 
   const isClientPortal = agency?.is_client_portal ?? false;
 
@@ -92,11 +98,38 @@ export function Sidebar() {
     }
   }
 
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem("bb_sidebar_collapsed", next ? "1" : "0");
+      return next;
+    });
+  }
+
   return (
-    <aside className="hidden lg:flex flex-col w-60 min-h-screen bg-white border-r border-border">
+    <aside
+      className={cn(
+        "hidden lg:flex flex-col min-h-screen bg-white border-r border-border transition-all duration-200 overflow-hidden shrink-0",
+        collapsed ? "w-[60px]" : "w-60"
+      )}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
-        {logoUrl ? (
+      <div className={cn(
+        "flex items-center border-b border-border shrink-0",
+        collapsed ? "justify-center px-0 py-5 h-[65px]" : "gap-3 px-5 py-5"
+      )}>
+        {collapsed ? (
+          logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="h-7 w-7 object-contain" />
+          ) : (
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "var(--accent)" }}
+            >
+              <Wifi size={16} className="text-white" />
+            </div>
+          )
+        ) : logoUrl ? (
           <img
             src={logoUrl}
             alt="Agency logo"
@@ -110,8 +143,8 @@ export function Sidebar() {
             >
               <Wifi size={16} className="text-white" />
             </div>
-            <div>
-              <p className="text-sm font-bold text-foreground leading-none">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground leading-none truncate">
                 {agency?.brand_name || "BrandBees"}
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -123,11 +156,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 pt-4 pb-2 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-3 mb-2">
-          Menu
-        </p>
-
+      <nav className={cn("flex-1 pt-4 pb-2 overflow-y-auto", collapsed ? "px-1.5" : "px-3")}>
         <div className="space-y-0.5">
           {navItems.map(({ href, label, icon: Icon }) => {
             const active = isActive(href);
@@ -135,8 +164,10 @@ export function Sidebar() {
               <Link
                 key={href}
                 href={href}
+                title={collapsed ? label : undefined}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-xl text-sm font-medium transition-colors",
+                  collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
                   active
                     ? "bg-accent-light text-accent"
                     : "text-muted-foreground hover:text-foreground hover:bg-gray-50"
@@ -144,9 +175,9 @@ export function Sidebar() {
               >
                 <Icon
                   size={16}
-                  className={active ? "text-accent" : ""}
+                  className={cn("shrink-0", active ? "text-accent" : "")}
                 />
-                {label}
+                {!collapsed && label}
               </Link>
             );
           })}
@@ -165,8 +196,10 @@ export function Sidebar() {
                   <Link
                     key={href}
                     href={href}
+                    title={collapsed ? label : undefined}
                     className={cn(
-                      "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                      "group flex items-center gap-3 rounded-xl text-sm font-medium transition-colors",
+                      collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
                       active
                         ? "bg-accent-light text-accent"
                         : "text-muted-foreground hover:text-foreground hover:bg-accent-light"
@@ -179,7 +212,7 @@ export function Sidebar() {
                         active ? "text-accent" : "group-hover:text-accent"
                       )}
                     />
-                    {label}
+                    {!collapsed && label}
                   </Link>
                 );
               })}
@@ -189,52 +222,99 @@ export function Sidebar() {
 
       {/* What's new — agency only */}
       {!isClientPortal && (
-        <div className="px-3 pb-2">
+        <div className={cn("pb-2", collapsed ? "px-1.5" : "px-3")}>
           <button
             onClick={() => setChangelogOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors"
+            title={collapsed ? "What's new" : undefined}
+            className={cn(
+              "w-full flex items-center gap-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors",
+              collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+            )}
           >
-            <Sparkles size={16} />
-            What&apos;s new
-            {unreadCount > 0 && (
-              <span
-                className="ml-auto text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-                style={{ background: "var(--accent)" }}
-              >
-                {unreadCount}
-              </span>
+            <Sparkles size={16} className="shrink-0" />
+            {!collapsed && (
+              <>
+                What&apos;s new
+                {unreadCount > 0 && (
+                  <span
+                    className="ml-auto text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </>
+            )}
+            {collapsed && unreadCount > 0 && (
+              <span className="absolute ml-3 mb-3 w-2 h-2 rounded-full" style={{ background: "var(--accent)" }} />
             )}
           </button>
         </div>
       )}
 
       {/* User footer */}
-      <div className="px-3 py-4 border-t border-border">
+      <div className={cn("py-3 border-t border-border", collapsed ? "px-1.5" : "px-3")}>
         {!!agency && (
-          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-              style={{ background: "var(--accent)" }}
-            >
-              {initials}
+          collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                style={{ background: "var(--accent)" }}
+                title={displayName}
+              >
+                {initials}
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={13} />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground truncate leading-none">
-                {displayName}
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                {displayEmail}
-              </p>
+          ) : (
+            <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                style={{ background: "var(--accent)" }}
+              >
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate leading-none">
+                  {displayName}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                  {displayEmail}
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors shrink-0"
+              >
+                <LogOut size={13} />
+              </button>
             </div>
-            <button
-              onClick={handleLogout}
-              title="Sign out"
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors shrink-0"
-            >
-              <LogOut size={13} />
-            </button>
-          </div>
+          )
         )}
+
+        {/* Collapse toggle */}
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={cn(
+            "mt-2 w-full flex items-center rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors py-2",
+            collapsed ? "justify-center px-0" : "gap-2 px-2"
+          )}
+        >
+          {collapsed ? <ChevronRight size={14} /> : (
+            <>
+              <ChevronLeft size={14} />
+              <span>Collapse</span>
+            </>
+          )}
+        </button>
       </div>
 
       <ChangelogModal

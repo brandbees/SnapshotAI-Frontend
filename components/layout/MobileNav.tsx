@@ -100,9 +100,6 @@ export function MobileNav() {
 
             {/* Nav */}
             <nav className="flex-1 px-3 pt-4 space-y-0.5 overflow-y-auto">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-3 mb-2">
-                Menu
-              </p>
               {navItems.map(({ href, label, icon: Icon }) => {
                 const active = isActive(href);
                 return (
