@@ -290,6 +290,8 @@ export interface MalwareFinding {
   cve_url: string | null;
   description: string | null;
   created_at: string;
+  ai_verdict: 'malware' | 'false_positive' | 'uncertain' | null;
+  ai_confidence: number | null;
 }
 
 export interface MalwareScanResult {
