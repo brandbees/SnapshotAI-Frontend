@@ -4497,7 +4497,7 @@ function SiteDetailContent() {
         }
 
         try {
-          const { data } = await api.get<{ status: string }>(`/scan/sites/${id}/status?scan_id=${newScanId}`);
+          const { data } = await api.get<{ status: string; threats_found?: number }>(`/scan/sites/${id}/status?scan_id=${newScanId}`);
 
           // pending/claimed = still waiting for WP to pick it up; don't count as failure
           if (data.status === "pending" || data.status === "claimed") {
