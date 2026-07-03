@@ -279,12 +279,15 @@ export function mapSite(raw: RawSite): Site {
     latest_scores: mapScores(raw),
     overall_score: raw.overall_score ?? undefined,
     malware_status:
-      // Scan results (new dedicated scanner) take priority over legacy audit malware_score.
-      // A non-clean scan result always marks the site as threat, even if the old audit said clean.
-      (raw.is_clean === false || (raw.overall_threat_score != null && raw.overall_threat_score > 0))
-        ? "threat"
-        : raw.is_clean === true
+      // is_clean is set by the scanner and updated by the dismiss endpoint:
+      //   true  = no active major threats (critical/high/medium all dismissed or absent)
+      //   false = at least one active major threat remains
+      // Check is_clean FIRST — a dismissed-all-majors site must show clean even if
+      // overall_threat_score > 0 due to remaining low-priority findings.
+      raw.is_clean === true
         ? "clean"
+        : (raw.is_clean === false || (raw.overall_threat_score != null && raw.overall_threat_score > 0))
+        ? "threat"
         : raw.malware_score != null
         ? (raw.malware_score >= 80 ? "clean" : "threat")
         : undefined,
