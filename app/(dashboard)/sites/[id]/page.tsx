@@ -4523,12 +4523,7 @@ function SiteDetailContent() {
             setScanLoading(false);
             if (data.status === "completed") {
               window.dispatchEvent(new Event("bb:refresh"));
-              const threats = data.threats_found ?? 0;
-              if (threats === 0) {
-                toast.success("Malware scan complete — no threats found.");
-              } else {
-                toast.warning(`Malware scan complete — ${threats} finding${threats !== 1 ? "s" : ""} detected.`, { duration: 6000 });
-              }
+              toast.success("Malware scan complete — review findings in the Malware tab.");
             }
             if (data.status === "failed") {
               setScanError("Scan failed. Please try again.");
@@ -4555,6 +4550,9 @@ function SiteDetailContent() {
     setDeleteLoading(true);
     try {
       await api.delete(`/sites/${id}`);
+      await api.post('/sites/cache/clear').catch(() => {});
+      window.dispatchEvent(new Event('bb:refresh'));
+      toast.success("Site deleted successfully.");
       router.replace("/sites");
     } catch {
       setDeleteLoading(false);

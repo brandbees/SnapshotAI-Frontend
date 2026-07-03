@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Activity, TrendingUp, Search, Shield, Bug, Eye, ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Activity, TrendingUp, Search, Shield, Bug, Eye, ArrowRight, Trash2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { truncateUrl, scoreHex } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import api from "@/lib/api";
 import type { Site } from "@/types";
 
 interface SiteCardProps {
@@ -51,6 +53,26 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
   const router = useRouter();
   const { agency } = useAuth();
   const [hovered, setHovered] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => { if (!hovered) setDeleteConfirm(false); }, [hovered]);
+
+  async function handleDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!deleteConfirm) { setDeleteConfirm(true); return; }
+    setDeleting(true);
+    try {
+      await api.delete(`/sites/${site.id}`);
+      await api.post('/sites/cache/clear').catch(() => {});
+      window.dispatchEvent(new Event('bb:refresh'));
+      toast.success("Site deleted.");
+    } catch {
+      toast.error("Failed to delete site.");
+      setDeleting(false);
+      setDeleteConfirm(false);
+    }
+  }
 
   const isClientPortal = agency?.is_client_portal ?? false;
   const uptime   = site.uptime_percentage ?? 0;
@@ -202,6 +224,26 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
           >
             Detailed View
             <ArrowRight size={15} />
+          </button>
+
+          <button
+            onClick={handleDeleteClick}
+            disabled={deleting}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 active:scale-95"
+            style={{
+              background: deleteConfirm ? "#ef4444" : "rgba(239,68,68,0.08)",
+              color: deleteConfirm ? "white" : "#ef4444",
+              border: "2px solid #ef4444",
+              cursor: "pointer",
+              transform: hovered ? "translateY(0)" : "translateY(10px)",
+              opacity: hovered ? 1 : 0,
+              transitionDelay: "90ms",
+            }}
+          >
+            {deleting
+              ? <Loader2 size={13} className="animate-spin" />
+              : <Trash2 size={13} />}
+            {deleting ? "Deleting…" : deleteConfirm ? "Confirm Delete?" : "Delete Site"}
           </button>
         </div>
       )}
