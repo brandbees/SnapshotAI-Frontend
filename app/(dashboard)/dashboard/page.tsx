@@ -153,9 +153,10 @@ function AlertRow({ icon, label, sub, severity }: {
   );
 }
 
-function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
+function PortfolioHealthSection({ portfolio, sites }: { portfolio: PortfolioStats; sites: Site[] }) {
   const router = useRouter();
   const { avg_score, total_sites, healthy, warning, critical, malware_detected, sites_down, ssl_expiring } = portfolio;
+  const threatSites = sites.filter(s => s.malware_status === "threat");
 
   const score      = avg_score ?? 0;
   const scoreLabel = avg_score == null ? "No data" : score >= 80 ? "Healthy" : score >= 50 ? "Needs Attention" : "Critical";
@@ -349,14 +350,27 @@ function PortfolioHealthSection({ portfolio }: { portfolio: PortfolioStats }) {
         ) : (
           <div className="space-y-2">
             {malware_detected > 0 && (
-              <Link href="/malware" className="block">
-                <AlertRow
-                  icon={<Shield size={13} />}
-                  label={`${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`}
-                  sub="Immediate action required"
-                  severity="critical"
-                />
-              </Link>
+              threatSites.length > 0
+                ? threatSites.map(s => (
+                    <Link key={s.id} href={`/sites/${s.id}?tab=malware`} className="block">
+                      <AlertRow
+                        icon={<Shield size={13} />}
+                        label={s.name}
+                        sub="Malware threat — immediate action required"
+                        severity="critical"
+                      />
+                    </Link>
+                  ))
+                : (
+                  <Link href="/malware" className="block">
+                    <AlertRow
+                      icon={<Shield size={13} />}
+                      label={`${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`}
+                      sub="Immediate action required"
+                      severity="critical"
+                    />
+                  </Link>
+                )
             )}
             {sites_down > 0 && (
               <Link href="/uptime" className="block">
@@ -470,23 +484,23 @@ function SitesOverviewCard({ sites }: { sites: Site[] }) {
 // ── Needs Attention ────────────────────────────────────────────────────────────
 
 function NeedsAttentionCard({ sites }: { sites: Site[] }) {
-  const issues: { icon: React.ReactNode; title: string; site: string; siteId: string; severity: "Critical" | "Warning" }[] = [];
+  const issues: { icon: React.ReactNode; title: string; site: string; href: string; severity: "Critical" | "Warning" }[] = [];
 
   for (const site of sites) {
     if (site.malware_status === "threat")
-      issues.push({ icon: <Shield size={12} className="text-red-500" />, title: "Malware threat detected", site: site.name, siteId: site.id, severity: "Critical" });
+      issues.push({ icon: <Shield size={12} className="text-red-500" />, title: "Malware threat detected", site: site.name, href: `/sites/${site.id}?tab=malware`, severity: "Critical" });
     if (site.uptime_status === "down")
-      issues.push({ icon: <WifiOff size={12} className="text-red-500" />, title: "Site is currently down", site: site.name, siteId: site.id, severity: "Critical" });
+      issues.push({ icon: <WifiOff size={12} className="text-red-500" />, title: "Site is currently down", site: site.name, href: `/sites/${site.id}?tab=uptime`, severity: "Critical" });
     const d = sslDaysRemaining(site.ssl_expiry_date);
     if (d !== null && d <= 30)
-      issues.push({ icon: <Lock size={12} className="text-amber-500" />, title: `SSL expiring in ${d} day${d !== 1 ? "s" : ""}`, site: site.name, siteId: site.id, severity: d <= 7 ? "Critical" : "Warning" });
+      issues.push({ icon: <Lock size={12} className="text-amber-500" />, title: `SSL expiring in ${d} day${d !== 1 ? "s" : ""}`, site: site.name, href: `/sites/${site.id}?tab=security`, severity: d <= 7 ? "Critical" : "Warning" });
     if (site.latest_scores) {
       if (site.latest_scores.performance < 50)
-        issues.push({ icon: <Zap size={12} className="text-amber-500" />, title: "Low performance score", site: site.name, siteId: site.id, severity: "Warning" });
+        issues.push({ icon: <Zap size={12} className="text-amber-500" />, title: "Low performance score", site: site.name, href: `/sites/${site.id}?tab=performance`, severity: "Warning" });
       if (site.latest_scores.seo < 50)
-        issues.push({ icon: <Search size={12} className="text-amber-500" />, title: "Low SEO score", site: site.name, siteId: site.id, severity: "Warning" });
+        issues.push({ icon: <Search size={12} className="text-amber-500" />, title: "Low SEO score", site: site.name, href: `/sites/${site.id}?tab=seo`, severity: "Warning" });
       if (site.latest_scores.security < 50)
-        issues.push({ icon: <Shield size={12} className="text-amber-500" />, title: "Security score critical", site: site.name, siteId: site.id, severity: "Critical" });
+        issues.push({ icon: <Shield size={12} className="text-amber-500" />, title: "Security score critical", site: site.name, href: `/sites/${site.id}?tab=security`, severity: "Critical" });
     }
     if (issues.length >= 6) break;
   }
@@ -513,7 +527,7 @@ function NeedsAttentionCard({ sites }: { sites: Site[] }) {
           {issues.map((item, i) => (
             <Link
               key={i}
-              href={`/sites/${item.siteId}`}
+              href={item.href}
               className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-colors"
             >
               <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
@@ -790,7 +804,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Portfolio Health (agency/team only) */}
-      {portfolio && !agency?.is_client_portal && <PortfolioHealthSection portfolio={portfolio} />}
+      {portfolio && !agency?.is_client_portal && <PortfolioHealthSection portfolio={portfolio} sites={sites} />}
 
       {/* ── 6 Stat Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
