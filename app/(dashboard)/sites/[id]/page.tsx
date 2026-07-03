@@ -4406,6 +4406,7 @@ function SiteDetailContent() {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scanInFlightRef = useRef(false); // prevents double-trigger on fast double-click
   const narrativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [benchmarks, setBenchmarks] = useState<Benchmarks | null>(null);
 
@@ -4470,6 +4471,8 @@ function SiteDetailContent() {
   }
 
   async function runScan() {
+    if (scanInFlightRef.current || scanLoading) return;
+    scanInFlightRef.current = true;
     setScanLoading(true);
     setScanError(null);
     try {
@@ -4541,6 +4544,7 @@ function SiteDetailContent() {
       }, 4000);
     } catch (err: unknown) {
       setScanLoading(false);
+      scanInFlightRef.current = false;
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setScanError(msg || "Failed to start scan.");
     }
