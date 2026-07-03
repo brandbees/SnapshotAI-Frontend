@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
          Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X,
          AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2,
@@ -842,8 +843,9 @@ function SshUpgradeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function AgentPage() {
+function AgentInner() {
   const { agency } = useAuth();
+  const searchParams = useSearchParams();
   const isFreePlan   = agency?.plan === 'free';
   const isIndividual = agency?.account_type === "individual";
   const canUseAgent  = !!agency && !isFreePlan;
@@ -864,6 +866,8 @@ export default function AgentPage() {
   const [pendingMessage, setPendingMessage]       = useState("");
   const [sshActive, setSshActive]                 = useState(false);
   const [sshPanelRefresh, setSshPanelRefresh]     = useState(0);
+  // Track whether URL params have been applied so we only do it once
+  const urlParamsApplied = useRef(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
@@ -876,6 +880,24 @@ export default function AgentPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Apply URL params (site_id + prompt) once sites are loaded — used by Fix button on malware page
+  useEffect(() => {
+    if (urlParamsApplied.current || sites.length === 0) return;
+    const paramSiteId = searchParams.get("site_id");
+    const paramPrompt = searchParams.get("prompt");
+    if (paramSiteId) {
+      const match = sites.find(s => s.id === paramSiteId);
+      if (match) {
+        setSelectedSiteId(paramSiteId);
+        urlParamsApplied.current = true;
+      }
+    }
+    if (paramPrompt) {
+      setInput(paramPrompt);
+      urlParamsApplied.current = true;
+    }
+  }, [sites, searchParams]);
 
   useEffect(() => {
     api.get<TokenState>("/agent/tokens")
@@ -1476,5 +1498,13 @@ export default function AgentPage() {
       )}
 
     </div>
+  );
+}
+
+export default function AgentPage() {
+  return (
+    <Suspense>
+      <AgentInner />
+    </Suspense>
   );
 }

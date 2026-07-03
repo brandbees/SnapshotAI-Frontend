@@ -279,12 +279,14 @@ export function mapSite(raw: RawSite): Site {
     latest_scores: mapScores(raw),
     overall_score: raw.overall_score ?? undefined,
     malware_status:
-      raw.malware_score != null
-        ? raw.malware_score >= 80 ? "clean" : "threat"
+      // Scan results (new dedicated scanner) take priority over legacy audit malware_score.
+      // A non-clean scan result always marks the site as threat, even if the old audit said clean.
+      (raw.is_clean === false || (raw.overall_threat_score != null && raw.overall_threat_score > 0))
+        ? "threat"
         : raw.is_clean === true
         ? "clean"
-        : raw.is_clean === false
-        ? "threat"
+        : raw.malware_score != null
+        ? (raw.malware_score >= 80 ? "clean" : "threat")
         : undefined,
     plugin_vuln_count: typeof raw.plugin_vuln_count === 'number' ? raw.plugin_vuln_count : undefined,
     plugin_data: pluginData,

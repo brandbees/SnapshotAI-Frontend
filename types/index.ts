@@ -292,6 +292,7 @@ export interface MalwareFinding {
   created_at: string;
   ai_verdict: 'malware' | 'false_positive' | 'uncertain' | null;
   ai_confidence: number | null;
+  dismissed?: boolean;
 }
 
 export interface MalwareScanResult {
