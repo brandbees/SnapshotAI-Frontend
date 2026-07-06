@@ -62,6 +62,7 @@ export interface Site {
   latest_scores?: PillarScores;
   overall_score?: number;
   malware_status?: "clean" | "threat";
+  overall_threat_score?: number | null;
   plugin_vuln_count?: number;
   plugin_data?: PluginData;
 
