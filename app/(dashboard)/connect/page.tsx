@@ -142,7 +142,7 @@ export default function ConnectPage() {
 
       {/* Site selector — shown when user has multiple sites */}
       {sites.length > 1 && (
-        <div className="bg-white border border-border rounded-2xl p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <p className="text-xs font-semibold text-foreground uppercase tracking-wide mb-3">
             Which site are you connecting?
           </p>
@@ -181,7 +181,7 @@ export default function ConnectPage() {
       {selected && (
         <>
           {/* Step 1 — Download */}
-          <div className="bg-white border border-border rounded-2xl p-5">
+          <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-foreground">Step 1 — Download the plugin</p>
@@ -201,7 +201,7 @@ export default function ConnectPage() {
           </div>
 
           {/* Step 2 — Install */}
-          <div className="bg-white border border-border rounded-2xl p-5">
+          <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
             <p className="text-sm font-semibold text-foreground mb-4">Step 2 — Install &amp; activate on WordPress</p>
             <div className="space-y-3">
               {[
@@ -224,7 +224,7 @@ export default function ConnectPage() {
           </div>
 
           {/* Step 3 — Token + verify */}
-          <div className="bg-white border border-border rounded-2xl p-5">
+          <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
             <p className="text-sm font-semibold text-foreground mb-1">Step 3 — Paste your site token</p>
             <p className="text-xs text-muted-foreground mb-4">
               Copy this token and paste it into the API Key field in your WordPress plugin settings.

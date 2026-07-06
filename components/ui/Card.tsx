@@ -5,6 +5,8 @@ interface CardProps {
   className?: string;
   padding?: "none" | "sm" | "md" | "lg";
   hover?: boolean;
+  /** Elevated variant — stronger shadow + brand-tinted border, for featured/highlighted content. */
+  featured?: boolean;
 }
 
 const paddingMap = {
@@ -19,14 +21,15 @@ export function Card({
   className,
   padding = "md",
   hover = false,
+  featured = false,
 }: CardProps) {
   return (
     <div
       className={cn(
-        "bg-card rounded-2xl border border-border",
-        "shadow-[0_1px_3px_0_rgb(0_0_0/0.07),0_1px_2px_-1px_rgb(0_0_0/0.07)]",
-        hover &&
-          "hover:shadow-[0_4px_6px_-1px_rgb(0_0_0/0.08),0_2px_4px_-2px_rgb(0_0_0/0.06)] hover:border-border-strong cursor-pointer",
+        "bg-card rounded-2xl transition-all duration-base",
+        "shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5",
+        featured && "shadow-elevated-md",
+        hover && "hover:shadow-glow hover:-translate-y-1 cursor-pointer",
         paddingMap[padding],
         className
       )}

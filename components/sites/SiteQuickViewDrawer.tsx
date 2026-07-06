@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void;
 }
 
-const AVATAR_COLORS = ["#6366f1", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+const AVATAR_COLORS = ["#1f5fb8", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
 
 function avatarColor(id: string): string {
   return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];

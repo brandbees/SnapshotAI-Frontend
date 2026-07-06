@@ -130,7 +130,7 @@ function SiteRow({ site, rank, showRank }: { site: Site; rank?: number; showRank
 export default function SeoPage() {
   const { sites, loading, error } = useSites();
   const { agency } = useAuth();
-  const brandColor = agency?.accent_color ?? "#6366f1";
+  const brandColor = agency?.accent_color ?? "#1f5fb8";
 
   const [filter, setFilter]   = useState<FilterTab>("all");
   const [sortBy, setSortBy]   = useState<SortKey>("seo");
@@ -255,7 +255,7 @@ export default function SeoPage() {
       </div>
 
       {/* ── Hero overview card ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-border">
 
           {/* Left: big avg score donut */}
@@ -361,7 +361,7 @@ export default function SeoPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Distribution donut with legend */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Score Distribution</h3>
           <p className="text-xs text-muted-foreground mb-4">Sites by health status</p>
           {audited.length === 0 ? (
@@ -400,7 +400,7 @@ export default function SeoPage() {
         </div>
 
         {/* Score buckets histogram */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Score Ranges</h3>
           <p className="text-xs text-muted-foreground mb-4">Sites per score bracket</p>
           {audited.length === 0 ? (
@@ -425,7 +425,7 @@ export default function SeoPage() {
         </div>
 
         {/* Insights panel */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">Key Insights</h3>
           <div className="space-y-3">
 
@@ -500,7 +500,7 @@ export default function SeoPage() {
 
       {/* ── Full-width per-site comparison bar chart ── */}
       {audited.length > 0 && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="flex items-center justify-between mb-1">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Site-by-Site SEO Comparison</h3>
@@ -538,7 +538,7 @@ export default function SeoPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Top performers */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
               <Award size={13} className="text-green-600" />
@@ -560,7 +560,7 @@ export default function SeoPage() {
         </div>
 
         {/* Needs attention */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
@@ -631,7 +631,7 @@ export default function SeoPage() {
       </div>
 
       {/* ── Sites table ── */}
-      <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <p className="text-sm font-semibold text-foreground">All Sites</p>
           <p className="text-xs text-muted-foreground">{filtered.length} site{filtered.length !== 1 ? "s" : ""}</p>

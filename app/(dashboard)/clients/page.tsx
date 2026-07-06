@@ -19,7 +19,7 @@ import type { Client } from "@/types";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CLIENT_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f97316",
+  "#1f5fb8", "#8b5cf6", "#ec4899", "#f97316",
   "#14b8a6", "#0ea5e9", "#84cc16", "#f59e0b",
 ];
 
@@ -159,7 +159,7 @@ function ClientCard({
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base overflow-hidden group">
 
         {/* Colored top accent */}
         <div className="h-1.5 w-full" style={{ background: `${color}60` }} />
@@ -309,7 +309,7 @@ export default function ClientsPage() {
   const { clients, loading, error, refetch } = useClients();
   const { roleCanDo }  = useRole();
   const { agency }     = useAuth();
-  const brandColor     = agency?.accent_color ?? "#6366f1";
+  const brandColor     = agency?.accent_color ?? "#1f5fb8";
   const canAdd         = roleCanDo("add_site");
 
   const [showAdd, setShowAdd] = useState(false);
@@ -358,7 +358,7 @@ export default function ClientsPage() {
       {!loading && !error && (
         <>
           {clients.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-border shadow-sm">
+            <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
               <EmptyState
                 icon={<Users size={22} />}
                 title="No clients yet"
@@ -382,7 +382,7 @@ export default function ClientsPage() {
                   { label: "Sites Assigned",   value: totalSites,      icon: Globe,     color: "#16a34a" },
                   { label: "With Company Info", value: withCompany,    icon: Building2, color: "#f97316" },
                 ].map(stat => (
-                  <div key={stat.label} className="bg-white rounded-2xl border border-border shadow-sm px-5 py-4 flex items-center gap-4">
+                  <div key={stat.label} className="bg-white rounded-2xl shadow-elevated-sm px-5 py-4 flex items-center gap-4 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                       style={{ background: `${stat.color}15` }}>
                       <stat.icon size={18} style={{ color: stat.color }} />

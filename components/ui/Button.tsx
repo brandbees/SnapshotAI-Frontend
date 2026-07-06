@@ -11,19 +11,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  "inline-flex items-center justify-center gap-2 font-semibold rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none select-none whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 font-semibold rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none select-none whitespace-nowrap transition-all duration-fast active:scale-[0.98]";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-accent text-white hover:bg-accent-hover shadow-sm hover:shadow-md",
+    "text-white bg-gradient-brand shadow-elevated-sm hover:shadow-glow",
   secondary:
-    "bg-surface text-foreground border border-border shadow-xs hover:bg-muted hover:border-border-strong",
+    "bg-surface text-foreground border border-border shadow-elevated-xs hover:bg-muted hover:border-border-strong",
   outline:
     "bg-transparent text-foreground border border-border hover:bg-muted",
   ghost:
     "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted",
   danger:
-    "bg-destructive text-white hover:bg-red-700 shadow-sm",
+    "bg-destructive text-white hover:bg-red-700 shadow-elevated-sm",
 };
 
 const sizes: Record<Size, string> = {
@@ -50,11 +50,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(base, variants[variant], sizes[size], className)}
-        style={
-          variant === "primary"
-            ? { background: "var(--accent)" }
-            : undefined
-        }
         {...props}
       >
         {loading && (

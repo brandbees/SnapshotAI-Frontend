@@ -23,6 +23,34 @@ const BrandingContext = createContext<BrandingContextValue>({
   setBranding: () => {},
 });
 
+function hexToRgbTriplet(hex: string): string | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const int = parseInt(m[1], 16);
+  return `${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}`;
+}
+
+/**
+ * A white-labeled tenant only supplies one accent hex — derive every other accent-dependent
+ * token (hover/light/deep shades, the button gradient, the rgb triplet for opacity compositing)
+ * from it via color-mix(), mirroring what the landing page's own CMS branding override does.
+ * Without this, components that reference --accent-hover/--gradient-brand/--accent-rgb directly
+ * (instead of --accent) silently ignore tenant branding.
+ */
+function applyAccentTokens(hex: string) {
+  const root = document.documentElement.style;
+  root.setProperty("--accent", hex);
+  root.setProperty("--accent-hover", `color-mix(in srgb, ${hex} 82%, black)`);
+  root.setProperty("--accent-light", `color-mix(in srgb, ${hex} 12%, white)`);
+  root.setProperty("--accent-deep", `color-mix(in srgb, ${hex} 55%, black)`);
+  root.setProperty(
+    "--gradient-brand",
+    `linear-gradient(135deg, color-mix(in srgb, ${hex} 85%, white) 0%, ${hex} 45%, color-mix(in srgb, ${hex} 55%, black) 100%)`
+  );
+  const rgb = hexToRgbTriplet(hex);
+  if (rgb) root.setProperty("--accent-rgb", rgb);
+}
+
 function applyFavicon(url: string) {
   let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!link) {
@@ -55,7 +83,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       });
       // accent_color is already set by the inline <script> in layout.tsx, but set again for safety
       if (stored.accent_color) {
-        document.documentElement.style.setProperty("--accent", stored.accent_color);
+        applyAccentTokens(stored.accent_color);
       }
       if (stored.favicon_url) applyFavicon(stored.favicon_url);
     }
@@ -79,7 +107,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
           brand_name:   patch.brandName,
         });
         if (patch.accentColor) {
-          document.documentElement.style.setProperty("--accent", patch.accentColor);
+          applyAccentTokens(patch.accentColor);
         }
         if (patch.brandName) {
           document.title = patch.brandName;
@@ -95,7 +123,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     setBrandingState((prev) => {
       const next = { ...prev, ...patch };
       if (patch.accentColor) {
-        document.documentElement.style.setProperty("--accent", patch.accentColor);
+        applyAccentTokens(patch.accentColor);
       }
       if (patch.brandName !== undefined) {
         document.title = patch.brandName || "SnapshotAI";

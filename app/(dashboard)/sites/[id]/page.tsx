@@ -32,7 +32,7 @@ import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
 import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth, PluginVulnerability, WooFatalError, WooGateway } from "@/types";
 
-const AVATAR_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
+const AVATAR_COLORS = ["#1f5fb8","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
 function siteAvatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length]; }
 
 // ── Tab config ────────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ function PluginDataPanel({ site }: { site: Site }) {
   const hasData = totalCount > 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
       {/* Toggle header */}
       <button
         onClick={() => setOpen((o) => !o)}
@@ -304,7 +304,7 @@ function OverviewTab({
             label: "Last Audit",
             value: site.last_audit_at ? timeAgo(site.last_audit_at) : "Never",
             unit: "",
-            color: "#6366f1",
+            color: "#1f5fb8",
             icon: <Clock size={15} />,
           },
           {
@@ -315,7 +315,7 @@ function OverviewTab({
             icon: <Zap size={15} />,
           },
         ].map(({ label, value, unit, color, icon }) => (
-          <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex items-center gap-3">
+          <div key={label} className="bg-white rounded-2xl shadow-elevated-sm p-4 flex items-center gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: color + "18", color }}>
               {icon}
@@ -345,7 +345,7 @@ function OverviewTab({
             return (
               <div
                 key={key}
-                className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center min-h-[190px] gap-1 cursor-pointer transition-all duration-150 hover:shadow-md hover:border-accent/40 hover:-translate-y-0.5 active:scale-[0.98]"
+                className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col items-center justify-center min-h-[190px] gap-1 cursor-pointer transition-all duration-base hover:shadow-glow hover:-translate-y-1 active:scale-[0.98]"
                 style={{ cursor: "pointer" }}
                 onClick={() => setTab(tab)}
                 title={`Open ${label} tab`}
@@ -372,7 +372,7 @@ function OverviewTab({
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-border shadow-sm flex items-center justify-center py-12">
+        <div className="bg-white rounded-2xl shadow-elevated-sm flex items-center justify-center py-12 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="text-center">
             {isAuditInProgress ? (
               <>
@@ -409,13 +409,13 @@ function OverviewTab({
         };
         const PILLAR_STYLE: Record<string, string> = {
           Security:    "bg-cyan-50 text-cyan-700",
-          Performance: "bg-indigo-50 text-indigo-700",
+          Performance: "bg-[var(--accent-light)] text-[var(--accent-hover)]",
           SEO:         "bg-pink-50 text-pink-700",
           Malware:     "bg-purple-50 text-purple-700",
           General:     "bg-gray-100 text-gray-600",
         };
         return (
-          <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                 style={{ background: brandColor + "18" }}>
@@ -489,14 +489,14 @@ function OverviewTab({
         {/* Left column */}
         <div className="lg:col-span-2 space-y-5">
           {/* Health Score Trend */}
-          <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <h3 className="text-sm font-semibold text-foreground mb-1">Health Score Trend</h3>
             <p className="text-xs text-muted-foreground mb-4">Per-pillar breakdown · select range and pillars below</p>
             <TrendChart siteId={site.id} />
           </div>
 
           {/* Audit History */}
-          <div className="bg-white rounded-2xl border border-border shadow-sm">
+          <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <div className="px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground">Audit History</h3>
             </div>
@@ -509,7 +509,7 @@ function OverviewTab({
         {/* Right column */}
         <div className="space-y-5">
           {/* Top Issues */}
-          <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground">Top Issues</h3>
               {issues.length > 0 && (
@@ -584,7 +584,7 @@ const EFFORT_META: Record<string, { label: string; cls: string }> = {
 const COMPONENT_CLS: Record<string, string> = {
   security:    "bg-cyan-50 text-cyan-700",
   malware:     "bg-purple-50 text-purple-700",
-  performance: "bg-indigo-50 text-indigo-700",
+  performance: "bg-[var(--accent-light)] text-[var(--accent-hover)]",
   seo:         "bg-pink-50 text-pink-700",
 };
 
@@ -629,7 +629,7 @@ function IssuesTab({ site, brandColor }: { site: Site; brandColor: string }) {
 
   if (activeFixes.length === 0 && resolvedFixes.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-border shadow-sm flex items-center justify-center py-20">
+      <div className="bg-white rounded-2xl shadow-elevated-sm flex items-center justify-center py-20 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="text-center">
           <CheckCircle2 size={28} className="text-green-500 mx-auto mb-3" />
           <p className="text-sm font-semibold text-foreground">No issues found</p>
@@ -717,7 +717,7 @@ function IssuesTab({ site, brandColor }: { site: Site; brandColor: string }) {
                 const effort = EFFORT_META[fix.effort] ?? EFFORT_META.medium;
                 const compCls = COMPONENT_CLS[fix.component] ?? "bg-gray-100 text-gray-600";
                 return (
-                  <div key={fix.title} className="bg-white rounded-2xl border border-border shadow-sm p-5">
+                  <div key={fix.title} className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground mb-1.5">{fix.title}</p>
@@ -750,7 +750,7 @@ function IssuesTab({ site, brandColor }: { site: Site; brandColor: string }) {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Resolved ({resolvedFixes.length})</p>
           <div className="space-y-2">
             {resolvedFixes.map((fix) => (
-              <div key={fix.title} className="bg-white rounded-2xl border border-border shadow-sm p-4 opacity-50">
+              <div key={fix.title} className="bg-white rounded-2xl shadow-elevated-sm p-4 opacity-50 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 size={14} className="text-green-500 shrink-0" />
                   <p className="text-sm text-foreground flex-1">{fix.title}</p>
@@ -810,7 +810,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Score card */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-2 min-h-[190px]">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col items-center justify-center gap-2 min-h-[190px] hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           {score !== undefined ? (
             <>
               <ScoreGauge
@@ -844,7 +844,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
         </div>
 
         {/* SSL Certificate */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
               <Shield size={15} className="text-teal-500" />
@@ -886,10 +886,10 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
         </div>
 
         {/* Login Security */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-              <Key size={15} className="text-indigo-500" />
+            <div className="w-9 h-9 rounded-xl bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+              <Key size={15} className="text-[var(--accent)]" />
             </div>
             <p className="text-sm font-semibold text-foreground">Login Security</p>
           </div>
@@ -911,7 +911,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
         </div>
 
         {/* File Security */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
               <Shield size={15} className="text-purple-500" />
@@ -939,7 +939,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
       {/* ── Middle: Trend + Admin accounts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Security score trend */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-foreground">Security Score Trend</h3>
             {trendPts.length >= 2 && (() => {
@@ -980,7 +980,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
         </div>
 
         {/* Admin accounts */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground">Admin Accounts</h3>
             {site.admin_users_count != null && (
@@ -998,7 +998,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
                 const risky = name.toLowerCase() === "admin";
                 return (
                   <div key={name} className={`flex items-center gap-3 p-2.5 rounded-xl ${risky ? "bg-red-50" : "bg-gray-50"}`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${risky ? "bg-red-100 text-red-600" : "bg-indigo-100 text-indigo-600"}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${risky ? "bg-red-100 text-red-600" : "bg-[var(--accent-light)] text-[var(--accent)]"}`}>
                       {name[0]?.toUpperCase() ?? "?"}
                     </div>
                     <span className="text-sm font-medium text-foreground flex-1 truncate">{name}</span>
@@ -1019,7 +1019,7 @@ function SecurityTab({ site, audits, brandColor, runAudit, canRunAudit }: { site
       </div>
 
       {/* ── Security checks table ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Security Checks</h3>
@@ -1146,7 +1146,7 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
 
         {/* Performance score — taller accent card */}
-        <div className="col-span-2 lg:col-span-1 bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-2 min-h-[200px]">
+        <div className="col-span-2 lg:col-span-1 bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col items-center justify-center gap-2 min-h-[200px] hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           {score !== undefined ? (
             <ScoreGauge
               score={score}
@@ -1180,7 +1180,7 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
           const statusLabel = st === "good" ? "Good" : st === "needs-work" ? "Needs Work" : st === "poor" ? "Poor" : null;
           const statusCls   = st === "good" ? "bg-green-50 text-green-700" : st === "needs-work" ? "bg-amber-50 text-amber-700" : st === "poor" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-500";
           return (
-            <div key={abbr} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex flex-col items-center justify-center gap-2 min-h-[200px]">
+            <div key={abbr} className="bg-white rounded-2xl shadow-elevated-sm p-4 flex flex-col items-center justify-center gap-2 min-h-[200px] hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
               <p className="text-[11px] text-muted-foreground font-medium text-center leading-snug">{title}</p>
               <PieChart width={84} height={84}>
                 <Pie
@@ -1207,7 +1207,7 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Trend */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center justify-between mb-1">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Performance Score Trend</h3>
@@ -1247,7 +1247,7 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
         </div>
 
         {/* Recommendations */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground">Recommendations</h3>
             {recs.length > 0 && (
@@ -1292,7 +1292,7 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* Caching & Optimisation */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <h3 className="text-sm font-semibold text-foreground mb-4">Caching & Optimisation</h3>
           <div className="space-y-3">
             {[
@@ -1320,7 +1320,7 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
         </div>
 
         {/* Database Health */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <h3 className="text-sm font-semibold text-foreground mb-4">Database Health</h3>
           {[
             { label: "Autoloaded Options", value: site.autoloaded_options_kb,      unit: "KB",  warnAt: 800,  max: 2000 },
@@ -1418,7 +1418,7 @@ function GoogleAnalyticsSection({ site, brandColor }: { site: Site; brandColor: 
   const fmtSec = (s: number) => s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`;
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
@@ -1563,7 +1563,7 @@ function BrokenLinksSection({ siteId, brandColor }: { siteId: string; brandColor
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Broken Links</h3>
@@ -1678,7 +1678,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
       {/* ── Top 3 stat cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Score gauge */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-1">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col items-center justify-center gap-1 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <ScoreGauge
             score={score ?? 0}
             label="SEO"
@@ -1690,7 +1690,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
         </div>
 
         {/* Issue counts */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <p className="text-xs font-medium text-muted-foreground mb-3">Issues Breakdown</p>
           <div className="grid grid-cols-3 gap-2">
             <div className="flex flex-col items-center bg-red-50 rounded-xl py-3">
@@ -1709,7 +1709,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
         </div>
 
         {/* Checklist summary */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <p className="text-xs font-medium text-muted-foreground mb-1">SEO Checklist</p>
           <p className="text-2xl font-bold text-foreground mt-2 tabular-nums">
             {passCount}
@@ -1730,7 +1730,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
       {/* ── Middle: trend + issues ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* SEO Score Trend */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center justify-between mb-0.5">
             <h3 className="text-sm font-semibold text-foreground">SEO Score Trend</h3>
             {scoreDelta !== null && (
@@ -1770,7 +1770,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
         </div>
 
         {/* SEO Issues */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground">SEO Issues</h3>
             {checksArray.filter((c) => c.status !== "pass").length > 0 && (
@@ -1838,7 +1838,7 @@ function SeoTab({ site, audits, brandColor }: { site: Site; audits: Audit[]; bra
       <SearchConsoleSection site={site} brandColor={brandColor} />
 
       {/* ── SEO Checklist ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <h3 className="text-sm font-semibold text-foreground mb-4">SEO Checklist</h3>
         {checksArray.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
@@ -1913,7 +1913,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         {/* 30-Day Uptime */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-6 flex flex-col justify-between">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-6 flex flex-col justify-between hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div>
             <p className="text-xs text-muted-foreground font-medium mb-3">30-Day Uptime</p>
             {hasData ? (
@@ -1935,7 +1935,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
         </div>
 
         {/* Donut ring with uptime % inside */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col items-center justify-center gap-4">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col items-center justify-center gap-4 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="relative">
             <PieChart width={120} height={120}>
               <Pie
@@ -1975,7 +1975,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
         </div>
 
         {/* Stats list */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Monitor Stats</p>
           <div className="space-y-0">
             {([
@@ -2018,7 +2018,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
       </div>
 
       {/* ── Response time chart ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm p-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Response Time — Last 30 Days</h3>
@@ -2094,7 +2094,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Incident Log (2/3) */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-sm">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Incident Log</h3>
@@ -2116,7 +2116,7 @@ function UptimeTab({ site, brandColor }: { site: Site; brandColor: string }) {
         </div>
 
         {/* Alert Settings (1/3) */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col gap-4">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col gap-4 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: brandColor + "18" }}>
@@ -2212,7 +2212,7 @@ function SearchConsoleSection({ site, brandColor }: { site: Site; brandColor: st
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
@@ -2959,13 +2959,13 @@ function BackupsTab({ site, brandColor, canUseAdvancedFeatures }: { site: Site; 
   };
 
   const typeBadge = (t: string) => {
-    const map: Record<string, string> = { db: "bg-purple-100 text-purple-700", files: "bg-indigo-100 text-indigo-700", full: "bg-teal-100 text-teal-700" };
+    const map: Record<string, string> = { db: "bg-purple-100 text-purple-700", files: "bg-[var(--accent-light)] text-[var(--accent-hover)]", full: "bg-teal-100 text-teal-700" };
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[t] ?? ""}`}>{t.toUpperCase()}</span>;
   };
 
   if (!canUseAdvancedFeatures) {
     return (
-      <div className="bg-white rounded-2xl border border-border shadow-sm flex flex-col items-center justify-center py-16 gap-4 text-center px-8">
+      <div className="bg-white rounded-2xl shadow-elevated-sm flex flex-col items-center justify-center py-16 gap-4 text-center px-8 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
           <HardDrive size={22} className="text-amber-500" />
         </div>
@@ -3409,7 +3409,7 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
 
   if (allPlugins.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-border shadow-sm flex flex-col items-center justify-center py-16 gap-3">
+      <div className="bg-white rounded-2xl shadow-elevated-sm flex flex-col items-center justify-center py-16 gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
           <Package size={24} className="text-muted-foreground" />
         </div>
@@ -3453,7 +3453,7 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
       )}
 
       {/* ── Safe Updates settings card ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5 space-y-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm p-5 space-y-5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         {!canUseAdvancedFeatures ? (
           <div className="space-y-3">
             <div>
@@ -3503,7 +3503,7 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
                 onClick={toggleVisualReview}
                 disabled={togglingReview}
                 className="flex items-center gap-2 text-sm font-semibold shrink-0 disabled:opacity-50 transition-colors"
-                style={{ color: visualReview ? "#6366f1" : "#9ca3af" }}
+                style={{ color: visualReview ? "#1f5fb8" : "#9ca3af" }}
               >
                 {togglingReview ? <Loader2 size={22} className="animate-spin" /> : visualReview ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                 {visualReview ? "On" : "Off"}
@@ -3572,12 +3572,12 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
         {([
           { label: "Total Plugins",  value: allPlugins.length,                      color: brandColor,  icon: <Package size={15} /> },
           { label: "Active",         value: activePlugins.length,                   color: "#10b981",   icon: <CheckCircle2 size={15} /> },
-          { label: "Inactive",       value: inactPlugins.length,                    color: "#6366f1",   icon: <Package size={15} /> },
+          { label: "Inactive",       value: inactPlugins.length,                    color: "#1f5fb8",   icon: <Package size={15} /> },
           { label: "Need Updates",   value: activeNeedsUpdate + inactNeedsUpdate,   color: "#f59e0b",   icon: <RefreshCw size={15} /> },
           { label: "Abandoned",      value: outdated12m.length,                     color: "#f97316",   icon: <AlertTriangle size={15} /> },
           { label: "Vulnerable",     value: pluginVulns.length,                     color: "#ef4444",   icon: <ShieldAlert size={15} /> },
         ] as { label: string; value: number; color: string; icon: React.ReactNode }[]).map(({ label, value, color, icon }) => (
-          <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex items-center gap-3">
+          <div key={label} className="bg-white rounded-2xl shadow-elevated-sm p-4 flex items-center gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: color + "18", color }}>
               {icon}
@@ -3592,7 +3592,7 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
 
       {/* ── Active Plugins ── */}
       {activePlugins.length > 0 && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Active Plugins</h3>
@@ -3621,7 +3621,7 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
 
       {/* ── Inactive Plugins ── */}
       {inactPlugins.length > 0 && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Inactive Plugins</h3>
@@ -3644,13 +3644,13 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
               )}
             </div>
           </div>
-          <PluginTable plugins={inactPlugins} brandColor="#6366f1" showUpdateStatus={true} vulnMap={vulnMap} siteId={site.id} updatesEnabled={updatesEnabled} updatedSlugs={updatedSlugs} excluded={excluded} onUpdateComplete={bumpHistory} onUpdateSuccess={markUpdated} onExclude={handleExclude} onUnexclude={handleUnexclude} />
+          <PluginTable plugins={inactPlugins} brandColor="#1f5fb8" showUpdateStatus={true} vulnMap={vulnMap} siteId={site.id} updatesEnabled={updatesEnabled} updatedSlugs={updatedSlugs} excluded={excluded} onUpdateComplete={bumpHistory} onUpdateSuccess={markUpdated} onExclude={handleExclude} onUnexclude={handleUnexclude} />
         </div>
       )}
 
       {/* ── Abandoned Plugins ── */}
       {outdated12m.length > 0 && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Abandoned Plugins</h3>
@@ -3695,7 +3695,7 @@ function PluginsTab({ site, audits, brandColor, onSiteRefetch, canUseAdvancedFea
       )}
 
       {/* ── Update History ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">Update History</h3>
           <p className="text-xs text-muted-foreground mt-0.5">All plugin updates run from this dashboard</p>
@@ -3755,7 +3755,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Total Orders */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col gap-3">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: brandColor + "18" }}>
@@ -3772,7 +3772,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
         </div>
 
         {/* Total Revenue */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col gap-3">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
               <DollarSign size={18} className="text-green-600" />
@@ -3786,7 +3786,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
         </div>
 
         {/* Avg Order Value */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col gap-3">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
               <TrendingUp size={18} className="text-amber-500" />
@@ -3804,7 +3804,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
         </div>
 
         {/* Store Status */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col gap-3">
+        <div className="bg-white rounded-2xl shadow-elevated-sm p-5 flex flex-col gap-3 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="flex items-center gap-2.5">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${hasWoo ? "bg-purple-50" : "bg-gray-100"}`}>
               <Package size={18} className={hasWoo ? "text-purple-500" : "text-muted-foreground"} />
@@ -3827,7 +3827,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
 
       {/* ── WooCommerce Fatal Errors ── */}
       {hasWoo && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Fatal Errors (last 24h)</h3>
@@ -3868,7 +3868,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
 
       {/* ── AI Store Insight ── */}
       {hasWoo && wooNarrative && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
               style={{ background: brandColor + "18" }}>
@@ -3887,7 +3887,7 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
 
       {/* ── Extended analytics ── */}
       {hasWoo && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Extended Analytics</h3>
@@ -3919,8 +3919,8 @@ function WooCommerceTab({ site, audits, brandColor }: { site: Site; audits: Audi
             {/* Orders 30d */}
             <div className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-gray-50/40">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                  <BarChart2 size={15} className="text-indigo-500" />
+                <div className="w-8 h-8 rounded-lg bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+                  <BarChart2 size={15} className="text-[var(--accent)]" />
                 </div>
                 <p className="text-xs font-semibold text-foreground">Orders (30 days)</p>
               </div>
@@ -4065,7 +4065,7 @@ function CronTab({ site, brandColor }: { site: Site; brandColor: string }) {
 
   if (!site.plugin_connected || events.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-10 flex flex-col items-center gap-3 text-center">
+      <div className="bg-white rounded-2xl shadow-elevated-sm p-10 flex flex-col items-center gap-3 text-center hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
           <CalendarClock size={24} className="text-muted-foreground" />
         </div>
@@ -4085,11 +4085,11 @@ function CronTab({ site, brandColor }: { site: Site; brandColor: string }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total Events", value: events.length, color: brandColor },
-          { label: "WP Cron",      value: wpCount,       color: "#6366f1" },
+          { label: "WP Cron",      value: wpCount,       color: "#1f5fb8" },
           { label: "Action Sched", value: asCount,       color: "#3b82f6" },
           { label: "Failed",       value: failedCnt,     color: failedCnt > 0 ? "#ef4444" : "#10b981" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="bg-white rounded-2xl border border-border shadow-sm p-4 flex flex-col gap-1.5">
+          <div key={label} className="bg-white rounded-2xl shadow-elevated-sm p-4 flex flex-col gap-1.5 hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
             <p className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</p>
             <p className="text-xs text-muted-foreground">{label}</p>
           </div>
@@ -4106,7 +4106,7 @@ function CronTab({ site, brandColor }: { site: Site; brandColor: string }) {
       )}
 
       {/* Table card */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         {/* Filter + search */}
         <div className="px-5 pt-4 pb-0 border-b border-border flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -4229,7 +4229,7 @@ function SiteHealthTab({ site }: { site: Site }) {
 
   if (!site.plugin_connected || !h) {
     return (
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-10 flex flex-col items-center gap-3 text-center">
+      <div className="bg-white rounded-2xl shadow-elevated-sm p-10 flex flex-col items-center gap-3 text-center hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
           <HeartPulse size={24} className="text-muted-foreground" />
         </div>
@@ -4291,7 +4291,7 @@ function SiteHealthTab({ site }: { site: Site }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* WordPress Checks */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
               <Shield size={14} className="text-blue-500" />
@@ -4317,7 +4317,7 @@ function SiteHealthTab({ site }: { site: Site }) {
         </div>
 
         {/* Filesystem Checks */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
               <Database size={14} className="text-amber-500" />
@@ -4334,7 +4334,7 @@ function SiteHealthTab({ site }: { site: Site }) {
 
       {/* PHP Extensions */}
       {extKeys.length > 0 && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
               <Server size={14} className="text-green-500" />
@@ -4392,7 +4392,7 @@ function SiteDetailContent() {
 
   const { site, loading, error, refetch } = useSite(id);
   const { agency } = useAuth();
-  const brandColor = agency?.accent_color ?? "#6366f1";
+  const brandColor = agency?.accent_color ?? "#1f5fb8";
   const canUseAdvancedFeatures = agency?.plan === "premium" || agency?.plan === "agency_plus";
   const { roleCanDo } = useRole();
   const canRunAudit = roleCanDo("run_audit");
@@ -4725,9 +4725,9 @@ function SiteDetailContent() {
 
         {/* Audit running banner */}
         {pendingAuditId && (
-          <div className="mx-6 mb-3 flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
-            <RefreshCw size={13} className="animate-spin text-indigo-600 shrink-0" />
-            <p className="text-xs text-indigo-700 font-medium">
+          <div className="mx-6 mb-3 flex items-center gap-2 px-4 py-2.5 bg-[var(--accent-light)] border border-[var(--accent)]/20 rounded-xl">
+            <RefreshCw size={13} className="animate-spin text-[var(--accent-hover)] shrink-0" />
+            <p className="text-xs text-[var(--accent-hover)] font-medium">
               Audit running — results will update automatically
             </p>
           </div>

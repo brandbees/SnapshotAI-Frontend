@@ -54,7 +54,7 @@ function MetricCard({
   color: string; icon: React.ElementType; progress?: number;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-6 relative overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-6 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-5 -translate-y-6 translate-x-6"
         style={{ background: color }} />
       <div className="flex items-start justify-between mb-3">
@@ -146,7 +146,7 @@ function FeatureChip({ value, label }: { value: string | boolean | null | undefi
 export default function PerformancePage() {
   const { sites, loading, error } = useSites();
   const { agency } = useAuth();
-  const brandColor = agency?.accent_color ?? "#6366f1";
+  const brandColor = agency?.accent_color ?? "#1f5fb8";
 
   const [filter, setFilter]   = useState<FilterTab>("all");
   const [sortBy, setSortBy]   = useState<SortKey>("performance");
@@ -327,7 +327,7 @@ export default function PerformancePage() {
       </div>
 
       {/* ── Scatter Chart: Response Time vs Score ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
         <div className="flex items-start justify-between mb-1">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Response Time vs Performance Score</h3>
@@ -405,7 +405,7 @@ export default function PerformancePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Distribution donut */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Score Distribution</h3>
           <p className="text-xs text-muted-foreground mb-4">Sites by performance health</p>
           {audited.length === 0 ? (
@@ -447,7 +447,7 @@ export default function PerformancePage() {
         </div>
 
         {/* Score histogram */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Score Buckets</h3>
           <p className="text-xs text-muted-foreground mb-4">Sites per 20-point score range</p>
           {audited.length === 0 ? (
@@ -472,12 +472,12 @@ export default function PerformancePage() {
         </div>
 
         {/* Optimization opportunities */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-1">Optimization Gaps</h3>
           <p className="text-xs text-muted-foreground mb-4">Missing performance technologies</p>
           <div className="space-y-3">
             {[
-              { label: "Page Caching",    missing: missingCaching,  icon: Server,    color: "#6366f1" },
+              { label: "Page Caching",    missing: missingCaching,  icon: Server,    color: "#1f5fb8" },
               { label: "CDN",             missing: missingCDN,      icon: Globe,     color: "#0ea5e9" },
               { label: "Image Optimizer", missing: missingImgOpt,   icon: ImageIcon, color: "#10b981" },
             ].map(({ label, missing, icon: Icon, color }) => {
@@ -521,7 +521,7 @@ export default function PerformancePage() {
       </div>
 
       {/* ── Tech Stack Matrix ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Tech Stack Matrix</h3>
@@ -639,7 +639,7 @@ export default function PerformancePage() {
                   </span>
                 </td>
                 {[
-                  { count: cachingCount, color: "#6366f1" },
+                  { count: cachingCount, color: "#1f5fb8" },
                   { count: cdnCount, color: "#0ea5e9" },
                   { count: imgOptCount, color: "#10b981" },
                   { count: objCacheCount, color: "#f59e0b" },
@@ -685,7 +685,7 @@ export default function PerformancePage() {
       </div>
 
       {/* ── Detailed sites table ── */}
-      <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <p className="text-sm font-semibold text-foreground">Site Performance Details</p>
           <p className="text-xs text-muted-foreground">{filtered.length} site{filtered.length !== 1 ? "s" : ""}</p>

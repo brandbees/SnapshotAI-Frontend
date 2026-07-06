@@ -17,6 +17,9 @@ import {
   ArrowRight,
   PlayCircle,
   Loader2,
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -36,6 +39,7 @@ import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { AddSiteModal } from "@/components/sites/AddSiteModal";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { Button } from "@/components/ui/Button";
+import { IconChip } from "@/components/ui/IconChip";
 import { PLAN_LIMITS } from "@/lib/constants";
 import type { Site } from "@/types";
 
@@ -100,14 +104,14 @@ interface StatCardProps {
   href?: string;
 }
 
-function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#6366f1", miniGauge, href }: StatCardProps) {
+function StatCard({ label, value, sub, subColor = "muted", icon, iconBg = "#1f5fb8", miniGauge, href }: StatCardProps) {
   const subCls =
     subColor === "green" ? "text-green-600" :
     subColor === "amber" ? "text-amber-500" :
     subColor === "red"   ? "text-red-500"   : "text-muted-foreground";
 
   const inner = (
-    <div className={`bg-white rounded-2xl border border-border shadow-sm p-5 h-full transition-all duration-150 ${href ? "cursor-pointer hover:shadow-md hover:border-[var(--accent)]/40 hover:-translate-y-px" : ""}`}>
+    <div className={`bg-white rounded-2xl shadow-elevated-sm p-5 h-full transition-all duration-150 ${href ? "cursor-pointer hover:shadow-glow hover:-translate-y-1" : "hover:shadow-elevated-md hover:-translate-y-0.5"}`}>
       <div className="flex items-start justify-between mb-2">
         <span className="text-xs text-muted-foreground">{label}</span>
         <div
@@ -138,17 +142,18 @@ function AlertRow({ icon, label, sub, severity }: {
 }) {
   const crit = severity === "critical";
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-opacity hover:opacity-80 ${crit ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
-      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${crit ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-500"}`}>
+    <div className="group flex items-center gap-3 p-3 rounded-xl bg-white shadow-elevated-sm hover:shadow-elevated-md transition-all duration-base cursor-pointer hover:-translate-y-0.5">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${crit ? "bg-red-50 text-red-500" : "bg-amber-50 text-amber-500"}`}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-xs font-semibold ${crit ? "text-red-700" : "text-amber-700"}`}>{label}</p>
-        <p className={`text-[10px] ${crit ? "text-red-400" : "text-amber-400"}`}>{sub}</p>
+        <p className="text-xs font-semibold text-foreground truncate">{label}</p>
+        <p className="text-[10px] text-muted-foreground truncate">{sub}</p>
       </div>
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${crit ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${crit ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}>
         {crit ? "Critical" : "Warning"}
       </span>
+      <ChevronRight size={14} className="shrink-0 -mr-1 text-muted-foreground/40 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
     </div>
   );
 }
@@ -187,114 +192,81 @@ function PortfolioHealthSection({ portfolio, sites }: { portfolio: PortfolioStat
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
       {/* ── Card 1: Score gauge ── */}
-      <Link href="/sites" className="rounded-2xl overflow-hidden relative block cursor-pointer group"
-        style={{ background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" }}>
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)" }} />
-        <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)" }} />
-        {/* Hover insights overlay — fades in, gauge fades out */}
-        <div className="absolute inset-0 flex flex-col justify-center gap-4 px-6 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-          style={{ background: "rgba(18, 10, 60, 0.92)" }}>
-          <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.4)" }}>
-            Active Risks &amp; Improvements
-          </p>
-          <div className="space-y-3">
-            {/* Always shown: critical / warning counts as risk items */}
-            {critical > 0 && (
-              <div className="flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#f87171" }} />
-                <span className="text-xs leading-snug" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  <span className="font-bold text-white">{critical} {critical === 1 ? "site" : "sites"}</span> in critical state — score below 50
-                </span>
-              </div>
-            )}
-            {warning > 0 && (
-              <div className="flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#fbbf24" }} />
-                <span className="text-xs leading-snug" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  <span className="font-bold text-white">{warning} {warning === 1 ? "site" : "sites"}</span> need attention — score 50–79
-                </span>
-              </div>
-            )}
-            {malware_detected > 0 && (
-              <div className="flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#f87171" }} />
-                <span className="text-xs leading-snug" style={{ color: "#fca5a5" }}>
-                  <span className="font-bold">{malware_detected} malware {malware_detected === 1 ? "threat" : "threats"}</span> detected — immediate action required
-                </span>
-              </div>
-            )}
-            {sites_down > 0 && (
-              <div className="flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#f87171" }} />
-                <span className="text-xs leading-snug" style={{ color: "#fca5a5" }}>
-                  <span className="font-bold">{sites_down} {sites_down === 1 ? "site is" : "sites are"} offline</span> — uptime monitoring active
-                </span>
-              </div>
-            )}
-            {ssl_expiring > 0 && (
-              <div className="flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#fbbf24" }} />
-                <span className="text-xs leading-snug" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  <span className="font-bold text-white">{ssl_expiring} SSL {ssl_expiring === 1 ? "certificate" : "certificates"}</span> expiring within 30 days
-                </span>
-              </div>
-            )}
-            {critical === 0 && warning === 0 && malware_detected === 0 && sites_down === 0 && ssl_expiring === 0 && (
-              <div className="flex items-start gap-3">
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#4ade80" }} />
-                <span className="text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  All {total_sites} {total_sites === 1 ? "site is" : "sites are"} healthy — no active risks
-                </span>
-              </div>
-            )}
-          </div>
-          <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.35)" }}>
-            Click to view all sites →
-          </span>
-        </div>
+      {(() => {
+        // Compact, always-visible risk summary — replaces the old hover-to-reveal
+        // overlay (users on touch devices could never see it, and it hid the gauge).
+        const riskChips: { icon: React.ReactNode; text: string; tone: "red" | "amber" | "green" }[] = [];
+        if (malware_detected > 0) riskChips.push({ icon: <Shield size={10} />, text: `${malware_detected} threat${malware_detected !== 1 ? "s" : ""}`, tone: "red" });
+        if (sites_down > 0)       riskChips.push({ icon: <WifiOff size={10} />, text: `${sites_down} down`, tone: "red" });
+        if (ssl_expiring > 0)     riskChips.push({ icon: <Lock size={10} />, text: `${ssl_expiring} SSL`, tone: "amber" });
+        if (critical > 0 && riskChips.length < 3) riskChips.push({ icon: <AlertTriangle size={10} />, text: `${critical} critical`, tone: "red" });
+        if (warning > 0  && riskChips.length < 3) riskChips.push({ icon: <AlertTriangle size={10} />, text: `${warning} warning`, tone: "amber" });
+        if (riskChips.length === 0) riskChips.push({ icon: <CheckCircle2 size={10} />, text: "All healthy", tone: "green" });
 
-        <div className="relative p-5 flex flex-col h-full justify-between transition-opacity duration-200 group-hover:opacity-0">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>
-              Portfolio Health
-            </p>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
-              {total_sites} {total_sites === 1 ? "site" : "sites"}
-            </span>
-          </div>
+        const chipStyle = (tone: "red" | "amber" | "green") => ({
+          background: tone === "red" ? "rgba(248,113,113,0.22)" : tone === "amber" ? "rgba(251,191,36,0.22)" : "rgba(74,222,128,0.22)",
+          color:      tone === "red" ? "#fecaca" : tone === "amber" ? "#fde68a" : "#bbf7d0",
+        });
 
-          <div className="flex justify-center">
-            <svg width={W} height={H} style={{ overflow: "visible" }}>
-              <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={13} strokeLinecap="round" />
-              {fgArc && (
-                <path d={fgArc} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={13} strokeLinecap="round"
-                  style={{ filter: "drop-shadow(0 0 10px rgba(255,255,255,0.45))" }} />
-              )}
-              <text x={cx} y={cy - 4} textAnchor="middle" dominantBaseline="middle"
-                fill="white" fontSize={40} fontWeight={800} fontFamily="system-ui,sans-serif">
-                {avg_score ?? "—"}
-              </text>
-              <text x={cx} y={cy + 22} textAnchor="middle" dominantBaseline="middle"
-                fill="rgba(255,255,255,0.4)" fontSize={11} fontFamily="system-ui,sans-serif">
-                out of 100
-              </text>
-            </svg>
-          </div>
+        return (
+          <Link href="/sites" className="rounded-2xl overflow-hidden relative block cursor-pointer group bg-gradient-brand transition-all duration-base hover:shadow-glow hover:-translate-y-0.5">
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)" }} />
+            <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)" }} />
 
-          <div className="flex justify-center">
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full"
-              style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.9)" }}>
-              {scoreLabel}
-            </span>
-          </div>
-        </div>
-      </Link>
+            <div className="relative p-5 flex flex-col h-full gap-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Portfolio Health
+                </p>
+                <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors"
+                  style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
+                  {total_sites} {total_sites === 1 ? "site" : "sites"}
+                  <ChevronRight size={11} className="opacity-0 group-hover:opacity-100 -ml-1 group-hover:ml-0 transition-all" />
+                </span>
+              </div>
+
+              <div className="flex justify-center">
+                <svg width={W} height={H} style={{ overflow: "visible" }}>
+                  <path d={bgArc} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={13} strokeLinecap="round" />
+                  {fgArc && (
+                    <path d={fgArc} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={13} strokeLinecap="round"
+                      style={{ filter: "drop-shadow(0 0 10px rgba(255,255,255,0.45))" }} />
+                  )}
+                  <text x={cx} y={cy - 4} textAnchor="middle" dominantBaseline="middle"
+                    fill="white" fontSize={40} fontWeight={800} fontFamily="system-ui,sans-serif">
+                    {avg_score ?? "—"}
+                  </text>
+                  <text x={cx} y={cy + 22} textAnchor="middle" dominantBaseline="middle"
+                    fill="rgba(255,255,255,0.4)" fontSize={11} fontFamily="system-ui,sans-serif">
+                    out of 100
+                  </text>
+                </svg>
+              </div>
+
+              <div className="flex justify-center">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.9)" }}>
+                  {scoreLabel}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 justify-center mt-auto pt-1">
+                {riskChips.slice(0, 3).map((chip, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
+                    style={chipStyle(chip.tone)}>
+                    {chip.icon}{chip.text}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </Link>
+        );
+      })()}
 
       {/* ── Card 2: Site status breakdown ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
         <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-4">Site Status</p>
         <div className="space-y-3.5">
           {statusRows.map(({ label, count, color, numBg, trackBg, filter }) => (
@@ -327,7 +299,7 @@ function PortfolioHealthSection({ portfolio, sites }: { portfolio: PortfolioStat
       </div>
 
       {/* ── Card 3: Active alerts ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Active Alerts</p>
           {hasAlerts && (
@@ -347,53 +319,71 @@ function PortfolioHealthSection({ portfolio, sites }: { portfolio: PortfolioStat
               <p className="text-xs text-muted-foreground mt-0.5">No active threats detected</p>
             </div>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {malware_detected > 0 && (
-              threatSites.length > 0
-                ? threatSites.map(s => (
-                    <Link key={s.id} href={`/sites/${s.id}?tab=malware`} className="block">
-                      <AlertRow
-                        icon={<Shield size={13} />}
-                        label={s.name}
-                        sub="Malware threat — immediate action required"
-                        severity="critical"
-                      />
-                    </Link>
-                  ))
-                : (
-                  <Link href="/malware" className="block">
-                    <AlertRow
-                      icon={<Shield size={13} />}
-                      label={`${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`}
-                      sub="Immediate action required"
-                      severity="critical"
-                    />
-                  </Link>
-                )
-            )}
-            {sites_down > 0 && (
-              <Link href="/uptime" className="block">
-                <AlertRow
-                  icon={<WifiOff size={13} />}
-                  label={`${sites_down} site${sites_down !== 1 ? "s" : ""} offline`}
-                  sub="Check uptime monitor"
-                  severity="critical"
-                />
-              </Link>
-            )}
-            {ssl_expiring > 0 && (
-              <Link href="/security" className="block">
-                <AlertRow
-                  icon={<Lock size={13} />}
-                  label={`${ssl_expiring} SSL expiring soon`}
-                  sub="Renew before expiry"
-                  severity="warning"
-                />
-              </Link>
-            )}
-          </div>
-        )}
+        ) : (() => {
+          // Build a flat list first so we can cap display at 3 regardless of how many
+          // sites contribute to it (many threat sites would otherwise blow out card height).
+          const alertItems: { key: string; icon: React.ReactNode; label: string; sub: string; severity: "critical" | "warning"; href: string }[] = [];
+
+          if (malware_detected > 0) {
+            if (threatSites.length > 0) {
+              threatSites.forEach(s => alertItems.push({
+                key: `malware-${s.id}`,
+                icon: <Shield size={13} />,
+                label: s.name,
+                sub: "Malware threat — immediate action required",
+                severity: "critical",
+                href: `/sites/${s.id}?tab=malware`,
+              }));
+            } else {
+              alertItems.push({
+                key: "malware-agg",
+                icon: <Shield size={13} />,
+                label: `${malware_detected} malware threat${malware_detected !== 1 ? "s" : ""}`,
+                sub: "Immediate action required",
+                severity: "critical",
+                href: "/malware",
+              });
+            }
+          }
+          if (sites_down > 0) {
+            alertItems.push({
+              key: "sites-down",
+              icon: <WifiOff size={13} />,
+              label: `${sites_down} site${sites_down !== 1 ? "s" : ""} offline`,
+              sub: "Check uptime monitor",
+              severity: "critical",
+              href: "/uptime",
+            });
+          }
+          if (ssl_expiring > 0) {
+            alertItems.push({
+              key: "ssl-expiring",
+              icon: <Lock size={13} />,
+              label: `${ssl_expiring} SSL expiring soon`,
+              sub: "Renew before expiry",
+              severity: "warning",
+              href: "/security",
+            });
+          }
+
+          const visibleAlerts   = alertItems.slice(0, 3);
+          const remainingCount = alertItems.length - visibleAlerts.length;
+
+          return (
+            <div className="space-y-2">
+              {visibleAlerts.map(item => (
+                <Link key={item.key} href={item.href} className="block">
+                  <AlertRow icon={item.icon} label={item.label} sub={item.sub} severity={item.severity} />
+                </Link>
+              ))}
+              {remainingCount > 0 && (
+                <Link href="/sites" className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground hover:text-accent transition-colors py-2">
+                  +{remainingCount} more alert{remainingCount !== 1 ? "s" : ""} <ArrowRight size={12} />
+                </Link>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -403,9 +393,19 @@ function PortfolioHealthSection({ portfolio, sites }: { portfolio: PortfolioStat
 
 function SitesOverviewCard({ sites }: { sites: Site[] }) {
   const router = useRouter();
-  const top = sites.slice(0, 5);
+  // Sort by overall health score, descending, so the most relevant sites surface first
+  // instead of whatever arbitrary order the API returned them in.
+  const top = [...sites]
+    .sort((a, b) => {
+      const avg = (s: Site) => {
+        const sc = s.latest_scores;
+        return sc ? (sc.performance + sc.seo + sc.security + sc.malware) / 4 : -1;
+      };
+      return avg(b) - avg(a);
+    })
+    .slice(0, 6);
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-5 lg:col-span-2">
+    <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5 lg:col-span-2">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-foreground">Sites Overview</h3>
         <Link href="/sites" className="text-xs font-medium text-accent hover:underline">
@@ -502,11 +502,11 @@ function NeedsAttentionCard({ sites }: { sites: Site[] }) {
       if (site.latest_scores.security < 50)
         issues.push({ icon: <Shield size={12} className="text-amber-500" />, title: "Security score critical", site: site.name, href: `/sites/${site.id}?tab=security`, severity: "Critical" });
     }
-    if (issues.length >= 6) break;
+    if (issues.length >= 20) break; // safety cap — display itself scrolls after 6 rows
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+    <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-foreground">Needs Attention</h3>
         {issues.length > 0 && (
@@ -523,7 +523,7 @@ function NeedsAttentionCard({ sites }: { sites: Site[] }) {
           <p className="text-xs text-muted-foreground text-center">All sites look healthy</p>
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-[312px] overflow-y-auto pr-1 -mr-1">
           {issues.map((item, i) => (
             <Link
               key={i}
@@ -574,18 +574,18 @@ function NextStepsPanel({ sites }: { sites: Site[] }) {
   const single = needsAudit.length === 1;
 
   return (
-    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-2xl p-5">
+    <div className="bg-[var(--accent-light)] border border-[var(--accent)]/20 rounded-2xl p-5">
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-          <PlayCircle size={20} className="text-indigo-600" />
-        </div>
+        <IconChip size="md">
+          <PlayCircle size={20} />
+        </IconChip>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-indigo-900">
+          <p className="text-sm font-semibold text-foreground">
             {single
               ? `Run your first audit on ${needsAudit[0].name}`
               : `${needsAudit.length} connected sites haven't been audited yet`}
           </p>
-          <p className="text-xs text-indigo-700 mt-0.5 mb-4 leading-relaxed">
+          <p className="text-xs text-[var(--accent-hover)] mt-0.5 mb-4 leading-relaxed">
             {single
               ? "The plugin is connected and ready. Run an audit to get your security score, SEO grade, performance metrics, and malware check."
               : "Run audits to get security scores, SEO grades, performance metrics, and malware checks for each site."}
@@ -607,7 +607,7 @@ function NextStepsPanel({ sites }: { sites: Site[] }) {
               </button>
               <Link
                 href={`/sites/${needsAudit[0].id}`}
-                className="flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900 transition-colors"
+                className="flex items-center gap-1 text-sm font-medium text-[var(--accent-hover)] hover:text-[var(--accent-deep)] transition-colors"
               >
                 View site <ArrowRight size={13} />
               </Link>
@@ -635,7 +635,7 @@ function NextStepsPanel({ sites }: { sites: Site[] }) {
                     </button>
                     <Link
                       href={`/sites/${site.id}`}
-                      className="text-xs font-medium text-indigo-700 hover:text-indigo-900 transition-colors"
+                      className="text-xs font-medium text-[var(--accent-hover)] hover:text-[var(--accent-deep)] transition-colors"
                     >
                       View
                     </Link>
@@ -814,7 +814,7 @@ export default function DashboardPage() {
           sub={avgScore === null ? "No audits yet" : avgScore >= 80 ? "Healthy" : avgScore >= 50 ? "Needs Attention" : "Critical"}
           subColor={avgScore === null ? "muted" : avgScore >= 80 ? "green" : avgScore >= 50 ? "amber" : "red"}
           icon={<TrendingUp size={14} />}
-          iconBg="#6366f1"
+          iconBg="#1f5fb8"
           miniGauge={avgScore ?? undefined}
           href="/sites"
         />
@@ -869,7 +869,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Health Score Trend */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="flex items-center justify-between mb-0.5">
             <h3 className="text-sm font-semibold text-foreground">Health Score Trend</h3>
             {scoreDelta !== null && (
@@ -890,8 +890,8 @@ export default function DashboardPage() {
               <AreaChart data={displayTrendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%"  stopColor="#1f5fb8" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#1f5fb8" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -901,14 +901,14 @@ export default function DashboardPage() {
                   contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
                   formatter={(v) => [`${v}`, "Score"]}
                 />
-                <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2} fill="url(#scoreGrad)" dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+                <Area type="monotone" dataKey="score" stroke="#1f5fb8" strokeWidth={2} fill="url(#scoreGrad)" dot={{ r: 3, fill: "#1f5fb8", strokeWidth: 0 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Score by Pillar — Radar */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Score by Pillar</h3>
           <p className="text-xs text-muted-foreground mb-4">Performance, SEO, Security, Malware</p>
           {radarData.length === 0 ? (
@@ -922,11 +922,11 @@ export default function DashboardPage() {
                 <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: "#6b7280" }} />
                 <Radar
                   dataKey="value"
-                  stroke="#6366f1"
+                  stroke="#1f5fb8"
                   strokeWidth={2}
-                  fill="#6366f1"
+                  fill="#1f5fb8"
                   fillOpacity={0.15}
-                  dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
+                  dot={{ r: 3, fill: "#1f5fb8", strokeWidth: 0 }}
                 />
               </RadarChart>
             </ResponsiveContainer>
@@ -934,7 +934,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Page Load Speed — Scatter */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="flex items-center justify-between mb-0.5">
             <h3 className="text-sm font-semibold text-foreground">Page Load Speed</h3>
             <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">

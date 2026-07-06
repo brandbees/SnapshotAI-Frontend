@@ -212,7 +212,7 @@ function ReportCard({ report, clientEmail, onSend }: { report: Report; clientEma
   const accentBar = isPending ? "#f59e0b" : isFailed ? "#ef4444" : report.overall_score != null ? scoreHex(report.overall_score) : "#10b981";
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden flex flex-col hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
       {/* Colored top accent bar */}
       <div className="h-1 w-full" style={{ background: accentBar }} />
 

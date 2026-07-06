@@ -7,7 +7,8 @@ type Variant =
   | "danger"
   | "info"
   | "muted"
-  | "outline";
+  | "outline"
+  | "accent";
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ const variants: Record<Variant, string> = {
   info: "bg-blue-50 text-blue-700 border border-blue-200",
   muted: "bg-muted text-muted-foreground border border-border",
   outline: "bg-transparent text-foreground border border-border",
+  accent: "bg-[var(--accent-light)] text-[var(--accent-hover)] border border-[var(--accent)]/20",
 };
 
 export function Badge({

@@ -12,26 +12,38 @@
   --card: #ffffff;
   --card-foreground: #111827;
 
-  /* Brand */
+  /* Brand — sampled from the Brandbees logo mark (public/Brandbees-sas-x512.png):
+     top face #2060b8, side face #185090, shadow face #102850. */
   --primary: #111827;
   --primary-foreground: #ffffff;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-light: #eef2ff;
+  --accent: #1f5fb8;
+  --accent-hover: #164a92;
+  --accent-light: #eaf1fb;
+  --accent-deep: #102850;
+  --accent-rgb: 31, 95, 184;
   --accent-foreground: #ffffff;
+  --gradient-brand: linear-gradient(135deg, #2668c4 0%, #1f5fb8 45%, #102850 100%);
 
   /* Feedback */
   --destructive: #dc2626;
   --destructive-light: #fef2f2;
-  --ring: #6366f1;
+  --ring: #1f5fb8;
   --radius: 0.75rem;
 
-  /* Shadows */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  /* Shadows — a hairline "shadow-border" (0 0 0 1px) replaces hard borders on cards,
+     layered with real elevation blur so depth reads without a visible line. */
+  --shadow-xs: 0 0 0 1px rgb(15 23 42 / 0.04), 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 0 0 1px rgb(15 23 42 / 0.05), 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 0 0 1px rgb(15 23 42 / 0.05), 0 8px 20px -6px rgb(15 23 42 / 0.14), 0 3px 8px -4px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 0 0 1px rgb(15 23 42 / 0.06), 0 20px 40px -10px rgb(15 23 42 / 0.20), 0 8px 16px -8px rgb(15 23 42 / 0.10);
   --shadow-inset: inset 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-glow: 0 0 0 1px rgb(var(--accent-rgb) / 0.3), 0 12px 28px -6px rgb(var(--accent-rgb) / 0.4);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 450ms;
 
   /* Score colors */
   --score-good: #16a34a;
@@ -60,6 +72,7 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-light: var(--accent-light);
+  --color-accent-deep: var(--accent-deep);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-ring: var(--ring);
@@ -68,6 +81,10 @@
   --color-score-bad: var(--score-bad);
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --radius: var(--radius);
+  --ease-out: var(--ease-out);
+  --duration-fast: var(--duration-fast);
+  --duration-base: var(--duration-base);
+  --duration-slow: var(--duration-slow);
 
   /* ── Font-size scale — bumped for readability, xl+ kept at Tailwind defaults ──
      xs: 12→13px  sm: 14→15px  base: 16→17px  lg: 18→19px
@@ -108,7 +125,7 @@ select:focus:not(.no-focus-ring),
 textarea:focus:not(.no-focus-ring) {
   outline: none !important;
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.12) !important;
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.14) !important;
 }
 
 /* Scrollbar */
@@ -122,6 +139,36 @@ button, a, input, select, textarea {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Dashboard elevation scale ────────────────────────────────────────────────
+   Deliberately separate from Tailwind's built-in shadow-sm/md/lg utilities so
+   this doesn't bleed into the landing page, which uses those defaults as-is. */
+.shadow-elevated-xs { box-shadow: var(--shadow-xs); }
+.shadow-elevated-sm { box-shadow: var(--shadow-sm); }
+.shadow-elevated-md { box-shadow: var(--shadow-md); }
+.shadow-elevated-lg { box-shadow: var(--shadow-lg); }
+.shadow-glow        { box-shadow: var(--shadow-glow); }
+.bg-gradient-brand   { background: var(--gradient-brand); }
+
+/* Colored status "shadow-borders" — same hairline+glow formula as --shadow-glow,
+   for status tiles/banners (malware, uptime, security) that used border-2 border-{color}-200
+   instead of an actual border. Replaces the hard colored ring with a soft one. */
+.shadow-status-red   { box-shadow: 0 0 0 1px rgb(239 68 68 / 0.22), 0 6px 16px -6px rgb(239 68 68 / 0.22); }
+.shadow-status-green  { box-shadow: 0 0 0 1px rgb(34 197 94 / 0.22), 0 6px 16px -6px rgb(34 197 94 / 0.2); }
+.shadow-status-amber  { box-shadow: 0 0 0 1px rgb(245 158 11 / 0.22), 0 6px 16px -6px rgb(245 158 11 / 0.2); }
+.shadow-status-blue   { box-shadow: 0 0 0 1px rgb(59 130 246 / 0.22), 0 6px 16px -6px rgb(59 130 246 / 0.2); }
+.shadow-status-orange { box-shadow: 0 0 0 1px rgb(234 88 12 / 0.22), 0 6px 16px -6px rgb(234 88 12 / 0.2); }
+.shadow-status-violet { box-shadow: 0 0 0 1px rgb(124 58 237 / 0.22), 0 6px 16px -6px rgb(124 58 237 / 0.2); }
+.shadow-status-gray   { box-shadow: 0 0 0 1px rgb(107 114 128 / 0.14), 0 4px 10px -4px rgb(107 114 128 / 0.1); }
+.hover\:shadow-status-red:hover   { box-shadow: 0 0 0 1.5px rgb(239 68 68 / 0.35), 0 12px 28px -8px rgb(239 68 68 / 0.3); }
+.hover\:shadow-status-green:hover  { box-shadow: 0 0 0 1.5px rgb(34 197 94 / 0.35), 0 12px 28px -8px rgb(34 197 94 / 0.28); }
+.hover\:shadow-status-amber:hover  { box-shadow: 0 0 0 1.5px rgb(245 158 11 / 0.35), 0 12px 28px -8px rgb(245 158 11 / 0.28); }
+.hover\:shadow-status-blue:hover   { box-shadow: 0 0 0 1.5px rgb(59 130 246 / 0.35), 0 12px 28px -8px rgb(59 130 246 / 0.28); }
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* Toggle switch */

@@ -14,7 +14,7 @@ interface SiteCardProps {
   onClick: () => void; // quick view
 }
 
-const AVATAR_COLORS = ["#6366f1", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+const AVATAR_COLORS = ["#1f5fb8", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
 
 function avatarColor(id: string): string {
   return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];
@@ -88,8 +88,8 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
 
   return (
     <div
-      className="relative bg-white rounded-2xl border border-border shadow-sm transition-all duration-200 overflow-hidden flex flex-col cursor-pointer"
-      style={hovered ? { boxShadow: "0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1)", borderColor: "var(--accent)" } : {}}
+      className="relative bg-white rounded-2xl shadow-elevated-sm transition-all duration-200 overflow-hidden flex flex-col cursor-pointer"
+      style={hovered ? { boxShadow: "var(--shadow-glow)", transform: "translateY(-2px)" } : {}}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

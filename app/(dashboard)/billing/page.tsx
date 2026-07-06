@@ -316,7 +316,7 @@ function BillingPage() {
                 <div className="flex justify-between mb-1.5">
                   <span className="text-xs text-muted-foreground">
                     {fmtTokens(effectiveUsed)} used of {fmtTokens(tokenTotal)} tokens
-                    {tokenExtra > 0 && <span className={`ml-1 ${extraHeadroom <= 0 ? "text-red-500" : "text-indigo-500"}`}>(+{fmtTokens(tokenExtra)} extra)</span>}
+                    {tokenExtra > 0 && <span className={`ml-1 ${extraHeadroom <= 0 ? "text-red-500" : "text-[var(--accent)]"}`}>(+{fmtTokens(tokenExtra)} extra)</span>}
                   </span>
                   <span className={`text-xs font-semibold ${tokenWarn ? "text-red-600" : "text-foreground"}`}>
                     {tokenPct.toFixed(0)}%
@@ -375,7 +375,7 @@ function BillingPage() {
                 <div className="flex justify-between mb-1.5">
                   <span className="text-xs text-muted-foreground">
                     {formatBytes(storageUsed)} used of {formatBytes(storageTotal)}
-                    {storageExtra > 0 && <span className="ml-1 text-indigo-500">(+{formatBytes(storageExtra)} extra)</span>}
+                    {storageExtra > 0 && <span className="ml-1 text-[var(--accent)]">(+{formatBytes(storageExtra)} extra)</span>}
                   </span>
                   <span className={`text-xs font-semibold ${storageWarn ? "text-red-600" : "text-foreground"}`}>
                     {storagePct.toFixed(0)}%
@@ -426,8 +426,8 @@ function BillingPage() {
             return (
               <div
                 key={plan}
-                className={`rounded-2xl border p-5 flex flex-col gap-4 ${
-                  isCurrent ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-border bg-white"
+                className={`rounded-2xl p-5 flex flex-col gap-4 transition-all duration-base ${
+                  isCurrent ? "shadow-glow bg-[var(--accent)]/5" : "shadow-elevated-sm hover:shadow-elevated-md hover:-translate-y-0.5 bg-white"
                 }`}
               >
                 {isCurrent && (
@@ -479,7 +479,7 @@ function BillingPage() {
           { icon: Users,  title: `${seatsLimit >= 9999 ? "Unlimited" : seatsLimit} seats`, sub: "Team members included" },
           { icon: Zap,    title: "Scheduled audits", sub: currentPlan === "free" ? "Upgrade to enable" : "Weekly & monthly" },
         ].map(({ icon: Icon, title, sub }) => (
-          <div key={title} className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
+          <div key={title} className="rounded-xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base bg-white p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
               <Icon size={16} className="text-muted-foreground" />
             </div>

@@ -52,9 +52,9 @@ export default function WhiteLabelPage() {
   const [faviconUploading, setFaviconUploading] = useState(false);
   const [brandName, setBrandName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [accentColor, setAccentColor] = useState("#6366f1");
+  const [accentColor, setAccentColor] = useState("#1f5fb8");
   const [showPicker, setShowPicker] = useState(false);
-  const [hexInput, setHexInput] = useState("#6366f1");
+  const [hexInput, setHexInput] = useState("#1f5fb8");
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -347,7 +347,7 @@ export default function WhiteLabelPage() {
               <Input
                 value={hexInput}
                 onChange={(e) => handleHexInput(e.target.value)}
-                placeholder="#6366f1"
+                placeholder="#1f5fb8"
                 className="w-32 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">

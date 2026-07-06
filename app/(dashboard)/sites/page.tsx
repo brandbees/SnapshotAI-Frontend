@@ -300,7 +300,7 @@ export default function SitesPage() {
       {/* Bulk action feedback */}
       {bulkMsg && (
         <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium ${
-          bulkMsg.includes("failed") ? "bg-red-50 border-red-200 text-red-700" : "bg-indigo-50 border-indigo-200 text-indigo-700"
+          bulkMsg.includes("failed") ? "bg-red-50 border-red-200 text-red-700" : "bg-[var(--accent-light)] border-[var(--accent)]/20 text-[var(--accent-hover)]"
         }`}>
           <RefreshCw size={14} className="shrink-0" />
           {bulkMsg}

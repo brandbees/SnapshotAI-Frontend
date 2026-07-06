@@ -33,7 +33,20 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: `
             try {
               var b = JSON.parse(localStorage.getItem('bb_branding') || 'null');
-              if (b && b.accent_color) document.documentElement.style.setProperty('--accent', b.accent_color);
+              if (b && b.accent_color) {
+                var hex = b.accent_color;
+                var root = document.documentElement.style;
+                root.setProperty('--accent', hex);
+                root.setProperty('--accent-hover', 'color-mix(in srgb, ' + hex + ' 82%, black)');
+                root.setProperty('--accent-light', 'color-mix(in srgb, ' + hex + ' 12%, white)');
+                root.setProperty('--accent-deep', 'color-mix(in srgb, ' + hex + ' 55%, black)');
+                root.setProperty('--gradient-brand', 'linear-gradient(135deg, color-mix(in srgb, ' + hex + ' 85%, white) 0%, ' + hex + ' 45%, color-mix(in srgb, ' + hex + ' 55%, black) 100%)');
+                var m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+                if (m) {
+                  var n = parseInt(m[1], 16);
+                  root.setProperty('--accent-rgb', ((n>>16)&255) + ', ' + ((n>>8)&255) + ', ' + (n&255));
+                }
+              }
             } catch(e) {}
           `}}
         />

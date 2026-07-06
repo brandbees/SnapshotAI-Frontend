@@ -61,7 +61,7 @@ function pillarIcon(pillar: string, cls: string, size = 16) {
 }
 
 function mainIcon(item: NotifItem, cls: string) {
-  if (item.notification_type === "announcement") return <Megaphone size={16} className={`text-indigo-500 ${cls}`} />;
+  if (item.notification_type === "announcement") return <Megaphone size={16} className={`text-[var(--accent)] ${cls}`} />;
   if (item.action === "audit_failed")            return <AlertTriangle size={16} className={`text-amber-500 ${cls}`} />;
   const breaches = item.details?.breaches ?? [];
   const firstPillar = breaches[0]?.pillar ?? "";
@@ -181,7 +181,7 @@ export default function NotificationsPage() {
             onClick={() => switchTab(t.key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.key
-                ? "border-indigo-500 text-indigo-600"
+                ? "border-[var(--accent)] text-[var(--accent)]"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
             }`}
           >
@@ -191,10 +191,10 @@ export default function NotificationsPage() {
       </div>
 
       {/* ── List ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm overflow-hidden hover:shadow-elevated-md hover:-translate-y-0.5 transition-all duration-base">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
@@ -285,7 +285,7 @@ export default function NotificationsPage() {
                       <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md ${
                         isAlert
                           ? "bg-red-50 text-red-600 border border-red-100"
-                          : "bg-indigo-50 text-indigo-600 border border-indigo-100"
+                          : "bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent)]/20"
                       }`}>
                         {isAlert ? "Alert" : "Announcement"}
                       </span>

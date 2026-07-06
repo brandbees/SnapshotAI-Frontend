@@ -20,10 +20,10 @@ interface ActivityLog {
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   site_added:        { label: "Site Added",        color: "bg-green-100 text-green-700"  },
   site_deleted:      { label: "Site Deleted",      color: "bg-red-100 text-red-700"      },
-  bulk_run_audit:    { label: "Bulk Audit",         color: "bg-indigo-100 text-indigo-700"},
+  bulk_run_audit:    { label: "Bulk Audit",         color: "bg-[var(--accent-light)] text-[var(--accent-hover)]"},
   bulk_trigger_scan: { label: "Bulk Scan",          color: "bg-purple-100 text-purple-700"},
   bulk_send_report:  { label: "Bulk Report",        color: "bg-blue-100 text-blue-700"   },
-  audit_triggered:   { label: "Audit Triggered",   color: "bg-indigo-100 text-indigo-700"},
+  audit_triggered:   { label: "Audit Triggered",   color: "bg-[var(--accent-light)] text-[var(--accent-hover)]"},
   report_sent:       { label: "Report Sent",        color: "bg-blue-100 text-blue-700"   },
   plugin_connected:  { label: "Plugin Connected",   color: "bg-green-100 text-green-700" },
 };
@@ -89,7 +89,7 @@ export default function ActivityPage() {
       </div>
 
       {/* Log table */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
             <LoadingSpinner size="lg" />

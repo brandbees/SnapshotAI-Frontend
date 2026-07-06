@@ -172,7 +172,7 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 export default function SecurityPage() {
   const { sites, loading, error } = useSites();
   const { agency } = useAuth();
-  const brandColor = agency?.accent_color ?? "#6366f1";
+  const brandColor = agency?.accent_color ?? "#1f5fb8";
 
   const [filter, setFilter]   = useState<FilterTab>("all");
   const [sortBy, setSortBy]   = useState<SortKey>("security");
@@ -263,7 +263,7 @@ export default function SecurityPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) return <div className="flex justify-center py-24"><LoadingSpinner size="lg" /></div>;
-  if (error)   return <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>;
+  if (error)   return <div className="bg-red-50 shadow-status-red rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>;
   if (sites.length === 0) return <EmptyState icon={<Shield size={22} />} title="No sites yet" description="Add your first site to start monitoring security signals." />;
 
   return (
@@ -357,7 +357,7 @@ export default function SecurityPage() {
       })()}
 
       {/* ── Security Grade Hero ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
 
           {/* Grade letter */}
@@ -397,7 +397,7 @@ export default function SecurityPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Security Score Landscape — Area Chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="mb-4">
             <h3 className="text-sm font-semibold text-foreground">Security Score Landscape</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -463,7 +463,7 @@ export default function SecurityPage() {
         </div>
 
         {/* Risk Distribution Donut */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5 flex flex-col">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Risk Distribution</h3>
           <p className="text-xs text-muted-foreground mb-4">Sites by security posture</p>
 
@@ -523,7 +523,7 @@ export default function SecurityPage() {
       </div>
 
       {/* ── Vulnerability Exposure Cards ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
         <div className="flex items-start justify-between mb-5">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Vulnerability Exposure</h3>
@@ -545,7 +545,7 @@ export default function SecurityPage() {
             const displayColor = safe ? "#16a34a" : item.color;
             return (
               <div key={item.label}
-                className="rounded-xl border border-border p-4 transition-all hover:shadow-sm"
+                className="rounded-xl p-4 shadow-elevated-xs hover:shadow-elevated-sm transition-all duration-base"
                 style={{ background: safe ? "#f0fdf4" : `${item.color}06` }}>
                 <div className="flex items-start gap-2.5 mb-4">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -577,7 +577,7 @@ export default function SecurityPage() {
       </div>
 
       {/* ── Security Signals Matrix ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Security Signals Matrix</h3>
@@ -734,7 +734,7 @@ export default function SecurityPage() {
       </div>
 
       {/* ── Sites Table ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-14 text-center text-sm text-muted-foreground">No sites match your filter.</div>
         ) : (

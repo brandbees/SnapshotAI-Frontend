@@ -16,6 +16,7 @@ import { HexColorPicker } from "react-colorful";
 import { useBranding } from "@/contexts/BrandingContext";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { IconChip } from "@/components/ui/IconChip";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,10 +68,10 @@ const ROLE_OPTIONS: { value: Exclude<TeamRole, "owner">; label: string }[] = [
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   site_added:        { label: "Site Added",       color: "bg-green-100 text-green-700"   },
   site_deleted:      { label: "Site Deleted",     color: "bg-red-100 text-red-700"       },
-  bulk_run_audit:    { label: "Bulk Audit",        color: "bg-indigo-100 text-indigo-700" },
+  bulk_run_audit:    { label: "Bulk Audit",        color: "bg-[var(--accent-light)] text-[var(--accent-hover)]" },
   bulk_trigger_scan: { label: "Bulk Scan",         color: "bg-purple-100 text-purple-700" },
   bulk_send_report:  { label: "Bulk Report",       color: "bg-blue-100 text-blue-700"    },
-  audit_triggered:   { label: "Audit Triggered",  color: "bg-indigo-100 text-indigo-700" },
+  audit_triggered:   { label: "Audit Triggered",  color: "bg-[var(--accent-light)] text-[var(--accent-hover)]" },
   report_sent:       { label: "Report Sent",       color: "bg-blue-100 text-blue-700"    },
   plugin_connected:  { label: "Plugin Connected",  color: "bg-green-100 text-green-700"  },
 };
@@ -185,9 +186,9 @@ function GeneralTab() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Agency info */}
-      <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-4">
+      <div className="rounded-xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base bg-muted/20 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">{isOwner ? "Agency Information" : "Your Profile"}</h3>
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">{isOwner ? "Agency Name" : "Your Name"}</label>
@@ -203,8 +204,10 @@ function GeneralTab() {
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">Current Plan</label>
           <div className="px-3 py-2.5 rounded-lg border border-border bg-muted/30 text-sm text-muted-foreground capitalize flex items-center justify-between">
             <span>{agency?.plan ?? "free"}</span>
-            <button onClick={() => (document.querySelector('[data-tab="billing"]') as HTMLButtonElement)?.click()}
-              className="text-xs font-medium text-accent hover:underline">Upgrade</button>
+            {agency?.plan !== "agency_plus" && (
+              <button onClick={() => (document.querySelector('[data-tab="billing"]') as HTMLButtonElement)?.click()}
+                className="text-xs font-medium text-accent hover:underline">Upgrade</button>
+            )}
           </div>
         </div>
         <Button onClick={saveProfile} loading={profileSaving} disabled={!name.trim() || name.trim() === displayName} className="w-full">
@@ -213,7 +216,7 @@ function GeneralTab() {
       </div>
 
       {/* Change password */}
-      <div className="rounded-xl border border-border bg-muted/20 p-5 space-y-4">
+      <div className="rounded-xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base bg-muted/20 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Lock size={14} className="text-muted-foreground" /> Change Password
         </h3>
@@ -304,9 +307,9 @@ function BrandingTab() {
   const [faviconUploading, setFaviconUploading] = useState(false);
   const [brandName, setBrandName]           = useState(agency?.brand_name ?? "");
   const [tagline, setTagline]               = useState(agency?.brand_tagline ?? "");
-  const [accentColor, setAccentColor]       = useState(agency?.accent_color ?? "#6366f1");
+  const [accentColor, setAccentColor]       = useState(agency?.accent_color ?? "#1f5fb8");
   const [showPicker, setShowPicker]         = useState(false);
-  const [hexInput, setHexInput]             = useState(agency?.accent_color ?? "#6366f1");
+  const [hexInput, setHexInput]             = useState(agency?.accent_color ?? "#1f5fb8");
   const [logoUploading, setLogoUploading]   = useState(false);
   const [logoDragging, setLogoDragging]     = useState(false);
   const [saving, setSaving]                 = useState(false);
@@ -485,7 +488,7 @@ function BrandingTab() {
             </div>
             <Input value={hexInput}
               onChange={(e) => { setHexInput(e.target.value); if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) setAccentColor(e.target.value); }}
-              placeholder="#6366f1" className="w-32 font-mono text-sm" />
+              placeholder="#1f5fb8" className="w-32 font-mono text-sm" />
             <p className="text-xs text-muted-foreground flex-1">Applied to report headers, score gauges, and portal accent elements.</p>
           </div>
         </div>
@@ -584,7 +587,7 @@ function NotificationsTab() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Site selector */}
         <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
@@ -678,7 +681,7 @@ function ActivityTab() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-muted-foreground">All significant actions across your agency account</p>
         <button onClick={() => fetchLogs(page * PAGE_SIZE)}
@@ -844,7 +847,7 @@ function TeamTab() {
   }
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="w-full space-y-4">
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -1001,18 +1004,18 @@ function IntegrationsTab() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Plugin download */}
         <div className="rounded-xl border border-border bg-muted/20 p-5 flex flex-col gap-5">
           <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-              <Package size={18} className="text-indigo-600" />
-            </div>
+            <IconChip size="lg" tone="info">
+              <Package size={18} />
+            </IconChip>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm font-semibold text-foreground">BrandBees Snapshot Plugin</p>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">WordPress</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent)]">WordPress</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 Install on each WordPress site you want to monitor. Enables full data collection and dashboard connectivity.
@@ -1627,14 +1630,14 @@ function SettingsPageInner() {
     router.replace(`/settings?tab=${id}`, { scroll: false });
   }
 
-  const accentColor = agency?.accent_color ?? "#6366f1";
+  const accentColor = agency?.accent_color ?? "#1f5fb8";
   const displayName = agency?.member_name ?? agency?.name ?? "";
   const roleColors  = ROLE_COLOR[role ?? "analyst"] ?? ROLE_COLOR.analyst;
 
   return (
     <div className="space-y-5">
       {/* Profile hero */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         <div className="h-14 w-full" style={{ background: `linear-gradient(135deg, ${accentColor}28 0%, ${accentColor}08 100%)` }} />
         <div className="px-6 pb-5">
           <div className="flex items-end gap-4 -mt-7 mb-3">
@@ -1654,7 +1657,7 @@ function SettingsPageInner() {
       </div>
 
       {/* Tabbed panel */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base">
         {/* Tab bar */}
         <div className="flex items-center gap-1 p-1.5 border-b border-border overflow-x-auto">
           {visibleTabs.map(({ id, label, icon: Icon }) => (

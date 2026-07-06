@@ -15,7 +15,7 @@ const PILLARS = [
   { key: "malware"     as const, label: "Mal",   color: "#8b5cf6", Icon: Bug       },
 ];
 
-const AVATAR_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
+const AVATAR_COLORS = ["#1f5fb8","#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4"];
 function avatarColor(id: string) { return AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length]; }
 
 function ScorePill({ score }: { score: number | undefined }) {
@@ -44,7 +44,7 @@ function ReportSiteCard({ site }: { site: Site }) {
   return (
     <button
       onClick={() => router.push(`/reports/${site.id}`)}
-      className="w-full text-left bg-white rounded-2xl border border-border shadow-sm hover:shadow-md hover:border-accent/30 transition-all group flex flex-col"
+      className="w-full text-left bg-white rounded-2xl shadow-elevated-sm hover:shadow-glow hover:-translate-y-1 transition-all duration-base group flex flex-col"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 pb-3">

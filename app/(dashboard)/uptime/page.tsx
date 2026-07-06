@@ -84,16 +84,16 @@ function SiteUptimeCard({ site }: { site: Site }) {
   const rColor     = responseColor(response);
   const initials   = site.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
-  const cardBorder = isDown    ? "border-red-200"
-                   : isUp      ? "border-green-100"
-                   : "border-border";
+  const cardShadow = isDown    ? "shadow-status-red hover:shadow-status-red"
+                   : isUp      ? "shadow-status-green hover:shadow-status-green"
+                   : "shadow-status-gray hover:shadow-elevated-md";
   const cardBg     = isDown    ? "bg-red-50/50"
                    : isUp      ? "bg-white"
                    : "bg-muted/20";
 
   return (
     <Link href={`/sites/${site.id}`}>
-      <div className={`rounded-2xl border-2 ${cardBorder} ${cardBg} p-4 transition-all hover:shadow-md hover:-translate-y-0.5 group`}>
+      <div className={`rounded-2xl ${cardShadow} ${cardBg} p-4 transition-all duration-base hover:-translate-y-0.5 group`}>
         {/* Header row */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2 min-w-0">
@@ -191,7 +191,7 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 export default function UptimePage() {
   const { sites, loading, error } = useSites();
   const { agency } = useAuth();
-  const brandColor = agency?.accent_color ?? "#6366f1";
+  const brandColor = agency?.accent_color ?? "#1f5fb8";
 
   const [filter, setFilter]   = useState<FilterTab>("all");
   const [sortBy, setSortBy]   = useState<SortKey>("uptime");
@@ -279,7 +279,7 @@ export default function UptimePage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) return <div className="flex justify-center py-24"><LoadingSpinner size="lg" /></div>;
-  if (error)   return <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>;
+  if (error)   return <div className="bg-red-50 shadow-status-red rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>;
   if (sites.length === 0) return <EmptyState icon={<Activity size={22} />} title="No sites yet" description="Add your first site to start monitoring uptime." />;
 
   return (
@@ -302,7 +302,7 @@ export default function UptimePage() {
 
       {/* ── System Status Banner ── */}
       {downSites.length > 0 ? (
-        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5">
+        <div className="bg-red-50 shadow-status-red rounded-2xl p-5">
           <div className="flex items-start gap-3 mb-4">
             <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
               <WifiOff size={17} className="text-red-600" />
@@ -325,7 +325,7 @@ export default function UptimePage() {
           </div>
         </div>
       ) : (
-        <div className="bg-green-50 border-2 border-green-200 rounded-2xl px-5 py-4 flex items-center gap-3">
+        <div className="bg-green-50 shadow-status-green rounded-2xl px-5 py-4 flex items-center gap-3">
           <span className="relative flex h-3 w-3 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
@@ -352,7 +352,7 @@ export default function UptimePage() {
       {/* ── 3 Summary Stats ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Sites Online */}
-        <div className="bg-white rounded-2xl border-2 border-green-100 shadow-sm p-5 flex items-center gap-4">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
             <Wifi size={22} className="text-green-500" />
           </div>
@@ -366,8 +366,7 @@ export default function UptimePage() {
         </div>
 
         {/* Sites Down */}
-        <div className={`bg-white rounded-2xl border-2 shadow-sm p-5 flex items-center gap-4 ${
-          downSites.length > 0 ? "border-red-200" : "border-border"}`}>
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5 flex items-center gap-4">
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
             downSites.length > 0 ? "bg-red-50" : "bg-gray-50"}`}>
             <WifiOff size={22} className={downSites.length > 0 ? "text-red-500" : "text-muted-foreground/40"} />
@@ -384,7 +383,7 @@ export default function UptimePage() {
         </div>
 
         {/* Avg Response Time */}
-        <div className="bg-white rounded-2xl border-2 border-border shadow-sm p-5 flex items-center gap-4">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: `${responseColor(avgResponse)}15` }}>
             <Activity size={22} style={{ color: responseColor(avgResponse) }} />
@@ -403,7 +402,7 @@ export default function UptimePage() {
       </div>
 
       {/* ── Site Uptime Board ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
         <div className="flex items-start justify-between mb-5">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Live Site Status</h3>
@@ -424,7 +423,7 @@ export default function UptimePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Response Time Bar Chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-sm p-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Response Time Comparison</h3>
@@ -487,7 +486,7 @@ export default function UptimePage() {
         </div>
 
         {/* Uptime Distribution */}
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-5 flex flex-col">
+        <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base p-5 flex flex-col">
           <h3 className="text-sm font-semibold text-foreground mb-0.5">Status Distribution</h3>
           <p className="text-xs text-muted-foreground mb-4">Sites by current availability</p>
 
@@ -591,7 +590,7 @@ export default function UptimePage() {
       </div>
 
       {/* ── Sites Table ── */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-elevated-sm hover:shadow-elevated-md transition-shadow duration-base overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-14 text-center text-sm text-muted-foreground">No sites match your filter.</div>
         ) : (

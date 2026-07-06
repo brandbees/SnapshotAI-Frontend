@@ -11,6 +11,7 @@ import api from "@/lib/api";
 import { mapSite, type RawSite } from "@/lib/mappers";
 import { useAuth } from "@/hooks/useAuth";
 import type { Site, AgentMessage } from "@/types";
+import { IconChip } from "@/components/ui/IconChip";
 
 const SUGGESTIONS_GLOBAL = [
   { q: "Which site has the lowest overall score?",    icon: "📉" },
@@ -49,7 +50,7 @@ interface ToolCall {
 }
 
 const TOOL_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  run_audit:                { label: "Audit triggered",           icon: Play,        color: "#6366f1" },
+  run_audit:                { label: "Audit triggered",           icon: Play,        color: "#1f5fb8" },
   send_report:              { label: "Report queued",             icon: FileText,    color: "#0ea5e9" },
   update_schedule:          { label: "Schedule updated",          icon: Calendar,    color: "#10b981" },
   list_sites:               { label: "Sites fetched",             icon: List,        color: "#8b5cf6" },
@@ -562,7 +563,7 @@ function renderAgentText(text: string): React.ReactNode {
 // Consolidated tool call pills — deduplicates repeated calls (e.g. "Live data fetched ×3")
 function ToolCallsSummary({ calls }: { calls: ToolCall[] }) {
   const grouped = calls.reduce<{ name: string; count: number; meta: typeof TOOL_META[string]; hasError: boolean }[]>((acc, tc) => {
-    const meta = TOOL_META[tc.name] ?? { label: tc.name, icon: Zap, color: "#6366f1" };
+    const meta = TOOL_META[tc.name] ?? { label: tc.name, icon: Zap, color: "#1f5fb8" };
     const existing = acc.find(g => g.name === tc.name);
     const hasError = typeof tc.result?.error === "string";
     if (existing) { existing.count++; if (hasError) existing.hasError = true; }
@@ -619,6 +620,114 @@ function TokenBar({ state }: { state: TokenState }) {
         <span className={extraHeadroom <= 0 ? "text-red-500 font-medium" : "text-green-600 font-medium"}>
           +{fmt(state.tokens_extra)} extra
         </span>
+      )}
+    </div>
+  );
+}
+
+// ── Site selector dropdown — custom-styled (native <select> options can't be styled) ──
+
+const SITE_AVATAR_COLORS = ["#1f5fb8", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+function siteAvatarColor(id: string): string {
+  return SITE_AVATAR_COLORS[id.charCodeAt(0) % SITE_AVATAR_COLORS.length];
+}
+
+function SiteSelectorDropdown({ sites, selectedSiteId, onChange }: {
+  sites: Site[]; selectedSiteId: string; onChange: (id: string) => void;
+}) {
+  const [open, setOpen]     = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  const selected = sites.find(s => s.id === selectedSiteId);
+  const filtered = search.trim()
+    ? sites.filter(s => (s.name || s.url).toLowerCase().includes(search.trim().toLowerCase()))
+    : sites;
+
+  function pick(id: string) {
+    onChange(id);
+    setOpen(false);
+    setSearch("");
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 pl-2.5 pr-2 sm:pr-2.5 py-1.5 text-xs font-medium rounded-lg bg-white shadow-elevated-xs hover:shadow-elevated-sm transition-all duration-base text-foreground w-[130px] sm:min-w-[160px]"
+      >
+        {selected ? (
+          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+            style={{ background: siteAvatarColor(selected.id) }}>
+            {(selected.name || selected.url).charAt(0).toUpperCase()}
+          </span>
+        ) : (
+          <Globe size={13} className="text-muted-foreground shrink-0" />
+        )}
+        <span className="flex-1 truncate text-left">{selected ? (selected.name || selected.url) : "All sites"}</span>
+        <ChevronDown size={11} className={`text-muted-foreground shrink-0 transition-transform duration-fast ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-elevated-lg overflow-hidden z-30">
+          {sites.length > 6 && (
+            <div className="p-2 border-b border-border/60">
+              <input
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search sites…"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-muted/50 outline-none focus:bg-white focus:shadow-elevated-xs transition-all duration-fast"
+              />
+            </div>
+          )}
+          <div className="max-h-72 overflow-y-auto py-1">
+            <button
+              onClick={() => pick("")}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors ${
+                !selectedSiteId ? "bg-[var(--accent-light)] text-[var(--accent-hover)] font-semibold" : "text-foreground hover:bg-muted/60"
+              }`}
+            >
+              <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Globe size={12} className="text-muted-foreground" />
+              </span>
+              All sites
+              {!selectedSiteId && <Check size={13} className="ml-auto text-[var(--accent)]" />}
+            </button>
+            {filtered.map(s => {
+              const isSelected = s.id === selectedSiteId;
+              const label = s.name || s.url;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => pick(s.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors ${
+                    isSelected ? "bg-[var(--accent-light)] text-[var(--accent-hover)] font-semibold" : "text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                    style={{ background: siteAvatarColor(s.id) }}>
+                    {label.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="flex-1 min-w-0 truncate">{label}</span>
+                  {isSelected && <Check size={13} className="shrink-0 text-[var(--accent)]" />}
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="px-3 py-4 text-xs text-muted-foreground text-center">No sites match &quot;{search}&quot;</p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1083,10 +1192,9 @@ function AgentInner() {
       {/* ── Top bar ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 py-3.5 bg-white border-b border-border shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-            style={{ background: "linear-gradient(135deg, #c8a96e 0%, #a07840 100%)" }}>
-            <Sparkles size={15} className="text-white" />
-          </div>
+          <IconChip size="sm">
+            <Sparkles size={15} />
+          </IconChip>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold text-foreground leading-none">AI Assistant</h1>
             <p className="text-[11px] text-muted-foreground mt-0.5 hidden sm:block">Powered by real audit &amp; scan data</p>
@@ -1119,21 +1227,7 @@ function AgentInner() {
               </button>
             </>
           )}
-          <div className="relative">
-            <Globe size={13} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <select
-              value={selectedSiteId}
-              onChange={e => handleSiteChange(e.target.value)}
-              className="pl-7 sm:pl-8 pr-6 sm:pr-7 py-1.5 text-xs border border-border rounded-lg bg-white appearance-none text-foreground w-[120px] sm:min-w-[150px]"
-              style={{ outline: "none" }}
-            >
-              <option value="">All sites</option>
-              {sites.map(s => (
-                <option key={s.id} value={s.id}>{s.name || s.url}</option>
-              ))}
-            </select>
-            <ChevronDown size={11} className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
+          <SiteSelectorDropdown sites={sites} selectedSiteId={selectedSiteId} onChange={handleSiteChange} />
         </div>
       </div>
 
@@ -1158,7 +1252,7 @@ function AgentInner() {
                 ? "AI Assistant is available on upgraded plans. Get plain-English explanations of your audit results, find out exactly what to fix, and take action — no technical knowledge needed."
                 : "AI Assistant is available on upgraded plans. Ask questions about your sites, get audit insights, run audits, send reports, and more — all in plain English."}
             </p>
-            <div className="bg-white border border-border rounded-2xl p-5 mb-6 text-left space-y-3">
+            <div className="bg-white rounded-2xl shadow-elevated-sm p-5 mb-6 text-left space-y-3">
               {(isIndividual ? [
                 "\"What's wrong with my site right now?\"",
                 "\"Is my WordPress version up to date?\"",
@@ -1195,11 +1289,11 @@ function AgentInner() {
       {/* ── Messages ─────────────────────────────────────────────────────────── */}
       {!isFreePlan && (
         <div className="flex-1 overflow-y-auto min-h-0 relative"
-          style={{ background: "radial-gradient(ellipse 100% 55% at 50% 0%, #f5e9d0 0%, #f7f4ef 45%, #f5f3f0 100%)" }}>
+          style={{ background: "radial-gradient(ellipse 100% 55% at 50% 0%, var(--accent-light) 0%, #f7f9fc 45%, var(--background) 100%)" }}>
 
           {/* Subtle top glow */}
           <div className="absolute inset-x-0 top-0 h-32 pointer-events-none"
-            style={{ background: "linear-gradient(to bottom, rgba(200,169,110,0.08), transparent)" }} />
+            style={{ background: "linear-gradient(to bottom, rgb(var(--accent-rgb) / 0.08), transparent)" }} />
 
           <div className="relative max-w-3xl mx-auto px-6 py-10">
 
@@ -1209,23 +1303,23 @@ function AgentInner() {
                 <div className="relative mb-8 mt-4">
                   {/* Outer glow rings */}
                   <div className="absolute inset-0 rounded-full scale-[2.2] opacity-[0.12]"
-                    style={{ background: "radial-gradient(circle, #c8a96e, transparent 70%)" }} />
+                    style={{ background: "radial-gradient(circle, var(--accent), transparent 70%)" }} />
                   <div className="absolute inset-0 rounded-full scale-[1.6] opacity-[0.18]"
-                    style={{ background: "radial-gradient(circle, #c8a96e, transparent 70%)" }} />
-                  <div className="w-24 h-24 rounded-3xl flex items-center justify-center relative shadow-2xl"
-                    style={{ background: "linear-gradient(145deg, #d4b278 0%, #a07840 50%, #7a5a28 100%)", boxShadow: "0 20px 60px rgba(160,120,64,0.4), 0 4px 16px rgba(0,0,0,0.15)" }}>
+                    style={{ background: "radial-gradient(circle, var(--accent), transparent 70%)" }} />
+                  <div className="w-24 h-24 rounded-3xl flex items-center justify-center relative shadow-2xl bg-gradient-brand"
+                    style={{ boxShadow: "0 20px 60px rgb(var(--accent-rgb) / 0.4), 0 4px 16px rgba(0,0,0,0.15)" }}>
                     <Sparkles size={38} className="text-white drop-shadow-sm" />
                   </div>
                   <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center shadow-md"
-                    style={{ background: "var(--accent)" }}>
+                    style={{ background: "var(--accent-deep)" }}>
                     <Zap size={12} className="text-white" />
                   </div>
                 </div>
 
-                <h2 className="text-2xl font-bold tracking-tight mb-2" style={{ color: "#1a1209" }}>
+                <h2 className="text-2xl font-bold tracking-tight mb-2 text-foreground">
                   {selectedSite ? `Let's look at ${selectedSite.name || selectedSite.url}` : "How can I help today?"}
                 </h2>
-                <p className="text-sm leading-relaxed mb-10 max-w-xs" style={{ color: "#8a7560" }}>
+                <p className="text-sm leading-relaxed mb-10 max-w-xs text-muted-foreground">
                   Live access to your audit scores, security signals, malware scans, and plugin data.
                 </p>
 
@@ -1238,23 +1332,23 @@ function AgentInner() {
                       className="group flex items-start gap-3 text-left px-4 py-4 rounded-2xl text-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                       style={{
                         background: "rgba(255,255,255,0.75)",
-                        border: "1px solid rgba(200,169,110,0.25)",
+                        border: "1px solid rgb(var(--accent-rgb) / 0.18)",
                         backdropFilter: "blur(8px)",
-                        boxShadow: "0 2px 8px rgba(160,120,64,0.08), 0 1px 2px rgba(0,0,0,0.04)",
-                        color: "#2d1f0e",
+                        boxShadow: "0 2px 8px rgb(var(--accent-rgb) / 0.08), 0 1px 2px rgba(0,0,0,0.04)",
+                        color: "var(--foreground)",
                         cursor: "pointer",
                       }}
                       onMouseEnter={e => {
                         const el = e.currentTarget as HTMLButtonElement;
                         el.style.background = "rgba(255,255,255,0.95)";
-                        el.style.borderColor = "rgba(160,120,64,0.5)";
-                        el.style.boxShadow = "0 8px 24px rgba(160,120,64,0.15), 0 2px 6px rgba(0,0,0,0.06)";
+                        el.style.borderColor = "rgb(var(--accent-rgb) / 0.45)";
+                        el.style.boxShadow = "0 8px 24px rgb(var(--accent-rgb) / 0.15), 0 2px 6px rgba(0,0,0,0.06)";
                       }}
                       onMouseLeave={e => {
                         const el = e.currentTarget as HTMLButtonElement;
                         el.style.background = "rgba(255,255,255,0.75)";
-                        el.style.borderColor = "rgba(200,169,110,0.25)";
-                        el.style.boxShadow = "0 2px 8px rgba(160,120,64,0.08), 0 1px 2px rgba(0,0,0,0.04)";
+                        el.style.borderColor = "rgb(var(--accent-rgb) / 0.18)";
+                        el.style.boxShadow = "0 2px 8px rgb(var(--accent-rgb) / 0.08), 0 1px 2px rgba(0,0,0,0.04)";
                       }}
                     >
                       <span className="text-lg leading-none shrink-0 mt-0.5">{icon}</span>
@@ -1263,7 +1357,7 @@ function AgentInner() {
                   ))}
                 </div>
 
-                <p className="text-[11px] mt-10 tracking-wide" style={{ color: "#b8a590" }}>
+                <p className="text-[11px] mt-10 tracking-wide text-muted-foreground">
                   SNAPSHOT AI · Actions require your confirmation
                 </p>
               </div>
@@ -1272,11 +1366,8 @@ function AgentInner() {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     {msg.role === "assistant" && (
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1"
-                        style={{
-                          background: "linear-gradient(145deg, #d4b278 0%, #8a6030 100%)",
-                          boxShadow: "0 2px 8px rgba(160,120,64,0.4)",
-                        }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1 bg-gradient-brand"
+                        style={{ boxShadow: "0 2px 8px rgb(var(--accent-rgb) / 0.4)" }}>
                         <Sparkles size={13} className="text-white" />
                       </div>
                     )}
@@ -1327,11 +1418,8 @@ function AgentInner() {
 
                 {loading && (
                   <div className="flex gap-3 justify-start">
-                    <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
-                      style={{
-                        background: "linear-gradient(145deg, #d4b278 0%, #a07840 100%)",
-                        boxShadow: "0 4px 12px rgba(160,120,64,0.35)",
-                      }}>
+                    <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 bg-gradient-brand"
+                      style={{ boxShadow: "0 4px 12px rgb(var(--accent-rgb) / 0.35)" }}>
                       <Sparkles size={14} className="text-white" />
                     </div>
                     <div className="flex items-center gap-1.5 px-4 py-3.5"
@@ -1344,7 +1432,7 @@ function AgentInner() {
                       }}>
                       {[0, 160, 320].map(delay => (
                         <span key={delay} className="w-2 h-2 rounded-full animate-bounce"
-                          style={{ background: "#b89050", opacity: 0.7, animationDelay: `${delay}ms`, animationDuration: "1.1s" }} />
+                          style={{ background: "var(--accent)", opacity: 0.7, animationDelay: `${delay}ms`, animationDuration: "1.1s" }} />
                       ))}
                     </div>
                   </div>
@@ -1435,14 +1523,14 @@ function AgentInner() {
       {!isFreePlan && (
         <div className="shrink-0 px-4 sm:px-6 pt-4"
           style={{
-            background: "linear-gradient(to top, #f0ece4 0%, #f5f3ef 100%)",
-            borderTop: "1px solid #e4ddd3",
+            background: "linear-gradient(to top, var(--background) 0%, #ffffff 100%)",
+            borderTop: "1px solid var(--border)",
             paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))",
           }}>
           <div className="max-w-3xl mx-auto">
             {/* Gradient-bordered input container */}
-            <div className="p-px rounded-2xl"
-              style={{ background: "linear-gradient(135deg, #c8a96e40, #e8e0d4 40%, #d4b27840)" }}>
+            <div className="p-px rounded-2xl shadow-elevated-md"
+              style={{ background: "linear-gradient(135deg, rgb(var(--accent-rgb) / 0.25), var(--border) 40%, rgb(var(--accent-rgb) / 0.15))" }}>
               <div className="flex gap-3 items-end rounded-2xl px-4 py-3"
                 style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}>
                 <textarea
@@ -1466,7 +1554,7 @@ function AgentInner() {
                   rows={1}
                   disabled={!canUseAgent}
                   className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground py-1 border-0 ring-0 disabled:cursor-not-allowed"
-                  style={{ outline: "none", boxShadow: "none", overflowY: "auto", color: "#1a1209", caretColor: "#a07840", minHeight: "28px", maxHeight: "140px" }}
+                  style={{ outline: "none", boxShadow: "none", overflowY: "auto", caretColor: "var(--accent)", minHeight: "28px", maxHeight: "140px" }}
                 />
                 <button
                   onClick={() => send(input)}
@@ -1476,10 +1564,10 @@ function AgentInner() {
                     width: 36, height: 36,
                     borderRadius: 12,
                     background: input.trim() && !loading && canUseAgent
-                      ? "linear-gradient(135deg, #c8a96e 0%, #8a6030 100%)"
+                      ? "var(--gradient-brand)"
                       : "var(--accent)",
                     opacity: (!input.trim() || loading || !canUseAgent) ? 0.35 : 1,
-                    boxShadow: input.trim() && canUseAgent ? "0 2px 8px rgba(160,120,64,0.4)" : "none",
+                    boxShadow: input.trim() && canUseAgent ? "0 2px 8px rgb(var(--accent-rgb) / 0.4)" : "none",
                     transition: "all 0.2s ease",
                   }}
                   aria-label="Send"
@@ -1490,7 +1578,7 @@ function AgentInner() {
                 </button>
               </div>
             </div>
-            <p className="text-[10px] text-center mt-2.5 tracking-wide" style={{ color: "#b8a88a" }}>
+            <p className="text-[10px] text-center mt-2.5 tracking-wide text-muted-foreground">
               ENTER TO SEND · SHIFT+ENTER FOR NEW LINE
             </p>
           </div>

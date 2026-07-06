@@ -1,4 +1,8 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { IconChip } from "@/components/ui/IconChip";
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -6,6 +10,8 @@ interface EmptyStateProps {
   description?: string;
   action?: React.ReactNode;
   className?: string;
+  /** Use the brand gradient chip instead of the flat neutral one — for primary empty states. */
+  tone?: "neutral" | "brand";
 }
 
 export function EmptyState({
@@ -14,18 +20,22 @@ export function EmptyState({
   description,
   action,
   className,
+  tone = "neutral",
 }: EmptyStateProps) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
         "flex flex-col items-center justify-center py-16 px-6 text-center",
         className
       )}
     >
       {icon && (
-        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
+        <IconChip tone={tone === "brand" ? "brand" : "neutral"} size="lg" className="mb-4">
           {icon}
-        </div>
+        </IconChip>
       )}
       <h3 className="text-sm font-semibold text-foreground mb-1">{title}</h3>
       {description && (
@@ -34,6 +44,6 @@ export function EmptyState({
         </p>
       )}
       {action}
-    </div>
+    </motion.div>
   );
 }

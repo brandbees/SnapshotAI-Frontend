@@ -40,7 +40,7 @@ interface ChartPoint {
 }
 
 const PILLARS = [
-  { key: "overall",  label: "Overall",     color: "#6366f1" },
+  { key: "overall",  label: "Overall",     color: "#1f5fb8" },
   { key: "perf",     label: "Performance", color: "#10b981" },
   { key: "seo",      label: "SEO",         color: "#ec4899" },
   { key: "security", label: "Security",    color: "#06b6d4" },
