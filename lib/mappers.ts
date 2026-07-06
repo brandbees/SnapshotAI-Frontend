@@ -170,8 +170,8 @@ function mapScores(raw: RawSite | RawAudit): PillarScores | undefined {
   const isClean     = siteRaw.is_clean;
   let malware: number;
   if (typeof threatScore === "number") {
-    // Use threat score directly — 0 = clean, 100 = threat
-    malware = threatScore;
+    // Convert threat score to health score: 0=threat, 100=clean
+    malware = Math.max(0, 100 - threatScore);
   } else if (isClean === true) {
     // No dedicated scan score but audit/scan says clean
     malware = 100;
