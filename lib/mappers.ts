@@ -105,6 +105,7 @@ export interface RawSite {
   is_clean?: boolean | null;
   threats?: unknown;
   overall_threat_score?: number | null;
+  malware_status?: string | null;
   plugin_vuln_count?: number | null;
 }
 
@@ -280,12 +281,11 @@ export function mapSite(raw: RawSite): Site {
     overall_score: raw.overall_score ?? undefined,
     overall_threat_score: raw.overall_threat_score ?? null,
     malware_status:
-      // is_clean is set by the scanner and updated by the dismiss endpoint:
-      //   true  = no active major threats (critical/high/medium all dismissed or absent)
-      //   false = at least one active major threat remains
-      // Check is_clean FIRST — a dismissed-all-majors site must show clean even if
-      // overall_threat_score > 0 due to remaining low-priority findings.
-      raw.is_clean === true
+      // Backend computes malware_status from the threats array, respecting per-threat
+      // dismissed flags (all majors dismissed → "clean"). Trust it when present.
+      raw.malware_status === "clean" || raw.malware_status === "threat"
+        ? raw.malware_status
+        : raw.is_clean === true
         ? "clean"
         : (raw.is_clean === false || (raw.overall_threat_score != null && raw.overall_threat_score > 0))
         ? "threat"
