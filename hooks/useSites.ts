@@ -58,7 +58,14 @@ export function useSites() {
   }, []);
 
   useEffect(() => {
-    fetch();
+    // Check if a refresh was needed while this component was unmounted
+    const needsRefresh = typeof window !== "undefined" && sessionStorage.getItem('needsDataRefresh') === 'true';
+    if (needsRefresh) {
+      sessionStorage.removeItem('needsDataRefresh');
+      fetch(true, false); // Force fresh fetch
+    } else {
+      fetch();
+    }
   }, [fetch]);
 
   useEffect(() => {

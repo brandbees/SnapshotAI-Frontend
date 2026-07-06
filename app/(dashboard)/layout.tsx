@@ -64,6 +64,18 @@ export default function DashboardLayout({
     });
   }, [router]);
 
+  // Global refresh listener — persists across route changes to catch bb:refresh events
+  useEffect(() => {
+    function handleRefresh() {
+      // Mark that data needs refreshing even if component is unmounted
+      sessionStorage.setItem('needsDataRefresh', 'true');
+      // Emit a persisting event that all pages can listen for
+      window.dispatchEvent(new CustomEvent('data-refresh-needed'));
+    }
+    window.addEventListener('bb:refresh', handleRefresh);
+    return () => window.removeEventListener('bb:refresh', handleRefresh);
+  }, []);
+
   // Auto-logout on inactivity or when returning to a tab with an expired token
   useEffect(() => {
     function doLogout() {
