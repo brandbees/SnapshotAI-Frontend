@@ -1085,7 +1085,7 @@ interface BillingEvent  {
   plan: string | null; tokens: number | null; bytes: number | null;
   amount_cents: number; currency: string; created_at: string; stripe_session_id: string | null;
 }
-interface TokenState { tokens_used: number; tokens_limit: number; tokens_extra: number; monthly_limit: number; }
+interface TokenState { tokens_used: number; tokens_limit: number; tokens_extra: number; monthly_limit: number; extra_remaining?: number; }
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -1409,24 +1409,38 @@ function BillingContent() {
             <Brain size={15} className="text-[var(--accent)]" />
             <p className="text-sm font-semibold text-foreground">AI Assistant Tokens</p>
           </div>
-          {tokenState && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Monthly usage</span>
-                <span className="font-medium text-foreground">
-                  {fmtTokens(tokenState.tokens_used)} / {fmtTokens(tokenState.tokens_limit)}
-                  {tokenState.tokens_extra > 0 && (
-                    <span className="ml-2 text-[var(--accent)] font-semibold">+{fmtTokens(tokenState.tokens_extra)} extra</span>
-                  )}
-                </span>
+          {tokenState && (() => {
+            // tokens_used is a monthly counter (resets each month) — it does NOT represent
+            // total lifetime consumption of purchased extra tokens. extra_remaining comes
+            // from the server and already accounts for all months of extra usage, so
+            // combining them gives the true picture. Must match TokenBar in agent/page.tsx
+            // exactly, otherwise this widget and the AI Agent panel show different numbers
+            // (most visible right after a top-up, when tokens_extra jumps but tokens_used doesn't).
+            const monthlyBase     = tokenState.monthly_limit ?? tokenState.tokens_limit;
+            const baseHeadroom    = Math.max(0, monthlyBase - tokenState.tokens_used);
+            const extraHeadroom   = Math.max(0, tokenState.extra_remaining ?? 0);
+            const actualRemaining = baseHeadroom + extraHeadroom;
+            const effectiveUsed   = Math.max(0, tokenState.tokens_limit - actualRemaining);
+
+            return (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Monthly usage</span>
+                  <span className="font-medium text-foreground">
+                    {fmtTokens(effectiveUsed)} / {fmtTokens(tokenState.tokens_limit)}
+                    {tokenState.tokens_extra > 0 && (
+                      <span className="ml-2 text-[var(--accent)] font-semibold">+{fmtTokens(tokenState.tokens_extra)} extra</span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-[var(--accent)] transition-all"
+                    style={{ width: `${Math.min(100, (effectiveUsed / Math.max(tokenState.tokens_limit, 1)) * 100)}%` }} />
+                </div>
+                <p className="text-[11px] text-muted-foreground">Extra tokens never expire and are used after your monthly allowance runs out.</p>
               </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full bg-[var(--accent)] transition-all"
-                  style={{ width: `${Math.min(100, (tokenState.tokens_used / Math.max(tokenState.tokens_limit, 1)) * 100)}%` }} />
-              </div>
-              <p className="text-[11px] text-muted-foreground">Extra tokens never expire and are used after your monthly allowance runs out.</p>
-            </div>
-          )}
+            );
+          })()}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {tokenPkgList.length > 0 ? tokenPkgList.map(({ key, tokens, price_cents, label }) => (
               <div key={key} className="rounded-xl border border-border bg-white p-4 flex flex-col gap-3">
