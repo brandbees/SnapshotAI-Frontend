@@ -106,6 +106,7 @@ export interface RawSite {
   threats?: unknown;
   overall_threat_score?: number | null;
   malware_status?: string | null;
+  major_threat_count?: number | null;
   plugin_vuln_count?: number | null;
 }
 
@@ -280,6 +281,7 @@ export function mapSite(raw: RawSite): Site {
     latest_scores: mapScores(raw),
     overall_score: raw.overall_score ?? undefined,
     overall_threat_score: raw.overall_threat_score ?? null,
+    major_threat_count: raw.major_threat_count ?? null,
     malware_status:
       // Backend computes malware_status from the threats array, respecting per-threat
       // dismissed flags (all majors dismissed → "clean"). Trust it when present.

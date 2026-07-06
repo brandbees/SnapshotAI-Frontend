@@ -63,6 +63,7 @@ export interface Site {
   overall_score?: number;
   malware_status?: "clean" | "threat";
   overall_threat_score?: number | null;
+  major_threat_count?: number | null;
   plugin_vuln_count?: number;
   plugin_data?: PluginData;
 
