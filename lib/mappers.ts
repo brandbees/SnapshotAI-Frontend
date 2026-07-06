@@ -278,6 +278,7 @@ export function mapSite(raw: RawSite): Site {
     created_at: raw.created_at,
     latest_scores: mapScores(raw),
     overall_score: raw.overall_score ?? undefined,
+    overall_threat_score: raw.overall_threat_score ?? null,
     malware_status:
       // is_clean is set by the scanner and updated by the dismiss endpoint:
       //   true  = no active major threats (critical/high/medium all dismissed or absent)
