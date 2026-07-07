@@ -28,6 +28,9 @@ import { LoadingPage } from "@/components/shared/LoadingSpinner";
 import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { Button } from "@/components/ui/Button";
 import { MalwareScanPanel } from "@/components/sites/MalwareScanPanel";
+import { SSHSettingsPanel } from "@/components/sites/SSHSettingsPanel";
+import { useSSHSettings } from "@/hooks/useSSHSettings";
+import { deleteSSHCredentials } from "@/lib/api/ssh";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
 import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth, PluginVulnerability, WooFatalError, WooGateway } from "@/types";
@@ -4432,6 +4435,8 @@ function SiteDetailContent() {
 
   const rawTab = searchParams.get("tab") as Tab | null;
   const [activeTab, setActiveTab] = useState<Tab>(rawTab ?? "overview");
+  const [showSSHModal, setShowSSHModal] = useState(false);
+  const { status: sshStatus, refreshStatus: refreshSSHStatus } = useSSHSettings(id);
 
   useEffect(() => {
     const connected = searchParams.get("connected");
@@ -4694,33 +4699,45 @@ function SiteDetailContent() {
         </div>
 
         {/* Token / plugin strip */}
-        <div className="px-6 pb-3 flex items-center gap-4 flex-wrap border-t border-gray-100 bg-gray-50/60 pt-2.5">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Key size={10} />
-            <span className="font-mono select-all">
-              {tokenVisible ? site.site_token : `${site.site_token.slice(0, 8)}••••••••`}
+        <div className="px-6 pb-3 flex items-center justify-between gap-4 flex-wrap border-t border-gray-100 bg-gray-50/60 pt-2.5">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Key size={10} />
+              <span className="font-mono select-all">
+                {tokenVisible ? site.site_token : `${site.site_token.slice(0, 8)}••••••••`}
+              </span>
+              <button onClick={() => setTokenVisible((v) => !v)} className="p-0.5 hover:text-foreground transition-colors">
+                {tokenVisible ? <EyeOff size={11} /> : <Eye size={11} />}
+              </button>
+              <button onClick={() => copyToken(site.site_token)} className="p-0.5 hover:text-foreground transition-colors">
+                {tokenCopied ? <CheckCircle2 size={11} style={{ color: "var(--score-good)" }} /> : <Copy size={11} />}
+              </button>
+            </div>
+            <span className={`flex items-center gap-1 text-xs font-medium ${site.plugin_connected ? "text-green-600" : "text-muted-foreground"}`}>
+              <Package size={10} />
+              {site.plugin_connected ? "Plugin connected" : "Plugin not connected"}
             </span>
-            <button onClick={() => setTokenVisible((v) => !v)} className="p-0.5 hover:text-foreground transition-colors">
-              {tokenVisible ? <EyeOff size={11} /> : <Eye size={11} />}
-            </button>
-            <button onClick={() => copyToken(site.site_token)} className="p-0.5 hover:text-foreground transition-colors">
-              {tokenCopied ? <CheckCircle2 size={11} style={{ color: "var(--score-good)" }} /> : <Copy size={11} />}
-            </button>
+            {site.uptime_percentage !== undefined && site.uptime_percentage !== null && (
+              <span className="text-xs text-muted-foreground">
+                Uptime: <span className="font-semibold text-foreground">{site.uptime_percentage.toFixed(1)}%</span>
+              </span>
+            )}
+            {site.scan_schedule && (
+              <span className="text-xs text-muted-foreground">
+                Schedule: <span className="font-semibold text-foreground capitalize">{site.scan_schedule}</span>
+              </span>
+            )}
           </div>
-          <span className={`flex items-center gap-1 text-xs font-medium ${site.plugin_connected ? "text-green-600" : "text-muted-foreground"}`}>
-            <Package size={10} />
-            {site.plugin_connected ? "Plugin connected" : "Plugin not connected"}
-          </span>
-          {site.uptime_percentage !== undefined && site.uptime_percentage !== null && (
-            <span className="text-xs text-muted-foreground">
-              Uptime: <span className="font-semibold text-foreground">{site.uptime_percentage.toFixed(1)}%</span>
-            </span>
-          )}
-          {site.scan_schedule && (
-            <span className="text-xs text-muted-foreground">
-              Schedule: <span className="font-semibold text-foreground capitalize">{site.scan_schedule}</span>
-            </span>
-          )}
+          <button
+            onClick={() => setShowSSHModal(true)}
+            className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all shrink-0 ${
+              sshStatus.saved
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300"
+                : "bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300"
+            }`}
+          >
+            {sshStatus.saved ? "✓ SSH Connected" : "SSH Access"}
+          </button>
         </div>
 
         {/* Audit running banner */}
@@ -4798,6 +4815,59 @@ function SiteDetailContent() {
         {activeTab === "health"      && <SiteHealthTab site={site} />}
         {activeTab === "backups"     && <BackupsTab site={site} brandColor={brandColor} canUseAdvancedFeatures={canUseAdvancedFeatures} />}
       </div>
+
+      {/* SSH Modal */}
+      {showSSHModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowSSHModal(false)}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900 rounded-t-2xl">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  SSH Access
+                </h2>
+                <button
+                  onClick={() => setShowSSHModal(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6">
+                <SSHSettingsPanel
+                  site={site}
+                  onCredentialsSaved={() => {
+                    refreshSSHStatus();
+                    toast.success("SSH credentials saved!");
+                  }}
+                />
+                {sshStatus.saved && (
+                  <div className="mt-4">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await deleteSSHCredentials(id);
+                          await refreshSSHStatus();
+                          toast.success("SSH credentials removed");
+                        } catch (error) {
+                          toast.error("Failed to remove SSH credentials");
+                        }
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 transition-colors text-sm font-medium"
+                    >
+                      <Trash2 size={14} className="inline mr-2" />
+                      Disconnect SSH
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

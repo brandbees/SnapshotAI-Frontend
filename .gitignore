@@ -44,3 +44,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 UI_ENHANCEMENT_PLAN.md
+FRONTEND_SSH_INTEGRATION.md
+FRONTEND_SSH_QUICK_START.md
