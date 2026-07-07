@@ -33,7 +33,7 @@ export interface SSHConnectResponse {
 export async function testSSHConnection(credentials: SSHCredentials): Promise<boolean> {
   try {
     const response = await api.post(
-      `/api/agent/ssh/connect`,
+      `/agent/ssh/connect`,
       {
         site_id: "test",
         ...credentials,
@@ -56,7 +56,7 @@ export async function saveSSHCredentials(
   credentials: SSHCredentials
 ): Promise<SSHConnectResponse> {
   const response = await api.post(
-    `/api/sites/${siteId}/ssh/credentials/save`,
+    `/sites/${siteId}/ssh/credentials/save`,
     credentials
   );
   return response.data;
@@ -70,7 +70,7 @@ export async function getSSHCredentialsStatus(
 ): Promise<SSHCredentialStatus> {
   try {
     const response = await api.get(
-      `/api/sites/${siteId}/ssh/credentials/status`,
+      `/sites/${siteId}/ssh/credentials/status`,
       { validateStatus: () => true }
     );
 
@@ -91,7 +91,7 @@ export async function getSSHCredentialsStatus(
 export async function deleteSSHCredentials(siteId: string): Promise<boolean> {
   try {
     const response = await api.delete(
-      `/api/sites/${siteId}/ssh/credentials`,
+      `/sites/${siteId}/ssh/credentials`,
       { validateStatus: () => true }
     );
     return response.status === 200;
@@ -110,7 +110,7 @@ export async function connectSSH(
   save: boolean = false
 ): Promise<SSHConnectResponse> {
   const response = await api.post(
-    `/api/agent/ssh/connect`,
+    `/agent/ssh/connect`,
     {
       site_id: siteId,
       ...credentials,
