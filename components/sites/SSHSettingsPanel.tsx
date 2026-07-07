@@ -58,7 +58,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
 
     setTesting(true);
     try {
-      const success = await testSSHConnection(formData);
+      const success = await testSSHConnection(site.id, formData);
       if (success) {
         toast.success("✓ Connection successful!");
       } else {

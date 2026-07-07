@@ -30,15 +30,11 @@ export interface SSHConnectResponse {
 /**
  * Test SSH connection without saving
  */
-export async function testSSHConnection(credentials: SSHCredentials): Promise<boolean> {
+export async function testSSHConnection(siteId: string, credentials: SSHCredentials): Promise<boolean> {
   try {
     const response = await api.post(
-      `/agent/ssh/connect`,
-      {
-        site_id: "test",
-        ...credentials,
-        save: false, // Don't save, just test
-      },
+      `/sites/${siteId}/ssh/test`,
+      credentials,
       { validateStatus: () => true }
     );
     return response.status === 200;

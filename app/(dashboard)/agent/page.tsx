@@ -304,6 +304,7 @@ function WriteConfirmCard({ call, siteId, onSuccess, bulkTrigger }: {
 
 interface SshStatus {
   active:       boolean;
+  saved?:       boolean;
   host?:        string;
   username?:    string;
   connected_at?: string;
@@ -357,6 +358,13 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
   };
 
   const disconnect = async () => {
+    if (status?.saved) {
+      // Saved credentials auto-reconnect on every message — must delete them to disconnect
+      if (!window.confirm("This removes the saved SSH credentials for this site. You'll need to re-enter them next time. Continue?")) return;
+      try {
+        await api.delete(`/sites/${siteId}/ssh/credentials`);
+      } catch { /* best-effort */ }
+    }
     try {
       await api.delete(`/agent/ssh/disconnect/${siteId}`);
     } catch { /* best-effort */ }
@@ -375,8 +383,10 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
           <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
           <Terminal size={11} className="shrink-0" />
           <span className="font-medium">SSH connected</span>
-          <span className="text-teal-600">{status.username}@{status.host}</span>
-          <span className="text-teal-500">· full access</span>
+          {status.username && status.host && (
+            <span className="text-teal-600">{status.username}@{status.host}</span>
+          )}
+          <span className="text-teal-500">{status.saved ? "· saved credentials · full access" : "· full access"}</span>
         </div>
         <button onClick={disconnect}
           className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
