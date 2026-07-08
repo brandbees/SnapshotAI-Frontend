@@ -29,7 +29,6 @@ import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { Button } from "@/components/ui/Button";
 import { MalwareScanPanel } from "@/components/sites/MalwareScanPanel";
 import { SSHSettingsPanel } from "@/components/sites/SSHSettingsPanel";
-import { ConfirmationModal, ThinkingPanel, ApprovalUI, ResultsDashboard } from "@/components/performance";
 import { useSSHSettings } from "@/hooks/useSSHSettings";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
@@ -1087,12 +1086,9 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const perf = latestAudit?.performance_data as any;
 
-  const [showPSIConfirm, setShowPSIConfirm] = useState(false);
-  const [psiRiskTier, setPsiRiskTier] = useState<'low' | 'medium' | 'high'>('low');
-
-  const startPSIOptimization = () => {
-    // Redirect to Agent page with PSI optimization mode
-    router.push(`/agent?mode=psi-optimization&site_id=${site.id}&risk_tier=${psiRiskTier}`);
+  const optimizePSIWithAgent = () => {
+    const prompt = `Optimize PSI for ${site.name} using low risk fixes. Show me the improvements step by step.`;
+    router.push(`/agent?site_id=${site.id}&prompt=${encodeURIComponent(prompt)}`);
   };
 
   const ttfb:    number | null = perf?.ttfb_ms      ?? null;
@@ -1365,46 +1361,23 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
         </div>
       </div>
 
-      {/* ── PSI Autonomous Optimization (Agent Integration) ── */}
+      {/* ── PSI Autonomous Optimization via Agent ── */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">PSI Autonomous Optimization</h3>
-            <p className="text-sm text-gray-700 mb-4">
-              Let our AI agent automatically optimize your site's PageSpeed Insights score with real-time approval workflow.
+            <h3 className="text-lg font-bold text-gray-900 mb-1">AI-Powered PSI Optimization</h3>
+            <p className="text-sm text-gray-700">
+              Let our AI agent optimize your PageSpeed Insights score. You approve each fix before it's applied.
             </p>
-            <ul className="text-xs text-gray-700 space-y-1.5">
-              <li>✓ Deploy and test fixes iteratively with Agent guidance</li>
-              <li>✓ See Agent thinking and reasoning in real-time</li>
-              <li>✓ You approve each change before continuing</li>
-              <li>✓ Instant rollback if something breaks</li>
-              <li>✓ See PSI improvements in real-time</li>
-            </ul>
           </div>
           <button
-            onClick={() => setShowPSIConfirm(true)}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors whitespace-nowrap"
+            onClick={optimizePSIWithAgent}
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors whitespace-nowrap shrink-0"
           >
-            Start with Agent
+            Optimize with Agent
           </button>
         </div>
       </div>
-
-      {/* PSI Confirmation Modal */}
-      {showPSIConfirm && (
-        <ConfirmationModal
-          site_url={site.url}
-          psi_mobile_before={score || 50}
-          psi_desktop_before={score || 50}
-          tier={psiRiskTier}
-          onConfirm={() => {
-            setShowPSIConfirm(false);
-            startPSIOptimization();
-          }}
-          onCancel={() => setShowPSIConfirm(false)}
-          isLoading={false}
-        />
-      )}
 
       {/* ── Google Analytics ── */}
       <GoogleAnalyticsSection site={site} brandColor={brandColor} />
