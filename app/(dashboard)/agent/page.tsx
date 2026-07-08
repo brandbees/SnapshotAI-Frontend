@@ -1158,7 +1158,7 @@ function AgentInner() {
       return;
     }
     try {
-      const res = await api.post('/api/performance/start-optimization', {
+      const res = await api.post('/performance/start-optimization', {
         site_id: selectedSiteId,
         risk_tier_preference: riskTier,
       });
@@ -1192,7 +1192,7 @@ function AgentInner() {
   const deployNextPSIFix = useCallback(async (sessionId: string, riskTier: 'low' | 'medium' | 'high') => {
     if (!selectedSiteId) return;
     try {
-      const res = await api.post('/api/performance/deploy-fix', {
+      const res = await api.post('/performance/deploy-fix', {
         session_id: sessionId,
         site_id: selectedSiteId,
         fix_id: 'auto-select',
@@ -1227,7 +1227,7 @@ function AgentInner() {
 
     if (lower === 'approve' || lower.includes('approve')) {
       try {
-        await api.post('/api/performance/approve-iteration', {
+        await api.post('/performance/approve-iteration', {
           session_id: psiSession.sessionId,
           iteration_id: psiSession.sessionId,
           continue_optimization: true,
@@ -1240,7 +1240,7 @@ function AgentInner() {
       }
     } else if (lower === 'reject' || lower.includes('reject') || lower.includes('rollback')) {
       try {
-        await api.post('/api/performance/rollback-iteration', {
+        await api.post('/performance/rollback-iteration', {
           session_id: psiSession.sessionId,
           iteration_id: psiSession.sessionId,
           reason: 'user_requested',
@@ -1252,7 +1252,7 @@ function AgentInner() {
       }
     } else if (lower === 'stop' || lower.includes('stop')) {
       try {
-        const resultsRes = await api.get(`/api/performance/results/${psiSession.sessionId}`);
+        const resultsRes = await api.get(`/performance/results/${psiSession.sessionId}`);
         const results = resultsRes.data?.results || {};
         sendWithSite(
           `✓ PSI Optimization Complete\n\n` +
