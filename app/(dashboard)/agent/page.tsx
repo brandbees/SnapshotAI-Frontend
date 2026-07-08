@@ -1185,7 +1185,15 @@ function AgentInner() {
       // Auto-deploy first fix
       deployNextPSIFix(data.session_id, riskTier);
     } catch (err: any) {
-      sendWithSite(`Failed to start PSI optimization: ${err.message}`, selectedSiteId, false);
+      const errorMsg = err.response?.data?.message || err.message || 'Unknown error';
+      const fullError = err.response?.data?.error ? `${err.response.data.error}: ${errorMsg}` : errorMsg;
+      sendWithSite(
+        `PSI optimization setup failed: ${fullError}\n\n` +
+        `💡 Tip: Make sure you have an active SSH connection to your server. ` +
+        `Connect via SSH first, then try the optimization again.`,
+        selectedSiteId,
+        false
+      );
     }
   }, [selectedSiteId, selectedSite, sendWithSite]);
 
@@ -1216,7 +1224,14 @@ function AgentInner() {
         totalImprovement: p.totalImprovement + improvement,
       }));
     } catch (err: any) {
-      sendWithSite(`Deployment failed: ${err.message}`, selectedSiteId, false);
+      const errorMsg = err.response?.data?.message || err.message || 'Unknown error';
+      const fullError = err.response?.data?.error ? `${err.response.data.error}: ${errorMsg}` : errorMsg;
+      sendWithSite(
+        `PSI fix deployment failed: ${fullError}\n\n` +
+        `💡 Tip: Ensure your SSH connection is active and try again.`,
+        selectedSiteId,
+        false
+      );
     }
   }, [selectedSiteId, sendWithSite]);
 
