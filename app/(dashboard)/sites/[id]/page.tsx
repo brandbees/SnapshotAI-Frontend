@@ -1119,15 +1119,16 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
         site_id: site.id,
         risk_tier_preference: psiWorkflow.riskTier,
       });
+      const data = res.data || res;
       setPsiWorkflow(p => ({
         ...p,
         step: 'thinking',
-        sessionId: res.session_id,
+        sessionId: data.session_id,
         currentIteration: 1,
         loading: false,
       }));
       // Auto-deploy first fix
-      deployNextFix(res.session_id);
+      deployNextFix(data.session_id);
     } catch (err: any) {
       setPsiWorkflow(p => ({ ...p, error: err.message || 'Failed to start optimization', loading: false }));
     }
@@ -1142,10 +1143,11 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
         site_id: site.id,
         fix_id: 'auto-select', // Backend will select based on confidence
       });
+      const data = res.data || res;
       setPsiWorkflow(p => ({
         ...p,
-        deploymentData: res.deployment,
-        iterationId: res.iteration_id,
+        deploymentData: data.deployment,
+        iterationId: data.iteration_id,
         step: 'approval',
         loading: false,
       }));
@@ -1175,10 +1177,11 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
       } else {
         // Show results
         const resultsRes = await api.get(`/api/performance/results/${psiWorkflow.sessionId}`);
+        const resultsData = resultsRes.data || resultsRes;
         setPsiWorkflow(p => ({
           ...p,
           step: 'results',
-          measurementData: resultsRes,
+          measurementData: resultsData,
           loading: false,
         }));
       }
@@ -1216,10 +1219,11 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
     setPsiWorkflow(p => ({ ...p, loading: true }));
     try {
       const resultsRes = await api.get(`/api/performance/results/${psiWorkflow.sessionId}`);
+      const resultsData = resultsRes.data || resultsRes;
       setPsiWorkflow(p => ({
         ...p,
         step: 'results',
-        measurementData: resultsRes,
+        measurementData: resultsData,
         loading: false,
       }));
     } catch (err: any) {
