@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "sonner";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -51,7 +50,6 @@ export default function RootLayout({
           `}}
         />
         {children}
-        <ConfirmDialog />
         <Toaster
           position="top-center"
           richColors
