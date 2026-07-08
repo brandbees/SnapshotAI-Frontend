@@ -390,117 +390,115 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
 
   if (!siteId) return null;
 
-  // Connected state — compact status bar
-  if (status?.active) {
-    return (
-      <div className="flex items-center justify-between px-6 py-2 bg-teal-50 border-b border-teal-100 text-[11px]">
-        <div className="flex items-center gap-2 text-teal-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
-          <Terminal size={11} className="shrink-0" />
-          <span className="font-medium">SSH connected</span>
-          {status.username && status.host && (
-            <span className="text-teal-600">{status.username}@{status.host}</span>
-          )}
-          <span className="text-teal-500">{status.saved ? "· saved credentials · full access" : "· full access"}</span>
-        </div>
-        <button onClick={promptDisconnect}
-          className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
-          <WifiOff size={10} /> Disconnect
-        </button>
-      </div>
-    );
-  }
-
-  // Not connected — collapsed trigger or expanded form
   return (
-    <div className="border-b border-border bg-white">
-      {/* Collapsed row */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-6 py-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-1.5">
-          <Terminal size={11} />
-          <span>Connect SSH for live file analysis</span>
+    <>
+      {status?.active ? (
+        <div className="flex items-center justify-between px-6 py-2 bg-teal-50 border-b border-teal-100 text-[11px]">
+          <div className="flex items-center gap-2 text-teal-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
+            <Terminal size={11} className="shrink-0" />
+            <span className="font-medium">SSH connected</span>
+            {status.username && status.host && (
+              <span className="text-teal-600">{status.username}@{status.host}</span>
+            )}
+            <span className="text-teal-500">{status.saved ? "· saved credentials · full access" : "· full access"}</span>
+          </div>
+          <button onClick={promptDisconnect}
+            className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
+            <WifiOff size={10} /> Disconnect
+          </button>
         </div>
-        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-      </button>
-
-      {expanded && (
-        <div className="px-6 pb-4 pt-1 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label className="block text-[10px] text-muted-foreground mb-1">Host</label>
-              <input value={host} onChange={e => setHost(e.target.value)}
-                placeholder="192.168.1.1 or example.com"
-                className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+      ) : (
+        <div className="border-b border-border bg-white">
+          {/* Collapsed row */}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="w-full flex items-center justify-between px-6 py-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <Terminal size={11} />
+              <span>Connect SSH for live file analysis</span>
             </div>
-            <div>
-              <label className="block text-[10px] text-muted-foreground mb-1">Port</label>
-              <input value={port} onChange={e => setPort(e.target.value)}
-                placeholder="22"
-                className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
-            </div>
-          </div>
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </button>
 
-          <div>
-            <label className="block text-[10px] text-muted-foreground mb-1">Username</label>
-            <input value={username} onChange={e => setUsername(e.target.value)}
-              placeholder="ubuntu, root, www-data…"
-              className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
-          </div>
+          {expanded && (
+            <div className="px-6 pb-4 pt-1 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="block text-[10px] text-muted-foreground mb-1">Host</label>
+                  <input value={host} onChange={e => setHost(e.target.value)}
+                    placeholder="192.168.1.1 or example.com"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-muted-foreground mb-1">Port</label>
+                  <input value={port} onChange={e => setPort(e.target.value)}
+                    placeholder="22"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+                </div>
+              </div>
 
-          {/* Auth mode toggle */}
-          <div className="flex items-center gap-1 text-[10px]">
-            <button onClick={() => setAuthMode("password")}
-              className={`px-2.5 py-1 rounded-lg border transition-colors ${authMode === "password" ? "border-[color:var(--accent)] text-[color:var(--accent)] bg-[color:var(--accent-light)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
-              <span className="flex items-center gap-1"><Lock size={9} /> Password</span>
-            </button>
-            <button onClick={() => setAuthMode("key")}
-              className={`px-2.5 py-1 rounded-lg border transition-colors ${authMode === "key" ? "border-[color:var(--accent)] text-[color:var(--accent)] bg-[color:var(--accent-light)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
-              <span className="flex items-center gap-1"><KeyRound size={9} /> Private Key</span>
-            </button>
-          </div>
+              <div>
+                <label className="block text-[10px] text-muted-foreground mb-1">Username</label>
+                <input value={username} onChange={e => setUsername(e.target.value)}
+                  placeholder="ubuntu, root, www-data…"
+                  className="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+              </div>
 
-          {authMode === "password" ? (
-            <div className="relative">
-              <label className="block text-[10px] text-muted-foreground mb-1">Password</label>
-              <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="SSH password"
-                className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
-              <button type="button" onClick={() => setShowPw(v => !v)}
-                className="absolute right-2 top-6 text-muted-foreground hover:text-foreground transition-colors">
-                {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
-              </button>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-[10px] text-muted-foreground mb-1">Private Key (PEM)</label>
-              <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)}
-                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-                rows={4}
-                className="w-full text-[10px] font-mono px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)] resize-none" />
+              {/* Auth mode toggle */}
+              <div className="flex items-center gap-1 text-[10px]">
+                <button onClick={() => setAuthMode("password")}
+                  className={`px-2.5 py-1 rounded-lg border transition-colors ${authMode === "password" ? "border-[color:var(--accent)] text-[color:var(--accent)] bg-[color:var(--accent-light)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                  <span className="flex items-center gap-1"><Lock size={9} /> Password</span>
+                </button>
+                <button onClick={() => setAuthMode("key")}
+                  className={`px-2.5 py-1 rounded-lg border transition-colors ${authMode === "key" ? "border-[color:var(--accent)] text-[color:var(--accent)] bg-[color:var(--accent-light)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                  <span className="flex items-center gap-1"><KeyRound size={9} /> Private Key</span>
+                </button>
+              </div>
+
+              {authMode === "password" ? (
+                <div className="relative">
+                  <label className="block text-[10px] text-muted-foreground mb-1">Password</label>
+                  <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder="SSH password"
+                    className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)]" />
+                  <button type="button" onClick={() => setShowPw(v => !v)}
+                    className="absolute right-2 top-6 text-muted-foreground hover:text-foreground transition-colors">
+                    {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] text-muted-foreground mb-1">Private Key (PEM)</label>
+                  <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)}
+                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                    rows={4}
+                    className="w-full text-[10px] font-mono px-3 py-1.5 rounded-lg border border-border bg-white focus:outline-none focus:border-[color:var(--accent)] resize-none" />
+                </div>
+              )}
+
+              {connError && <p className="text-[11px] text-destructive">{connError}</p>}
+
+              <div className="flex items-center gap-2">
+                <button onClick={connect}
+                  disabled={connecting || !host.trim() || !username.trim() || (authMode === "password" ? !password : !privateKey.trim())}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
+                  style={{ background: "var(--accent)" }}>
+                  {connecting ? <Loader2 size={11} className="animate-spin" /> : <Wifi size={11} />}
+                  {connecting ? "Connecting…" : "Connect"}
+                </button>
+                <button onClick={() => setExpanded(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <p className="text-[10px] text-muted-foreground ml-1">
+                  Credentials are stored in memory only and expire after 30 min.
+                </p>
+              </div>
             </div>
           )}
-
-          {connError && <p className="text-[11px] text-destructive">{connError}</p>}
-
-          <div className="flex items-center gap-2">
-            <button onClick={connect}
-              disabled={connecting || !host.trim() || !username.trim() || (authMode === "password" ? !password : !privateKey.trim())}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-              style={{ background: "var(--accent)" }}>
-              {connecting ? <Loader2 size={11} className="animate-spin" /> : <Wifi size={11} />}
-              {connecting ? "Connecting…" : "Connect"}
-            </button>
-            <button onClick={() => setExpanded(false)}
-              className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <p className="text-[10px] text-muted-foreground ml-1">
-              Credentials are stored in memory only and expire after 30 min.
-            </p>
-          </div>
         </div>
       )}
 
@@ -516,7 +514,7 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
         onConfirm={performDisconnect}
         onCancel={() => setShowConfirmDisconnect(false)}
       />
-    </div>
+    </>
   );
 }
 
