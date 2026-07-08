@@ -1002,6 +1002,7 @@ function AgentInner() {
   const [toolCallsMap, setToolCallsMap] = useState<Record<number, ToolCall[]>>({});
   const [input, setInput]               = useState("");
   const [loading, setLoading]           = useState(false);
+  const [workingStatus, setWorkingStatus] = useState<string | null>(null);
   const [error, setError]               = useState<string | null>(null);
   const [copied, setCopied]             = useState(false);
   const [tokenState, setTokenState]     = useState<TokenState | null>(null);
@@ -1062,6 +1063,15 @@ function AgentInner() {
     setLoading(true);
     setError(null);
 
+    // Live progress feed — poll backend for the current working step while the request runs
+    const progressId = crypto.randomUUID();
+    setWorkingStatus(null);
+    const progressTimer = setInterval(() => {
+      api.get<{ label: string | null }>(`/agent/progress/${progressId}`)
+        .then(({ data }) => { if (data.label) setWorkingStatus(data.label); })
+        .catch(() => {});
+    }, 1200);
+
     try {
       const { data } = await api.post<{
         reply: string;
@@ -1078,6 +1088,7 @@ function AgentInner() {
         message: text,
         site_id: siteId || undefined,
         history: messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
+        progress_id: progressId,
       });
 
       if (data.needs_site_selection) {
@@ -1126,6 +1137,8 @@ function AgentInner() {
         setError(errMsg ?? errCode ?? "Something went wrong. Please try again.");
       }
     } finally {
+      clearInterval(progressTimer);
+      setWorkingStatus(null);
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
@@ -1463,7 +1476,7 @@ function AgentInner() {
                       style={{ boxShadow: "0 4px 12px rgb(var(--accent-rgb) / 0.35)" }}>
                       <Sparkles size={14} className="text-white" />
                     </div>
-                    <div className="flex items-center gap-1.5 px-4 py-3.5"
+                    <div className="flex items-center gap-2 px-4 py-3.5"
                       style={{
                         background: "rgba(255,255,255,0.7)",
                         borderRadius: "4px 18px 18px 18px",
@@ -1471,10 +1484,17 @@ function AgentInner() {
                         WebkitBackdropFilter: "blur(16px)",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.8)",
                       }}>
-                      {[0, 160, 320].map(delay => (
-                        <span key={delay} className="w-2 h-2 rounded-full animate-bounce"
-                          style={{ background: "var(--accent)", opacity: 0.7, animationDelay: `${delay}ms`, animationDuration: "1.1s" }} />
-                      ))}
+                      <span className="flex items-center gap-1.5">
+                        {[0, 160, 320].map(delay => (
+                          <span key={delay} className="w-2 h-2 rounded-full animate-bounce"
+                            style={{ background: "var(--accent)", opacity: 0.7, animationDelay: `${delay}ms`, animationDuration: "1.1s" }} />
+                        ))}
+                      </span>
+                      {workingStatus && (
+                        <span className="text-xs font-medium text-muted-foreground animate-pulse" key={workingStatus}>
+                          {workingStatus}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
