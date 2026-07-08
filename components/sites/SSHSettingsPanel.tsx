@@ -3,14 +3,13 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  Trash2, CheckCircle2, Loader2, Eye, EyeOff,
+  CheckCircle2, Loader2, Eye, EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   saveSSHCredentials,
   deleteSSHCredentials,
   getSSHCredentialsStatus,
-  testSSHConnection,
   SSHCredentials,
   SSHCredentialStatus,
 } from "@/lib/api/ssh";
@@ -23,8 +22,8 @@ interface SSHSettingsPanelProps {
 
 export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelProps) {
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [usePrivateKey, setUsePrivateKey] = useState(false);
   const [status, setStatus] = useState<SSHCredentialStatus>({ saved: false });
@@ -35,6 +34,9 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
     password: "",
     privateKey: "",
   });
+
+  // Form is editable when nothing is saved, or user clicked Update Credentials
+  const formEnabled = !status.saved || editing;
 
   // Load credential status on mount
   useEffect(() => {
@@ -50,28 +52,8 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
     }
   };
 
-  const handleTestConnection = async () => {
-    if (!formData.host || !formData.username) {
-      toast.error("Host and username are required");
-      return;
-    }
-
-    setTesting(true);
-    try {
-      const success = await testSSHConnection(site.id, formData);
-      if (success) {
-        toast.success("✓ Connection successful!");
-      } else {
-        toast.error("Connection failed. Check credentials.");
-      }
-    } catch (error) {
-      toast.error("Connection test failed: " + (error as Error).message);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleSaveCredentials = async () => {
+  // Backend tests the connection before encrypting & saving — one click does both
+  const handleConnectAndSave = async () => {
     if (!formData.host || !formData.username) {
       toast.error("Host and username are required");
       return;
@@ -85,45 +67,52 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
     setLoading(true);
     try {
       await saveSSHCredentials(site.id, formData);
-      toast.success("✓ SSH credentials saved securely!");
+      toast.success("✓ Connected — credentials saved securely!");
+      setEditing(false);
       await loadStatus();
       onCredentialsSaved?.();
     } catch (error) {
-      toast.error("Failed to save: " + (error as Error).message);
+      toast.error("Connection failed: " + (error as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm("Delete saved SSH credentials? You'll need to re-enter them next time.")) {
+  const handleDisconnect = async () => {
+    if (!window.confirm("Disconnect SSH? Saved credentials will be removed and you'll need to re-enter them next time.")) {
       return;
     }
 
-    setDeleting(true);
+    setDisconnecting(true);
     try {
       const success = await deleteSSHCredentials(site.id);
       if (success) {
-        toast.success("✓ SSH credentials removed");
-        await loadStatus();
+        toast.success("✓ SSH disconnected");
         setFormData({ host: "", port: 22, username: "", password: "", privateKey: "" });
+        setEditing(false);
+        await loadStatus();
       }
     } catch (error) {
-      toast.error("Failed to delete: " + (error as Error).message);
+      toast.error("Failed to disconnect: " + (error as Error).message);
     } finally {
-      setDeleting(false);
+      setDisconnecting(false);
     }
+  };
+
+  const startEditing = () => {
+    setFormData({ host: "", port: 22, username: "", password: "", privateKey: "" });
+    setEditing(true);
   };
 
   return (
     <div className="space-y-5">
-      {status.saved && (
+      {status.saved && !editing && (
         <div className="p-4 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-xl">
           <div className="flex items-start gap-3">
             <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                Credentials Saved & Encrypted
+                SSH Connected — Credentials Encrypted
               </p>
               <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
                 Secured with AES-256-GCM • Saved {new Date(status.saved_at || "").toLocaleDateString()}
@@ -144,7 +133,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
             placeholder="ssh.example.com"
             value={formData.host}
             onChange={(e) => setFormData({ ...formData, host: e.target.value })}
-            disabled={status.saved}
+            disabled={!formEnabled}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
@@ -159,7 +148,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
               type="number"
               value={formData.port}
               onChange={(e) => setFormData({ ...formData, port: Number(e.target.value) })}
-              disabled={status.saved}
+              disabled={!formEnabled}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
@@ -172,14 +161,14 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
               placeholder="deploy"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              disabled={status.saved}
+              disabled={!formEnabled}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>
 
         {/* Auth Method Toggle */}
-        {!status.saved && (
+        {formEnabled && (
           <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-md">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -205,7 +194,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
               placeholder="-----BEGIN RSA PRIVATE KEY-----"
               value={formData.privateKey || ""}
               onChange={(e) => setFormData({ ...formData, privateKey: e.target.value })}
-              disabled={status.saved}
+              disabled={!formEnabled}
               rows={5}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             />
@@ -221,7 +210,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
                 placeholder="••••••••"
                 value={formData.password || ""}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                disabled={status.saved}
+                disabled={!formEnabled}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button
@@ -237,50 +226,57 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
 
         {/* Buttons */}
         <div className="flex gap-3 pt-4">
-          {!status.saved ? (
+          {formEnabled ? (
             <>
+              {editing && (
+                <Button
+                  onClick={() => setEditing(false)}
+                  disabled={loading}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              )}
               <Button
-                onClick={handleTestConnection}
-                disabled={loading || testing}
-                variant="outline"
-                className="flex-1"
-              >
-                {testing && <Loader2 size={16} className="mr-2 animate-spin" />}
-                Test Connection
-              </Button>
-              <Button
-                onClick={handleSaveCredentials}
-                disabled={loading || testing}
+                onClick={handleConnectAndSave}
+                disabled={loading}
                 className="flex-1"
               >
                 {loading && <Loader2 size={16} className="mr-2 animate-spin" />}
-                Save Credentials
+                {loading ? "Connecting…" : "Connect & Save Credentials"}
               </Button>
             </>
           ) : (
             <>
-              <Button variant="outline" className="flex-1" disabled>
-                ✓ Credentials Saved
+              <Button
+                onClick={startEditing}
+                disabled={disconnecting}
+                variant="outline"
+                className="flex-1"
+              >
+                Update Credentials
               </Button>
               <Button
-                onClick={handleDelete}
-                disabled={deleting}
+                onClick={handleDisconnect}
+                disabled={disconnecting}
                 className="flex-1 border-red-300 text-red-700 bg-red-50 hover:bg-red-100"
               >
-                {deleting && <Loader2 size={16} className="mr-2 animate-spin" />}
-                <Trash2 size={16} className="mr-2" />
-                Delete
+                {disconnecting && <Loader2 size={16} className="mr-2 animate-spin" />}
+                Disconnect
               </Button>
             </>
           )}
         </div>
 
         {/* Info */}
-        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-md">
-          <p className="text-xs text-amber-800 dark:text-amber-200">
-            💡 <strong>Tip:</strong> Save credentials once to enable automatic SSH access. No repeated prompts!
-          </p>
-        </div>
+        {formEnabled && (
+          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-md">
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              💡 <strong>Tip:</strong> Connect once — credentials are encrypted and the AI agent gets automatic SSH access. No repeated prompts!
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/Button";
 import { MalwareScanPanel } from "@/components/sites/MalwareScanPanel";
 import { SSHSettingsPanel } from "@/components/sites/SSHSettingsPanel";
 import { useSSHSettings } from "@/hooks/useSSHSettings";
-import { deleteSSHCredentials } from "@/lib/api/ssh";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
 import type { Site, Audit, ScanResult, AlertSettings, Plugin as SitePlugin, CronEvent, SiteHealth, PluginVulnerability, WooFatalError, WooGateway } from "@/types";
@@ -4821,7 +4820,7 @@ function SiteDetailContent() {
         <>
           <div
             className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setShowSSHModal(false)}
+            onClick={() => { setShowSSHModal(false); refreshSSHStatus(); }}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -4830,7 +4829,7 @@ function SiteDetailContent() {
                   SSH Access
                 </h2>
                 <button
-                  onClick={() => setShowSSHModal(false)}
+                  onClick={() => { setShowSSHModal(false); refreshSSHStatus(); }}
                   className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                 >
                   <X size={20} />
@@ -4839,30 +4838,8 @@ function SiteDetailContent() {
               <div className="p-6">
                 <SSHSettingsPanel
                   site={site}
-                  onCredentialsSaved={() => {
-                    refreshSSHStatus();
-                    toast.success("SSH credentials saved!");
-                  }}
+                  onCredentialsSaved={() => refreshSSHStatus()}
                 />
-                {sshStatus.saved && (
-                  <div className="mt-4">
-                    <button
-                      onClick={async () => {
-                        try {
-                          await deleteSSHCredentials(id);
-                          await refreshSSHStatus();
-                          toast.success("SSH credentials removed");
-                        } catch (error) {
-                          toast.error("Failed to remove SSH credentials");
-                        }
-                      }}
-                      className="w-full px-4 py-2 rounded-lg border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 transition-colors text-sm font-medium"
-                    >
-                      <Trash2 size={14} className="inline mr-2" />
-                      Disconnect SSH
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
