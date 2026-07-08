@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { ConfirmationModal, ThinkingPanel, ApprovalUI, ResultsDashboard } from "@/components/performance";
 import { Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
          Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X,
          AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2,
@@ -1014,6 +1015,33 @@ function AgentInner() {
   // Track whether URL params have been applied so we only do it once
   const urlParamsApplied = useRef(false);
 
+  // PSI Optimization Mode
+  const [psiMode, setPsiMode] = useState<{
+    active: boolean;
+    siteId: string | null;
+    riskTier: 'low' | 'medium' | 'high';
+    step: 'thinking' | 'approval' | 'results';
+    sessionId: string | null;
+    iterationId: string | null;
+    currentIteration: number;
+    loading: boolean;
+    error: string | null;
+    deploymentData: any | null;
+    measurementData: any | null;
+  }>({
+    active: false,
+    siteId: null,
+    riskTier: 'low',
+    step: 'thinking',
+    sessionId: null,
+    iterationId: null,
+    currentIteration: 0,
+    loading: false,
+    error: null,
+    deploymentData: null,
+    measurementData: null,
+  });
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
 
@@ -1031,6 +1059,25 @@ function AgentInner() {
     if (urlParamsApplied.current || sites.length === 0) return;
     const paramSiteId = searchParams.get("site_id");
     const paramPrompt = searchParams.get("prompt");
+    const paramMode = searchParams.get("mode");
+    const paramRiskTier = (searchParams.get("risk_tier") || 'low') as 'low' | 'medium' | 'high';
+
+    // PSI Optimization Mode detected
+    if (paramMode === 'psi-optimization' && paramSiteId) {
+      const match = sites.find(s => s.id === paramSiteId);
+      if (match) {
+        setPsiMode(p => ({
+          ...p,
+          active: true,
+          siteId: paramSiteId,
+          riskTier: paramRiskTier,
+        }));
+        setSelectedSiteId(paramSiteId);
+        urlParamsApplied.current = true;
+        return;
+      }
+    }
+
     if (paramSiteId) {
       const match = sites.find(s => s.id === paramSiteId);
       if (match) {
@@ -1218,9 +1265,238 @@ function AgentInner() {
 
   const isTokenLimitError = error === "Token limit reached. Purchase more tokens to continue.";
 
+  // PSI Optimization Workflow Functions
+  const startPSIOptimization = async () => {
+    if (!psiMode.siteId) return;
+    setPsiMode(p => ({ ...p, loading: true, error: null, step: 'thinking' }));
+    try {
+      const res = await api.post('/api/performance/start-optimization', {
+        site_id: psiMode.siteId,
+        risk_tier_preference: psiMode.riskTier,
+      });
+      const data = res.data || res;
+      setPsiMode(p => ({
+        ...p,
+        sessionId: data.session_id,
+        currentIteration: 1,
+        loading: false,
+      }));
+      // Auto-deploy first fix
+      deployPSIFix(data.session_id);
+    } catch (err: any) {
+      setPsiMode(p => ({ ...p, error: err.message || 'Failed to start', loading: false }));
+    }
+  };
+
+  const deployPSIFix = async (sessionId: string) => {
+    setPsiMode(p => ({ ...p, loading: true }));
+    try {
+      const res = await api.post('/api/performance/deploy-fix', {
+        session_id: sessionId,
+        site_id: psiMode.siteId,
+        fix_id: 'auto-select',
+      });
+      const data = res.data || res;
+      setPsiMode(p => ({
+        ...p,
+        deploymentData: data.deployment,
+        iterationId: data.iteration_id,
+        step: 'approval',
+        loading: false,
+      }));
+    } catch (err: any) {
+      setPsiMode(p => ({ ...p, error: err.message || 'Deployment failed', loading: false }));
+    }
+  };
+
+  const approvePSIFix = async (continueOpt: boolean) => {
+    if (!psiMode.sessionId || !psiMode.iterationId) return;
+    setPsiMode(p => ({ ...p, loading: true }));
+    try {
+      await api.post('/api/performance/approve-iteration', {
+        session_id: psiMode.sessionId,
+        iteration_id: psiMode.iterationId,
+        continue_optimization: continueOpt,
+      });
+      if (continueOpt) {
+        setPsiMode(p => ({
+          ...p,
+          step: 'thinking',
+          currentIteration: p.currentIteration + 1,
+          loading: false,
+        }));
+        setTimeout(() => deployPSIFix(psiMode.sessionId!), 1000);
+      } else {
+        // Get results
+        const resultsRes = await api.get(`/api/performance/results/${psiMode.sessionId}`);
+        const resultsData = resultsRes.data || resultsRes;
+        setPsiMode(p => ({
+          ...p,
+          step: 'results',
+          measurementData: resultsData,
+          loading: false,
+        }));
+      }
+    } catch (err: any) {
+      setPsiMode(p => ({ ...p, error: err.message || 'Action failed', loading: false }));
+    }
+  };
+
+  const rollbackPSIFix = async () => {
+    if (!psiMode.sessionId || !psiMode.iterationId) return;
+    setPsiMode(p => ({ ...p, loading: true }));
+    try {
+      await api.post('/api/performance/rollback-iteration', {
+        session_id: psiMode.sessionId,
+        iteration_id: psiMode.iterationId,
+        reason: 'user_requested',
+      });
+      setPsiMode(p => ({
+        ...p,
+        step: 'thinking',
+        currentIteration: p.currentIteration + 1,
+        loading: false,
+      }));
+      setTimeout(() => deployPSIFix(psiMode.sessionId!), 1000);
+    } catch (err: any) {
+      setPsiMode(p => ({ ...p, error: err.message || 'Rollback failed', loading: false }));
+    }
+  };
+
+  const stopPSIOptimization = async () => {
+    if (!psiMode.sessionId) return;
+    setPsiMode(p => ({ ...p, loading: true }));
+    try {
+      const resultsRes = await api.get(`/api/performance/results/${psiMode.sessionId}`);
+      const resultsData = resultsRes.data || resultsRes;
+      setPsiMode(p => ({
+        ...p,
+        step: 'results',
+        measurementData: resultsData,
+        loading: false,
+      }));
+    } catch (err: any) {
+      setPsiMode(p => ({ ...p, error: err.message || 'Failed to get results', loading: false }));
+    }
+  };
+
   const selectedSite = sites.find(s => s.id === selectedSiteId);
   const suggestions  = selectedSiteId ? SUGGESTIONS_SITE : SUGGESTIONS_GLOBAL;
   const isEmpty      = messages.length === 0;
+
+  // PSI Optimization Mode - show workflow instead of chat
+  if (psiMode.active && psiMode.siteId) {
+    const psiSite = sites.find(s => s.id === psiMode.siteId);
+    const psiScore = psiSite?.latest_scores?.performance || 50;
+
+    return (
+      <div className="-m-6 flex flex-col bg-gray-50" style={{ height: "calc(100dvh - 3.5rem)" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 px-6 py-4 bg-white border-b border-border">
+          <div>
+            <p className="text-sm text-gray-600">PSI Autonomous Optimization</p>
+            <h2 className="text-lg font-bold text-gray-900">{psiSite?.name}</h2>
+          </div>
+          <button
+            onClick={() => setPsiMode(p => ({ ...p, active: false }))}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Exit Optimization
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {psiMode.error && (
+            <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <AlertTriangle size={18} />
+              <div>
+                <p className="font-semibold">Error</p>
+                <p className="text-xs mt-1">{psiMode.error}</p>
+              </div>
+              <button
+                onClick={() => setPsiMode(p => ({ ...p, error: null }))}
+                className="ml-auto text-red-500 hover:text-red-700"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {psiMode.step === 'thinking' && !psiMode.loading && (
+            <button
+              onClick={startPSIOptimization}
+              className="w-full px-6 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              Start PSI Optimization
+            </button>
+          )}
+
+          {psiMode.step === 'thinking' && psiMode.loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin mb-4 text-2xl">⚙️</div>
+                <p className="text-gray-600 font-semibold">Agent deploying fix...</p>
+              </div>
+            </div>
+          )}
+
+          {psiMode.step === 'approval' && psiMode.deploymentData && (
+            <>
+              <ThinkingPanel
+                current_iteration={psiMode.currentIteration}
+                thinking_steps={[]}
+                recent_decisions={[]}
+                fixes_deployed={psiMode.currentIteration - 1}
+                rollbacks={0}
+                status="active"
+                isCollapsed={true}
+              />
+              <ApprovalUI
+                fix_id={psiMode.deploymentData.fix_id || 'Fix ' + psiMode.currentIteration}
+                risk_tier={psiMode.riskTier}
+                psi_improvement_mobile={psiMode.deploymentData.improvement_mobile || 0}
+                psi_improvement_desktop={psiMode.deploymentData.improvement_desktop || 0}
+                health_check_status={psiMode.deploymentData.health_check?.healthy ? 'healthy' : 'failed'}
+                cache_cleared={psiMode.deploymentData.cache?.cleared || false}
+                onApprove={() => approvePSIFix(true)}
+                onRollback={rollbackPSIFix}
+                onStop={() => stopPSIOptimization()}
+                isLoading={psiMode.loading}
+              />
+            </>
+          )}
+
+          {psiMode.step === 'results' && psiMode.measurementData && (
+            <ResultsDashboard
+              session_id={psiMode.sessionId!}
+              site_id={psiMode.siteId}
+              status="completed"
+              duration_ms={0}
+              started_at={new Date().toISOString()}
+              psi_mobile_before={psiScore}
+              psi_mobile_after={psiMode.measurementData.results?.psi_mobile_after || psiScore}
+              psi_improvement={psiMode.measurementData.results?.psi_improvement || 0}
+              fixes_deployed={psiMode.measurementData.results?.fixes_deployed || 0}
+              fixes_rejected={psiMode.measurementData.results?.fixes_rejected || 0}
+              rollbacks={psiMode.measurementData.results?.rollbacks || 0}
+              iterations_total={psiMode.measurementData.results?.iterations_total || 0}
+              fixes_applied={psiMode.measurementData.results?.fixes_applied || []}
+              onNewOptimization={() => setPsiMode(p => ({
+                ...p,
+                step: 'thinking',
+                sessionId: null,
+                iterationId: null,
+                currentIteration: 0,
+                deploymentData: null,
+                measurementData: null,
+              }))}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="-m-6 flex flex-col" style={{ height: "calc(100dvh - 3.5rem)" }}>
