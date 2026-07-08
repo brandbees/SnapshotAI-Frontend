@@ -29,6 +29,7 @@ import { UpgradeBanner } from "@/components/shared/UpgradeBanner";
 import { Button } from "@/components/ui/Button";
 import { MalwareScanPanel } from "@/components/sites/MalwareScanPanel";
 import { SSHSettingsPanel } from "@/components/sites/SSHSettingsPanel";
+import { ConfirmationModal, ThinkingPanel, ApprovalUI, ResultsDashboard } from "@/components/performance";
 import { useSSHSettings } from "@/hooks/useSSHSettings";
 import api from "@/lib/api";
 import { timeAgo, scoreHex } from "@/lib/utils";
@@ -1085,6 +1086,147 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const perf = latestAudit?.performance_data as any;
 
+  // PSI Optimization Workflow State
+  const [psiWorkflow, setPsiWorkflow] = useState<{
+    step: 'idle' | 'confirm' | 'thinking' | 'approval' | 'results';
+    sessionId: string | null;
+    iterationId: string | null;
+    currentIteration: number;
+    riskTier: 'low' | 'medium' | 'high';
+    loading: boolean;
+    error: string | null;
+    deploymentData: any | null;
+    measurementData: any | null;
+    thinkingData: any | null;
+  }>({
+    step: 'idle',
+    sessionId: null,
+    iterationId: null,
+    currentIteration: 0,
+    riskTier: 'low',
+    loading: false,
+    error: null,
+    deploymentData: null,
+    measurementData: null,
+    thinkingData: null,
+  });
+
+  // Start optimization
+  const startOptimization = async () => {
+    setPsiWorkflow(p => ({ ...p, loading: true, error: null }));
+    try {
+      const res = await api.post('/api/performance/start-optimization', {
+        site_id: site.id,
+        risk_tier_preference: psiWorkflow.riskTier,
+      });
+      setPsiWorkflow(p => ({
+        ...p,
+        step: 'thinking',
+        sessionId: res.session_id,
+        currentIteration: 1,
+        loading: false,
+      }));
+      // Auto-deploy first fix
+      deployNextFix(res.session_id);
+    } catch (err: any) {
+      setPsiWorkflow(p => ({ ...p, error: err.message || 'Failed to start optimization', loading: false }));
+    }
+  };
+
+  // Deploy next fix
+  const deployNextFix = async (sessionId: string) => {
+    setPsiWorkflow(p => ({ ...p, loading: true }));
+    try {
+      const res = await api.post('/api/performance/deploy-fix', {
+        session_id: sessionId,
+        site_id: site.id,
+        fix_id: 'auto-select', // Backend will select based on confidence
+      });
+      setPsiWorkflow(p => ({
+        ...p,
+        deploymentData: res.deployment,
+        iterationId: res.iteration_id,
+        step: 'approval',
+        loading: false,
+      }));
+    } catch (err: any) {
+      setPsiWorkflow(p => ({ ...p, error: err.message || 'Deployment failed', loading: false }));
+    }
+  };
+
+  // User approves and continue
+  const approveAndContinue = async (continueOpt: boolean) => {
+    if (!psiWorkflow.sessionId || !psiWorkflow.iterationId) return;
+    setPsiWorkflow(p => ({ ...p, loading: true }));
+    try {
+      await api.post('/api/performance/approve-iteration', {
+        session_id: psiWorkflow.sessionId,
+        iteration_id: psiWorkflow.iterationId,
+        continue_optimization: continueOpt,
+      });
+      if (continueOpt) {
+        setPsiWorkflow(p => ({
+          ...p,
+          step: 'thinking',
+          currentIteration: p.currentIteration + 1,
+          loading: false,
+        }));
+        setTimeout(() => deployNextFix(psiWorkflow.sessionId!), 1000);
+      } else {
+        // Show results
+        const resultsRes = await api.get(`/api/performance/results/${psiWorkflow.sessionId}`);
+        setPsiWorkflow(p => ({
+          ...p,
+          step: 'results',
+          measurementData: resultsRes,
+          loading: false,
+        }));
+      }
+    } catch (err: any) {
+      setPsiWorkflow(p => ({ ...p, error: err.message || 'Action failed', loading: false }));
+    }
+  };
+
+  // User rollback
+  const rollback = async () => {
+    if (!psiWorkflow.sessionId || !psiWorkflow.iterationId) return;
+    setPsiWorkflow(p => ({ ...p, loading: true }));
+    try {
+      await api.post('/api/performance/rollback-iteration', {
+        session_id: psiWorkflow.sessionId,
+        iteration_id: psiWorkflow.iterationId,
+        reason: 'user_requested',
+      });
+      // Go back to thinking and deploy next
+      setPsiWorkflow(p => ({
+        ...p,
+        step: 'thinking',
+        currentIteration: p.currentIteration + 1,
+        loading: false,
+      }));
+      setTimeout(() => deployNextFix(psiWorkflow.sessionId!), 1000);
+    } catch (err: any) {
+      setPsiWorkflow(p => ({ ...p, error: err.message || 'Rollback failed', loading: false }));
+    }
+  };
+
+  // Stop optimization
+  const stopOptimization = async () => {
+    if (!psiWorkflow.sessionId) return;
+    setPsiWorkflow(p => ({ ...p, loading: true }));
+    try {
+      const resultsRes = await api.get(`/api/performance/results/${psiWorkflow.sessionId}`);
+      setPsiWorkflow(p => ({
+        ...p,
+        step: 'results',
+        measurementData: resultsRes,
+        loading: false,
+      }));
+    } catch (err: any) {
+      setPsiWorkflow(p => ({ ...p, error: err.message || 'Failed to get results', loading: false }));
+    }
+  };
+
   const ttfb:    number | null = perf?.ttfb_ms      ?? null;
   const total:   number | null = perf?.total_ms     ?? null;
   const scripts: number | null = perf?.script_count ?? null;
@@ -1354,6 +1496,130 @@ function PerformanceTab({ site, audits, brandColor, runAudit, canRunAudit }: { s
           )}
         </div>
       </div>
+
+      {/* ── PSI Autonomous Optimization ── */}
+      {psiWorkflow.step === 'idle' && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">PSI Autonomous Optimization</h3>
+              <p className="text-sm text-gray-700 mb-4">
+                Let our AI automatically optimize your site's PageSpeed Insights score with real-time approval workflow.
+              </p>
+              <ul className="text-xs text-gray-700 space-y-1.5">
+                <li>✓ Deploy and test fixes iteratively</li>
+                <li>✓ You approve each change before continuing</li>
+                <li>✓ Instant rollback if something breaks</li>
+                <li>✓ See PSI improvements in real-time</li>
+              </ul>
+            </div>
+            <button
+              onClick={() => setPsiWorkflow(p => ({ ...p, step: 'confirm' }))}
+              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors whitespace-nowrap"
+            >
+              Start Optimization
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {psiWorkflow.step === 'confirm' && (
+        <ConfirmationModal
+          site_url={site.url}
+          psi_mobile_before={score || 50}
+          psi_desktop_before={score || 50}
+          tier={psiWorkflow.riskTier}
+          onConfirm={startOptimization}
+          onCancel={() => setPsiWorkflow(p => ({ ...p, step: 'idle', error: null }))}
+          isLoading={psiWorkflow.loading}
+        />
+      )}
+
+      {/* Thinking + Approval Workflow */}
+      {(psiWorkflow.step === 'thinking' || psiWorkflow.step === 'approval') && psiWorkflow.sessionId && (
+        <div className="space-y-4">
+          <ThinkingPanel
+            current_iteration={psiWorkflow.currentIteration}
+            thinking_steps={[]}
+            recent_decisions={[]}
+            fixes_deployed={psiWorkflow.currentIteration - 1}
+            rollbacks={0}
+            status="active"
+            isCollapsed={psiWorkflow.step !== 'thinking'}
+          />
+
+          {psiWorkflow.step === 'approval' && psiWorkflow.deploymentData && (
+            <ApprovalUI
+              fix_id={psiWorkflow.deploymentData.fix_id || 'Fix ' + psiWorkflow.currentIteration}
+              risk_tier={psiWorkflow.riskTier}
+              psi_improvement_mobile={psiWorkflow.deploymentData.improvement_mobile || 0}
+              psi_improvement_desktop={psiWorkflow.deploymentData.improvement_desktop || 0}
+              health_check_status={psiWorkflow.deploymentData.health_check?.healthy ? 'healthy' : 'failed'}
+              cache_cleared={psiWorkflow.deploymentData.cache?.cleared || false}
+              onApprove={() => approveAndContinue(true)}
+              onRollback={rollback}
+              onStop={() => stopOptimization()}
+              isLoading={psiWorkflow.loading}
+            />
+          )}
+
+          {psiWorkflow.step === 'thinking' && psiWorkflow.loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin mb-4">⚙️</div>
+                <p className="text-gray-600 font-semibold">Deploying fix...</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Results Dashboard */}
+      {psiWorkflow.step === 'results' && psiWorkflow.sessionId && psiWorkflow.measurementData && (
+        <ResultsDashboard
+          session_id={psiWorkflow.sessionId}
+          site_id={site.id}
+          status="completed"
+          duration_ms={0}
+          started_at={new Date().toISOString()}
+          psi_mobile_before={score || 50}
+          psi_mobile_after={psiWorkflow.measurementData.results?.psi_mobile_after || score || 50}
+          psi_improvement={psiWorkflow.measurementData.results?.psi_improvement || 0}
+          fixes_deployed={psiWorkflow.measurementData.results?.fixes_deployed || 0}
+          fixes_rejected={psiWorkflow.measurementData.results?.fixes_rejected || 0}
+          rollbacks={psiWorkflow.measurementData.results?.rollbacks || 0}
+          iterations_total={psiWorkflow.measurementData.results?.iterations_total || 0}
+          fixes_applied={psiWorkflow.measurementData.results?.fixes_applied || []}
+          onNewOptimization={() => setPsiWorkflow(p => ({
+            ...p,
+            step: 'idle',
+            sessionId: null,
+            iterationId: null,
+            currentIteration: 0,
+            error: null,
+            deploymentData: null,
+            measurementData: null,
+          }))}
+        />
+      )}
+
+      {/* Error Display */}
+      {psiWorkflow.error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <AlertTriangle size={18} />
+          <div>
+            <p className="font-semibold">Optimization Error</p>
+            <p className="text-xs mt-1">{psiWorkflow.error}</p>
+          </div>
+          <button
+            onClick={() => setPsiWorkflow(p => ({ ...p, error: null }))}
+            className="ml-auto text-red-500 hover:text-red-700"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ── Google Analytics ── */}
       <GoogleAnalyticsSection site={site} brandColor={brandColor} />
