@@ -12,6 +12,7 @@ import { mapSite, type RawSite } from "@/lib/mappers";
 import { useAuth } from "@/hooks/useAuth";
 import type { Site, AgentMessage } from "@/types";
 import { IconChip } from "@/components/ui/IconChip";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 const SUGGESTIONS_GLOBAL = [
   { q: "Which site has the lowest overall score?",    icon: "📉" },
@@ -311,17 +312,19 @@ interface SshStatus {
 }
 
 function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; onStatusChange: (active: boolean) => void; refreshTrigger?: number }) {
-  const [status, setStatus]         = useState<SshStatus | null>(null);
-  const [expanded, setExpanded]     = useState(false);
-  const [authMode, setAuthMode]     = useState<"password" | "key">("password");
-  const [host, setHost]             = useState("");
-  const [port, setPort]             = useState("22");
-  const [username, setUsername]     = useState("");
-  const [password, setPassword]     = useState("");
-  const [privateKey, setPrivateKey] = useState("");
-  const [showPw, setShowPw]         = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [connError, setConnError]   = useState<string | null>(null);
+  const [status, setStatus]              = useState<SshStatus | null>(null);
+  const [expanded, setExpanded]          = useState(false);
+  const [authMode, setAuthMode]          = useState<"password" | "key">("password");
+  const [host, setHost]                  = useState("");
+  const [port, setPort]                  = useState("22");
+  const [username, setUsername]          = useState("");
+  const [password, setPassword]          = useState("");
+  const [privateKey, setPrivateKey]      = useState("");
+  const [showPw, setShowPw]              = useState(false);
+  const [connecting, setConnecting]      = useState(false);
+  const [connError, setConnError]        = useState<string | null>(null);
+  const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   // Fetch session status when site changes or after modal-based connect
   useEffect(() => {
@@ -357,20 +360,32 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
     }
   };
 
-  const disconnect = async () => {
+  const promptDisconnect = () => {
     if (status?.saved) {
-      // Saved credentials auto-reconnect on every message — must delete them to disconnect
-      if (!window.confirm("This removes the saved SSH credentials for this site. You'll need to re-enter them next time. Continue?")) return;
-      try {
-        await api.delete(`/sites/${siteId}/ssh/credentials`);
-      } catch { /* best-effort */ }
+      setShowConfirmDisconnect(true);
+    } else {
+      performDisconnect();
     }
+  };
+
+  const performDisconnect = async () => {
+    setDisconnecting(true);
     try {
-      await api.delete(`/agent/ssh/disconnect/${siteId}`);
-    } catch { /* best-effort */ }
-    setStatus({ active: false });
-    onStatusChange(false);
-    setExpanded(false);
+      if (status?.saved) {
+        try {
+          await api.delete(`/sites/${siteId}/ssh/credentials`);
+        } catch { /* best-effort */ }
+      }
+      try {
+        await api.delete(`/agent/ssh/disconnect/${siteId}`);
+      } catch { /* best-effort */ }
+      setStatus({ active: false });
+      onStatusChange(false);
+      setExpanded(false);
+    } finally {
+      setDisconnecting(false);
+      setShowConfirmDisconnect(false);
+    }
   };
 
   if (!siteId) return null;
@@ -388,7 +403,7 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
           )}
           <span className="text-teal-500">{status.saved ? "· saved credentials · full access" : "· full access"}</span>
         </div>
-        <button onClick={disconnect}
+        <button onClick={promptDisconnect}
           className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
           <WifiOff size={10} /> Disconnect
         </button>
@@ -488,6 +503,19 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
           </div>
         </div>
       )}
+
+      {/* Disconnect Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showConfirmDisconnect}
+        title="Disconnect SSH?"
+        message="This removes the saved SSH credentials for this site. You'll need to re-enter them next time."
+        confirmText="Disconnect"
+        cancelText="Keep Connected"
+        isDangerous={true}
+        isLoading={disconnecting}
+        onConfirm={performDisconnect}
+        onCancel={() => setShowConfirmDisconnect(false)}
+      />
     </div>
   );
 }
