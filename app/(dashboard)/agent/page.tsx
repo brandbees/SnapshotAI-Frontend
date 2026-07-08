@@ -1377,7 +1377,6 @@ function AgentInner() {
   };
 
   const isTokenLimitError = error === "Token limit reached. Purchase more tokens to continue.";
-  const selectedSite = sites.find(s => s.id === selectedSiteId);
   const suggestions  = selectedSiteId ? SUGGESTIONS_SITE : SUGGESTIONS_GLOBAL;
   const isEmpty      = messages.length === 0;
 
