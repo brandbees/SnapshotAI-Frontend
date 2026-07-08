@@ -6,6 +6,7 @@ import {
   CheckCircle2, Loader2, Eye, EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
   saveSSHCredentials,
   deleteSSHCredentials,
@@ -27,6 +28,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
   const [showPassword, setShowPassword] = useState(false);
   const [usePrivateKey, setUsePrivateKey] = useState(false);
   const [status, setStatus] = useState<SSHCredentialStatus>({ saved: false });
+  const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
   const [formData, setFormData] = useState<SSHCredentials>({
     host: "",
     port: 22,
@@ -78,11 +80,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!window.confirm("Disconnect SSH? Saved credentials will be removed and you'll need to re-enter them next time.")) {
-      return;
-    }
-
+  const handleConfirmDisconnect = async () => {
     setDisconnecting(true);
     try {
       const success = await deleteSSHCredentials(site.id);
@@ -96,6 +94,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
       toast.error("Failed to disconnect: " + (error as Error).message);
     } finally {
       setDisconnecting(false);
+      setShowConfirmDisconnect(false);
     }
   };
 
@@ -258,7 +257,7 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
                 Update Credentials
               </Button>
               <Button
-                onClick={handleDisconnect}
+                onClick={() => setShowConfirmDisconnect(true)}
                 disabled={disconnecting}
                 className="flex-1 border-red-300 text-red-700 bg-red-50 hover:bg-red-100"
               >
@@ -278,6 +277,19 @@ export function SSHSettingsPanel({ site, onCredentialsSaved }: SSHSettingsPanelP
           </div>
         )}
       </div>
+
+      {/* Disconnect Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showConfirmDisconnect}
+        title="Disconnect SSH?"
+        message="This removes the saved SSH credentials for this site. You'll need to re-enter them next time."
+        confirmText="Disconnect"
+        cancelText="Keep Connected"
+        isDangerous={true}
+        isLoading={disconnecting}
+        onConfirm={handleConfirmDisconnect}
+        onCancel={() => setShowConfirmDisconnect(false)}
+      />
     </div>
   );
 }

@@ -1,117 +1,86 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
-import { _subscribe, _answer, ConfirmOptions } from "@/lib/confirm";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
-export function ConfirmDialog() {
-  const [opts, setOpts] = useState<ConfirmOptions | null>(null);
-  const [visible, setVisible] = useState(false);
-  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  isDangerous?: boolean;
+  onConfirm: () => void | Promise<void>;
+  onCancel: () => void;
+  isLoading?: boolean;
+}
 
-  useEffect(() => _subscribe(setOpts), []);
-
-  useEffect(() => {
-    if (opts) {
-      requestAnimationFrame(() => setVisible(true));
-      confirmBtnRef.current?.focus();
-    } else {
-      setVisible(false);
-    }
-  }, [opts]);
-
-  useEffect(() => {
-    if (!opts) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") _answer(false);
-      if (e.key === "Enter") _answer(true);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [opts]);
-
-  if (!opts) return null;
-
-  const isDanger = opts.danger ?? false;
-  const accent   = isDanger ? "#ef4444" : "var(--accent, #f59e0b)";
-  const accentBg = isDanger ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)";
+export function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  isDangerous = false,
+  onConfirm,
+  onCancel,
+  isLoading = false,
+}: ConfirmDialogProps) {
+  if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center px-4"
-      aria-modal="true"
-      role="dialog"
-    >
-      {/* Backdrop */}
+    <>
       <div
-        className="absolute inset-0 transition-opacity duration-200"
-        style={{
-          background: "rgba(0,0,0,0.45)",
-          backdropFilter: "blur(4px)",
-          opacity: visible ? 1 : 0,
-        }}
-        onClick={() => _answer(false)}
+        className="fixed inset-0 bg-black/50 z-40"
+        onClick={onCancel}
       />
-
-      {/* Card */}
-      <div
-        className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-200"
-        style={{
-          opacity: visible ? 1 : 0,
-          transform: visible ? "scale(1) translateY(0)" : "scale(0.94) translateY(12px)",
-        }}
-      >
-        {/* Top color strip */}
-        <div className="h-1 w-full" style={{ background: accent }} />
-
-        <div className="p-6">
-          {/* Icon + title */}
-          <div className="flex items-start gap-4 mb-5">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: accentBg }}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h2>
+            <button
+              onClick={onCancel}
+              disabled={isLoading}
+              className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
             >
-              {isDanger
-                ? <Trash2 size={18} style={{ color: accent }} />
-                : <AlertTriangle size={18} style={{ color: accent }} />
-              }
-            </div>
-            <div className="flex-1 pt-0.5">
-              <p className="text-base font-bold text-foreground leading-snug">
-                {opts.title}
-              </p>
-              {opts.description && (
-                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                  {opts.description}
-                </p>
-              )}
-            </div>
+              <X size={20} />
+            </button>
           </div>
 
-          {/* Hint */}
-          <p className="text-[11px] text-muted-foreground/60 mb-5">
-            Press <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-[10px]">Esc</kbd> to cancel
-          </p>
+          {/* Content */}
+          <div className="p-6">
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              {message}
+            </p>
+          </div>
 
-          {/* Buttons */}
-          <div className="flex gap-2.5">
-            <button
-              onClick={() => _answer(false)}
-              className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+          {/* Footer */}
+          <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+            <Button
+              onClick={onCancel}
+              disabled={isLoading}
+              variant="outline"
+              className="flex-1"
             >
-              {opts.cancelLabel ?? "Cancel"}
-            </button>
-            <button
-              ref={confirmBtnRef}
-              onClick={() => _answer(true)}
-              className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl text-white transition-all hover:opacity-90 active:scale-[0.98]"
-              style={{ background: accent }}
+              {cancelText}
+            </Button>
+            <Button
+              onClick={onConfirm}
+              disabled={isLoading}
+              className={`flex-1 ${
+                isDangerous
+                  ? "border-red-300 text-red-700 bg-red-50 hover:bg-red-100"
+                  : ""
+              }`}
             >
-              {opts.confirmLabel ?? (isDanger ? "Delete" : "Confirm")}
-            </button>
+              {confirmText}
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
