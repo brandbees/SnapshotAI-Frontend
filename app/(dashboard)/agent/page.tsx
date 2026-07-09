@@ -401,7 +401,7 @@ function SshPanel({ siteId, onStatusChange, refreshTrigger }: { siteId: string; 
             {status.username && status.host && (
               <span className="text-teal-600">{status.username}@{status.host}</span>
             )}
-            <span className="text-teal-500">{status.saved ? "· saved credentials · full access" : "· full access"}</span>
+            <span className="text-teal-500">{status.saved ? "· encrypted (AES-256-GCM) · full access" : "· full access"}</span>
           </div>
           <button onClick={promptDisconnect}
             className="flex items-center gap-1 text-teal-600 hover:text-red-600 transition-colors font-medium">
