@@ -23,20 +23,22 @@ const SUGGESTIONS_GLOBAL = [
   { q: "Is any site currently down?",                 icon: "📡" },
 ];
 
+// A few optional starter prompts. Performance optimization has its own dedicated
+// entry (the Start Performance Optimization button), not a predefined action here.
 const SUGGESTIONS_SITE = [
   { q: "What's the most urgent thing to fix?",              icon: "🚨" },
-  { q: "Is XML-RPC enabled? Is WP_DEBUG on?",               icon: "🔐" },
-  { q: "What are my largest autoloaded options?",           icon: "🗄️" },
-  { q: "Show me the last 100 lines of my error log",        icon: "📋" },
   { q: "What are my biggest media files?",                  icon: "🖼️" },
-  { q: "Check my file and folder permissions",              icon: "🔒" },
-  { q: "How many cron events do I have scheduled?",         icon: "⏰" },
-  { q: "Show my WooCommerce orders and revenue",            icon: "🛒" },
-  { q: "Do I have orphaned post meta rows?",                icon: "🗑️" },
   { q: "What plugins have known vulnerabilities?",          icon: "⚠️" },
-  { q: "Do I have too many post revisions?",                icon: "📝" },
-  { q: "Run an audit on this site",                         icon: "▶️" },
+  { q: "Show me the last 100 lines of my error log",        icon: "📋" },
 ];
+
+// Kicks off the free-form, agent-driven optimization flow. It measures first, speaks
+// in its own words, and takes a full backup (consented here) before any change.
+const OPTIMIZE_PROMPT =
+  "Start a performance optimization for this site. First measure the current PageSpeed and tell me — in your own words — what is actually slowing it down. Then we'll fix issues one at a time with my approval. I approve taking a full backup (database + files) before any changes are made.";
+
+const UNDO_PROMPT =
+  "Undo the optimization changes you made and restore the site to how it was before.";
 
 interface TokenState {
   tokens_used:      number;
@@ -1018,6 +1020,7 @@ function AgentInner() {
   const [showSshModal, setShowSshModal]           = useState(false);
   const [showSshUpgradeModal, setShowSshUpgradeModal] = useState(false);
   const [showTopupModal, setShowTopupModal]       = useState(false);
+  const [showOptimizeModal, setShowOptimizeModal] = useState(false);
   const [pendingMessage, setPendingMessage]       = useState("");
   // Message that failed on out-of-tokens; auto-resent once the balance is topped up.
   const pendingRetryRef = useRef<{ text: string; siteId: string } | null>(null);
@@ -1315,6 +1318,16 @@ function AgentInner() {
 
           {messages.length > 0 && (
             <>
+              {selectedSiteId && canUseAgent && (
+                <button
+                  onClick={() => { if (!loading) send(UNDO_PROMPT); }}
+                  disabled={loading}
+                  title="Undo the optimization changes the assistant made"
+                  className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 transition-colors border border-amber-200 disabled:opacity-50"
+                >
+                  <Undo2 size={11} /><span className="hidden sm:inline"> Undo changes</span>
+                </button>
+              )}
               <button
                 onClick={copyTranscript}
                 className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
@@ -1428,9 +1441,21 @@ function AgentInner() {
                 <h2 className="text-2xl font-bold tracking-tight mb-2 text-foreground">
                   {selectedSite ? `Let's look at ${selectedSite.name || selectedSite.url}` : "How can I help today?"}
                 </h2>
-                <p className="text-sm leading-relaxed mb-10 max-w-xs text-muted-foreground">
+                <p className="text-sm leading-relaxed mb-8 max-w-xs text-muted-foreground">
                   Live access to your audit scores, security signals, malware scans, and plugin data.
                 </p>
+
+                {/* Start Performance Optimization — dedicated entry point (site selected) */}
+                {selectedSite && canUseAgent && (
+                  <button
+                    onClick={() => setShowOptimizeModal(true)}
+                    className="group flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-semibold text-white mb-8 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+                    style={{ background: "var(--accent)", boxShadow: "0 6px 20px rgb(var(--accent-rgb) / 0.35)" }}
+                  >
+                    <Zap size={16} className="shrink-0" />
+                    Start Performance Optimization
+                  </button>
+                )}
 
                 {/* Suggestion grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
@@ -1595,6 +1620,62 @@ function AgentInner() {
           outOfCredits={isTokenLimitError}
           onClose={() => setShowTopupModal(false)}
         />
+      )}
+
+      {/* ── Start Performance Optimization modal (backup consent + flow) ───────── */}
+      {showOptimizeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowOptimizeModal(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                  <Zap size={16} className="text-accent" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Start Performance Optimization</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{selectedSite?.name || selectedSite?.url}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowOptimizeModal(false)} className="text-muted-foreground hover:text-foreground shrink-0">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+              <p>The assistant will optimize this site step by step:</p>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">1.</span> Measure your live PageSpeed and explain, in its own words, what's actually slowing the site down.</li>
+                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">2.</span> Fix issues <strong>one at a time, with your approval</strong> — nothing is applied in bulk.</li>
+                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">3.</span> Take a <strong>full backup (database + files) before any change</strong>, so everything is recoverable.</li>
+                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">4.</span> You verify the site after each change; you can say <strong>"undo"</strong> at any time.</li>
+              </ul>
+              {!sshActive && (
+                <div className="mt-1 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                  Tip: connect SSH (below the top bar) so the assistant can make server-side fixes, not just measure.
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground pt-1">
+                For a full restore in a worst-case scenario, a backup is always available under Site Details → Backups.
+              </p>
+            </div>
+
+            <div className="flex gap-3 px-5 pb-5">
+              <button
+                onClick={() => setShowOptimizeModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowOptimizeModal(false); send(OPTIMIZE_PROMPT); }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+                style={{ background: "var(--accent)" }}
+              >
+                Start &amp; Back Up
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Choose Site modal ────────────────────────────────────────────────── */}
