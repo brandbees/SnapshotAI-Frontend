@@ -3,16 +3,18 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
-         Zap, Play, FileText, Calendar, List, ShieldCheck, ExternalLink, Database, X,
+         Zap, Play, FileText, Calendar, List, ShieldCheck, Plus, Database, X,
          AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2,
          Terminal, Lock, KeyRound, ChevronUp, Wifi, WifiOff, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import api from "@/lib/api";
 import { mapSite, type RawSite } from "@/lib/mappers";
 import { useAuth } from "@/hooks/useAuth";
 import type { Site, AgentMessage } from "@/types";
 import { IconChip } from "@/components/ui/IconChip";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { TokenTopupModal } from "@/components/agent/TokenTopupModal";
 
 const SUGGESTIONS_GLOBAL = [
   { q: "Which site has the lowest overall score?",    icon: "📉" },
@@ -626,7 +628,7 @@ function ToolCallsSummary({ calls }: { calls: ToolCall[] }) {
   );
 }
 
-function TokenBar({ state }: { state: TokenState }) {
+function TokenBar({ state, onTopup }: { state: TokenState; onTopup?: () => void }) {
   const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
 
   // Compute actual remaining using server-supplied extra_remaining + base headroom.
@@ -656,6 +658,12 @@ function TokenBar({ state }: { state: TokenState }) {
         <span className={extraHeadroom <= 0 ? "text-red-500 font-medium" : "text-green-600 font-medium"}>
           +{fmt(state.tokens_extra)} extra
         </span>
+      )}
+      {onTopup && (
+        <button onClick={onTopup} title="Add tokens"
+          className="ml-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-colors shrink-0">
+          <Plus size={10} />
+        </button>
       )}
     </div>
   );
@@ -1009,7 +1017,13 @@ function AgentInner() {
   const [showSiteModal, setShowSiteModal]         = useState(false);
   const [showSshModal, setShowSshModal]           = useState(false);
   const [showSshUpgradeModal, setShowSshUpgradeModal] = useState(false);
+  const [showTopupModal, setShowTopupModal]       = useState(false);
   const [pendingMessage, setPendingMessage]       = useState("");
+  // Message that failed on out-of-tokens; auto-resent once the balance is topped up.
+  const pendingRetryRef = useRef<{ text: string; siteId: string } | null>(null);
+  // Always points at the latest sendWithSite so the (mount-once) top-up listener
+  // can retry with current state without re-subscribing.
+  const sendWithSiteRef = useRef<((text: string, siteId: string, addUserMsg: boolean) => Promise<void>) | null>(null);
   const [sshActive, setSshActive]                 = useState(false);
   const [sshPanelRefresh, setSshPanelRefresh]     = useState(0);
   // Track whether URL params have been applied so we only do it once
@@ -1131,6 +1145,10 @@ function AgentInner() {
           setTokenState({ tokens_used: resp!.data!.tokens_used!, tokens_limit: resp!.data!.tokens_limit ?? 0, tokens_extra: resp!.data!.tokens_extra ?? 0, extra_remaining: resp!.data!.extra_remaining, monthly_limit: resp!.data!.monthly_limit });
         });
         setError("Token limit reached. Purchase more tokens to continue.");
+        // Remember this message so we can auto-resend it after the user tops up,
+        // and surface the in-chat top-up modal (checkout opens in a new tab).
+        pendingRetryRef.current = { text, siteId };
+        setShowTopupModal(true);
       } else if (errCode === 'rate_limit' || resp?.status === 429) {
         setError(errMsg ?? "AI service is temporarily rate-limited. Please try again in a few minutes.");
       } else {
@@ -1143,6 +1161,43 @@ function AgentInner() {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [messages]);
+
+  // Keep the retry ref pointing at the freshest sendWithSite.
+  useEffect(() => { sendWithSiteRef.current = sendWithSite; });
+
+  // Listen for a successful token top-up from the checkout tab (BroadcastChannel,
+  // with a localStorage-event fallback). Refresh the balance in place — the chat is
+  // never remounted — and auto-resend the message that ran out of tokens.
+  useEffect(() => {
+    const onTopupSuccess = () => {
+      api.get<TokenState>("/agent/tokens").then(({ data }) => setTokenState(data)).catch(() => {});
+      setShowTopupModal(false);
+      setError(null);
+      const retry = pendingRetryRef.current;
+      pendingRetryRef.current = null;
+      if (retry) {
+        toast.success("Tokens added — resuming your request…");
+        // Let the balance settle before resending (no duplicate user bubble).
+        setTimeout(() => { sendWithSiteRef.current?.(retry.text, retry.siteId, false); }, 400);
+      } else {
+        toast.success("Tokens added to your balance.");
+      }
+    };
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("bbss-tokens");
+      bc.onmessage = (e) => { if (e.data?.type === "topup-success") onTopupSuccess(); };
+    } catch { /* browser without BroadcastChannel */ }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "bbss-topup-signal" && e.newValue) {
+        try { if (JSON.parse(e.newValue).type === "topup-success") onTopupSuccess(); } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => { bc?.close(); window.removeEventListener("storage", onStorage); };
+  }, []);
 
   // Site lookup
   const selectedSite = sites.find(s => s.id === selectedSiteId);
@@ -1256,7 +1311,7 @@ function AgentInner() {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {tokenState && canUseAgent && <div className="hidden sm:flex"><TokenBar state={tokenState} /></div>}
+          {tokenState && canUseAgent && <div className="hidden sm:flex"><TokenBar state={tokenState} onTopup={() => setShowTopupModal(true)} /></div>}
 
           {messages.length > 0 && (
             <>
@@ -1504,10 +1559,10 @@ function AgentInner() {
                     <div className="text-xs bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-center max-w-sm">
                       <p className="text-destructive font-medium">{error}</p>
                       {isTokenLimitError && (
-                        <a href="/settings?tab=billing"
+                        <button onClick={() => setShowTopupModal(true)}
                           className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-accent hover:underline">
-                          <ExternalLink size={11} /> Buy more tokens
-                        </a>
+                          <Zap size={11} /> Add tokens & continue
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1532,6 +1587,14 @@ function AgentInner() {
       {/* ── SSH Upgrade modal ─────────────────────────────────────────────────── */}
       {showSshUpgradeModal && (
         <SshUpgradeModal onClose={() => setShowSshUpgradeModal(false)} />
+      )}
+
+      {/* ── Token top-up modal (checkout opens in a new tab; chat stays intact) ── */}
+      {showTopupModal && (
+        <TokenTopupModal
+          outOfCredits={isTokenLimitError}
+          onClose={() => setShowTopupModal(false)}
+        />
       )}
 
       {/* ── Choose Site modal ────────────────────────────────────────────────── */}
