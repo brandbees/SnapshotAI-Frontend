@@ -1308,13 +1308,13 @@ function AgentInner() {
             <Sparkles size={15} />
           </IconChip>
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold text-foreground leading-none">AI Assistant</h1>
-            <p className="text-[11px] text-muted-foreground mt-0.5 hidden sm:block">Powered by real audit &amp; scan data</p>
+            <h1 className="text-sm font-semibold text-foreground leading-none whitespace-nowrap">AI Assistant</h1>
+            <p className="text-[11px] text-muted-foreground mt-0.5 hidden xl:block whitespace-nowrap">Powered by real audit &amp; scan data</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {tokenState && canUseAgent && <div className="hidden sm:flex"><TokenBar state={tokenState} onTopup={() => setShowTopupModal(true)} /></div>}
+          {tokenState && canUseAgent && <div className="hidden md:flex"><TokenBar state={tokenState} onTopup={() => setShowTopupModal(true)} /></div>}
 
           {messages.length > 0 && (
             <>
@@ -1322,18 +1322,19 @@ function AgentInner() {
                 <button
                   onClick={() => { if (!loading) send(UNDO_PROMPT); }}
                   disabled={loading}
-                  title="Undo the optimization changes the assistant made"
-                  className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 transition-colors border border-amber-200 disabled:opacity-50"
+                  title="Undo the changes the assistant made"
+                  className="flex items-center gap-1.5 px-2 lg:px-3 py-1.5 rounded-lg text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 transition-colors border border-amber-200 disabled:opacity-50"
                 >
-                  <Undo2 size={11} /><span className="hidden sm:inline"> Undo changes</span>
+                  <Undo2 size={11} /><span className="hidden lg:inline">Undo</span>
                 </button>
               )}
               <button
                 onClick={copyTranscript}
-                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
+                title="Copy transcript"
+                className="flex items-center gap-1.5 px-2 lg:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
               >
                 {copied ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
-                <span className="hidden sm:inline">{copied ? "Copied!" : "Copy transcript"}</span>
+                <span className="hidden lg:inline">{copied ? "Copied!" : "Copy"}</span>
               </button>
               <button
                 onClick={() => {
@@ -1343,9 +1344,10 @@ function AgentInner() {
                   }
                   setMessages([]); setToolCallsMap({}); setError(null);
                 }}
-                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
+                title="New chat"
+                className="flex items-center gap-1.5 px-2 lg:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
               >
-                <RotateCcw size={11} /><span className="hidden sm:inline"> New chat</span>
+                <RotateCcw size={11} /><span className="hidden lg:inline">New chat</span>
               </button>
             </>
           )}
