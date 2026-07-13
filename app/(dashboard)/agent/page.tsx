@@ -1641,20 +1641,27 @@ function AgentInner() {
               </button>
             </div>
 
-            <div className="p-5 space-y-3 text-sm text-gray-700 dark:text-gray-300">
-              <p>The assistant will optimize this site step by step:</p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">1.</span> Measure your live PageSpeed and explain, in its own words, what's actually slowing the site down.</li>
-                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">2.</span> Fix issues <strong>one at a time, with your approval</strong> — nothing is applied in bulk.</li>
-                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">3.</span> Take a <strong>full backup (database + files) before any change</strong>, so everything is recoverable.</li>
-                <li className="flex items-start gap-2"><span className="text-accent mt-0.5">4.</span> You verify the site after each change; you can say <strong>"undo"</strong> at any time.</li>
-              </ul>
+            <div className="p-5 space-y-4 text-sm text-gray-700 dark:text-gray-300">
+              <p>Here's how it works, step by step:</p>
+              <ol className="space-y-3">
+                {[
+                  "Measures your live PageSpeed and explains, in plain words, what's actually slowing the site down.",
+                  "Fixes issues one at a time — only with your approval. Nothing is applied in bulk.",
+                  "Takes a full backup (database + files) before any change, so everything is recoverable.",
+                  "You check the site after each change — and you can say “undo” at any time.",
+                ].map((text, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/10 text-accent text-xs font-semibold shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="leading-relaxed">{text}</span>
+                  </li>
+                ))}
+              </ol>
               {!sshActive && (
-                <div className="mt-1 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
                   Tip: connect SSH (below the top bar) so the assistant can make server-side fixes, not just measure.
                 </div>
               )}
-              <p className="text-xs text-muted-foreground pt-1">
+              <p className="text-xs text-muted-foreground">
                 For a full restore in a worst-case scenario, a backup is always available under Site Details → Backups.
               </p>
             </div>
