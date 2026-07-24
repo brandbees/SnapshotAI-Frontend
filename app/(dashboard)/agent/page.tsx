@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Send, ChevronDown, Loader2, Globe, RotateCcw, Sparkles, Copy, Check,
          Zap, Play, FileText, Calendar, List, ShieldCheck, Plus, Database, X,
          AlertTriangle, CheckCircle2, Trash2, Wrench, Undo2,
-         Terminal, Lock, KeyRound, ChevronUp, Wifi, WifiOff, Eye, EyeOff } from "lucide-react";
+         Terminal, Lock, KeyRound, ChevronUp, Wifi, WifiOff, Eye, EyeOff, Square } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -1035,6 +1035,8 @@ function AgentInner() {
   const [showOptimizeModal, setShowOptimizeModal] = useState(false);
   // Optimize mode routes chat to the thin, Cursor-style optimization loop (mode:'optimize').
   const optimizeModeRef = useRef(false);
+  // Set by the in-flight send() to a halt function; the Stop button calls it. Cleared when done.
+  const stopRef = useRef<(() => void) | null>(null);
   const [pendingMessage, setPendingMessage]       = useState("");
   // Message that failed on out-of-tokens; auto-resent once the balance is topped up.
   const pendingRetryRef = useRef<{ text: string; siteId: string } | null>(null);
@@ -1106,12 +1108,26 @@ function AgentInner() {
 
     let delivered = false;
     const pollDeadline = Date.now() + 5 * 60 * 1000;
+    // Aborts the POST locally; the Stop button also tells the backend to halt its loop.
+    const controller = new AbortController();
 
     const stopWork = () => {
       clearInterval(progressTimer);
+      stopRef.current = null;
       setWorkingStatus(null);
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    // Stop button hook — halt the server loop (frees the lock, stops spending), abort the
+    // local request, and close out the UI. Guarded by `delivered` so nothing races in after.
+    stopRef.current = () => {
+      if (delivered) return;
+      delivered = true;
+      api.post("/agent/stop", { progress_id: progressId }).catch(() => {});
+      controller.abort();
+      setMessages(prev => [...prev, { role: "assistant", content: "Stopped.", created_at: new Date().toISOString() }]);
+      stopWork();
     };
 
     const finishDelivery = (data: AgentReply) => {
@@ -1155,9 +1171,9 @@ function AgentInner() {
         history: messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
         progress_id: progressId,
         mode: optimizeModeRef.current ? "optimize" : undefined,
-      });
+      }, { signal: controller.signal });
 
-      if (delivered) return; // the poll already rendered the result
+      if (delivered) return; // the poll already rendered the result, or the user stopped
 
       if (data.needs_site_selection) {
         setPendingMessage(text);
@@ -1312,7 +1328,8 @@ function AgentInner() {
   }, [pendingMessage, selectedSiteId, sendWithSite]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
+    // Ignore Enter while a run is in flight — one turn at a time (use Stop to interrupt).
+    if (e.key === "Enter" && !e.shiftKey && !loading) { e.preventDefault(); send(input); }
   };
 
   const handleSiteChange = (id: string) => {
@@ -1818,26 +1835,42 @@ function AgentInner() {
                   className="no-focus-ring flex-1 resize-none bg-transparent text-sm text-foreground py-1 border-0 ring-0 disabled:cursor-not-allowed"
                   style={{ outline: "none", boxShadow: "none", overflowY: "auto", caretColor: "var(--accent)", minHeight: "28px", maxHeight: "140px" }}
                 />
-                <button
-                  onClick={() => send(input)}
-                  disabled={!input.trim() || loading || !canUseAgent}
-                  className="flex items-center justify-center shrink-0 transition-all disabled:cursor-not-allowed"
-                  style={{
-                    width: 36, height: 36,
-                    borderRadius: 12,
-                    background: input.trim() && !loading && canUseAgent
-                      ? "var(--gradient-brand)"
-                      : "var(--accent)",
-                    opacity: (!input.trim() || loading || !canUseAgent) ? 0.35 : 1,
-                    boxShadow: input.trim() && canUseAgent ? "0 2px 8px rgb(var(--accent-rgb) / 0.4)" : "none",
-                    transition: "all 0.2s ease",
-                  }}
-                  aria-label="Send"
-                >
-                  {loading
-                    ? <Loader2 size={15} className="text-white animate-spin" />
-                    : <Send size={14} className="text-white" style={{ transform: "translateX(1px)" }} />}
-                </button>
+                {loading ? (
+                  <button
+                    onClick={() => stopRef.current?.()}
+                    className="flex items-center justify-center shrink-0 transition-all group"
+                    style={{
+                      width: 36, height: 36,
+                      borderRadius: 12,
+                      background: "#dc2626",
+                      boxShadow: "0 2px 8px rgb(220 38 38 / 0.4)",
+                      transition: "all 0.2s ease",
+                    }}
+                    aria-label="Stop"
+                    title="Stop"
+                  >
+                    <Square size={13} className="text-white" fill="currentColor" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => send(input)}
+                    disabled={!input.trim() || !canUseAgent}
+                    className="flex items-center justify-center shrink-0 transition-all disabled:cursor-not-allowed"
+                    style={{
+                      width: 36, height: 36,
+                      borderRadius: 12,
+                      background: input.trim() && canUseAgent
+                        ? "var(--gradient-brand)"
+                        : "var(--accent)",
+                      opacity: (!input.trim() || !canUseAgent) ? 0.35 : 1,
+                      boxShadow: input.trim() && canUseAgent ? "0 2px 8px rgb(var(--accent-rgb) / 0.4)" : "none",
+                      transition: "all 0.2s ease",
+                    }}
+                    aria-label="Send"
+                  >
+                    <Send size={14} className="text-white" style={{ transform: "translateX(1px)" }} />
+                  </button>
+                )}
               </div>
             </div>
             <p className="text-[10px] text-center mt-2.5 tracking-wide text-muted-foreground">
