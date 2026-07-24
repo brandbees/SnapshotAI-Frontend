@@ -54,6 +54,18 @@ interface ToolCall {
   result: Record<string, unknown>;
 }
 
+// The agent's final answer — delivered either directly by the POST response or (when a
+// long run outlasts the reverse-proxy timeout) fetched from GET /agent/progress/:id.
+interface AgentReply {
+  reply:            string;
+  tool_calls?:      ToolCall[];
+  tokens_used?:     number;
+  tokens_limit?:    number;
+  tokens_extra?:    number;
+  extra_remaining?: number;
+  monthly_limit?:   number;
+}
+
 const TOOL_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   run_audit:                { label: "Audit triggered",           icon: Play,        color: "#1f5fb8" },
   send_report:              { label: "Report queued",             icon: FileText,    color: "#0ea5e9" },
@@ -1082,27 +1094,61 @@ function AgentInner() {
     setLoading(true);
     setError(null);
 
-    // Live progress feed — poll backend for the current working step while the request runs
+    // Live progress feed AND result delivery over one channel. A multi-round agent run
+    // can outlast the reverse-proxy timeout (~60s), which kills/retries the POST
+    // connection — so we do NOT rely on the POST response for the answer. The backend
+    // also stores the finished result under the same progress id; we poll for it and
+    // render whichever arrives first (POST or poll). This makes the proxy timeout
+    // harmless and also handles a gateway retry (its "busy" reply is ignored — the
+    // original run, same progress id, still delivers here).
     const progressId = crypto.randomUUID();
     setWorkingStatus(null);
+
+    let delivered = false;
+    const pollDeadline = Date.now() + 5 * 60 * 1000;
+
+    const stopWork = () => {
+      clearInterval(progressTimer);
+      setWorkingStatus(null);
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    const finishDelivery = (data: AgentReply) => {
+      if (delivered) return;
+      delivered = true;
+      setMessages(prev => [...prev, { role: "assistant", content: data.reply, created_at: new Date().toISOString() }]);
+      if (data.tool_calls?.length) {
+        setToolCallsMap(prev => ({ ...prev, [msgIndex]: data.tool_calls! }));
+      }
+      if (data.tokens_used != null) {
+        setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0, extra_remaining: data.extra_remaining, monthly_limit: data.monthly_limit });
+      }
+      stopWork();
+    };
+
     const progressTimer = setInterval(() => {
-      api.get<{ label: string | null }>(`/agent/progress/${progressId}`)
-        .then(({ data }) => { if (data.label) setWorkingStatus(data.label); })
+      if (delivered) { clearInterval(progressTimer); return; }
+      if (Date.now() > pollDeadline) {
+        setError("This is taking longer than usual. Your changes may still be applying — check the site, or try again in a moment.");
+        stopWork();
+        return;
+      }
+      api.get<{ label?: string | null; done?: boolean; result?: AgentReply }>(`/agent/progress/${progressId}`)
+        .then(({ data }) => {
+          if (delivered) return;
+          if (data.done && data.result) finishDelivery(data.result);
+          else if (data.label) setWorkingStatus(data.label);
+        })
         .catch(() => {});
-    }, 1200);
+    }, 1500);
 
     try {
-      const { data } = await api.post<{
-        reply: string;
-        tool_calls?: ToolCall[];
-        tokens_used?: number;
-        tokens_limit?: number;
-        tokens_extra?: number;
-        extra_remaining?: number;
-        monthly_limit?: number;
+      const { data } = await api.post<AgentReply & {
         needs_site_selection?: boolean;
         needs_ssh?: boolean;
         can_ssh?:   boolean;
+        busy?:      boolean;
       }>("/agent/chat", {
         message: text,
         site_id: siteId || undefined,
@@ -1111,10 +1157,12 @@ function AgentInner() {
         mode: optimizeModeRef.current ? "optimize" : undefined,
       });
 
+      if (delivered) return; // the poll already rendered the result
+
       if (data.needs_site_selection) {
         setPendingMessage(text);
         setShowSiteModal(true);
-        setLoading(false);
+        stopWork();
         return;
       }
 
@@ -1128,20 +1176,19 @@ function AgentInner() {
         } else {
           setShowSshUpgradeModal(true);
         }
-        setLoading(false);
+        stopWork();
         return;
       }
 
-      setMessages(prev => [...prev, { role: "assistant", content: data.reply, created_at: new Date().toISOString() }]);
-
-      if (data.tool_calls?.length) {
-        setToolCallsMap(prev => ({ ...prev, [msgIndex]: data.tool_calls! }));
+      if (data.busy) {
+        // A gateway retry hit the still-running original request. Don't render this —
+        // the original run (same progress id) will deliver its result via the poll.
+        return;
       }
 
-      if (data.tokens_used != null) {
-        setTokenState({ tokens_used: data.tokens_used, tokens_limit: data.tokens_limit ?? 0, tokens_extra: data.tokens_extra ?? 0, extra_remaining: data.extra_remaining, monthly_limit: data.monthly_limit });
-      }
+      finishDelivery(data);
     } catch (err: unknown) {
+      if (delivered) return;
       const resp = (err as { response?: { status?: number; data?: { error?: string; message?: string; tokens_used?: number; tokens_limit?: number; tokens_extra?: number; extra_remaining?: number; monthly_limit?: number } } })?.response;
       const errCode = resp?.data?.error;
       const errMsg  = resp?.data?.message;
@@ -1151,20 +1198,17 @@ function AgentInner() {
           setTokenState({ tokens_used: resp!.data!.tokens_used!, tokens_limit: resp!.data!.tokens_limit ?? 0, tokens_extra: resp!.data!.tokens_extra ?? 0, extra_remaining: resp!.data!.extra_remaining, monthly_limit: resp!.data!.monthly_limit });
         });
         setError("Token limit reached. Purchase more tokens to continue.");
-        // Remember this message so we can auto-resend it after the user tops up,
-        // and surface the in-chat top-up modal (checkout opens in a new tab).
         pendingRetryRef.current = { text, siteId };
         setShowTopupModal(true);
+        stopWork();
       } else if (errCode === 'rate_limit' || resp?.status === 429) {
         setError(errMsg ?? "AI service is temporarily rate-limited. Please try again in a few minutes.");
+        stopWork();
       } else {
-        setError(errMsg ?? errCode ?? "Something went wrong. Please try again.");
+        // Most likely the reverse-proxy closed the connection while the agent is still
+        // running (no HTTP response body). Do NOT error out — the result is coming over
+        // the poll. Keep polling; finishDelivery or the deadline handles the rest.
       }
-    } finally {
-      clearInterval(progressTimer);
-      setWorkingStatus(null);
-      setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [messages]);
 
