@@ -1021,6 +1021,8 @@ function AgentInner() {
   const [showSshUpgradeModal, setShowSshUpgradeModal] = useState(false);
   const [showTopupModal, setShowTopupModal]       = useState(false);
   const [showOptimizeModal, setShowOptimizeModal] = useState(false);
+  // Optimize mode routes chat to the thin, Cursor-style optimization loop (mode:'optimize').
+  const optimizeModeRef = useRef(false);
   const [pendingMessage, setPendingMessage]       = useState("");
   // Message that failed on out-of-tokens; auto-resent once the balance is topped up.
   const pendingRetryRef = useRef<{ text: string; siteId: string } | null>(null);
@@ -1106,6 +1108,7 @@ function AgentInner() {
         site_id: siteId || undefined,
         history: messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
         progress_id: progressId,
+        mode: optimizeModeRef.current ? "optimize" : undefined,
       });
 
       if (data.needs_site_selection) {
@@ -1343,6 +1346,7 @@ function AgentInner() {
                     setSshActive(false);
                   }
                   setMessages([]); setToolCallsMap({}); setError(null);
+                  optimizeModeRef.current = false;
                 }}
                 title="New chat"
                 className="flex items-center gap-1.5 px-2 lg:px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors border border-border"
@@ -1676,7 +1680,7 @@ function AgentInner() {
                 Cancel
               </button>
               <button
-                onClick={() => { setShowOptimizeModal(false); send(OPTIMIZE_PROMPT); }}
+                onClick={() => { optimizeModeRef.current = true; setShowOptimizeModal(false); send(OPTIMIZE_PROMPT); }}
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
                 style={{ background: "var(--accent)" }}
               >
